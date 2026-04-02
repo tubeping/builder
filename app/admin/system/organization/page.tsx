@@ -22,52 +22,84 @@ type Agent = {
   permission: "RW" | "RO";
 };
 
-const AGENTS: Agent[] = [
+/* 팀 정의 */
+type Team = {
+  name: string;
+  color: string;
+  members: Agent[];
+};
+
+const TEAMS: Team[] = [
   {
-    name: "튜핑 블로거",
-    nameEn: "TubePing Blogger",
-    icon: "✍️",
-    role: "콘텐츠팀",
-    desc: "SEO 최적화 블로그 콘텐츠를 기획·작성·발행하는 전문 에이전트",
-    file: ".claude/agents/tubeping-blogger.md",
-    status: "활성",
-    skills: ["키워드 리서치", "SEO 최적화", "콘텐츠 작성", "E-E-A-T 준수"],
-    permission: "RW",
+    name: "기획팀",
+    color: "bg-purple-100 border-purple-300",
+    members: [
+      { name: "전략이", nameEn: "Strategist", icon: "🧠", role: "기획팀", desc: "사업 기획서/제안서 작성, 시장 분석", file: "", status: "예정", skills: ["사업 기획", "시장 분석", "제안서 작성"], permission: "RW" },
+      { name: "벤치마커", nameEn: "Benchmarker", icon: "🔍", role: "기획팀", desc: "경쟁사 분석, 벤치마킹 리서치", file: "", status: "예정", skills: ["경쟁 분석", "벤치마킹", "트렌드 리서치"], permission: "RO" },
+      { name: "플래너", nameEn: "Planner", icon: "📋", role: "기획팀", desc: "프로젝트 일정 관리, 마일스톤 추적", file: "", status: "예정", skills: ["일정 관리", "마일스톤", "로드맵"], permission: "RW" },
+    ],
   },
   {
-    name: "리뷰엉이",
-    nameEn: "Review Owl",
-    icon: "🦉",
-    role: "콘텐츠팀",
-    desc: "노써치 스타일의 상품 리뷰·추천 사이트를 구축·관리하는 에이전트",
-    file: ".claude/agents/review-owl.md",
-    status: "활성",
-    skills: ["상품 리뷰", "점수 시스템", "구매가이드", "랭킹"],
-    permission: "RW",
+    name: "소싱팀",
+    color: "bg-blue-100 border-blue-300",
+    members: [
+      { name: "트렌디", nameEn: "Trendy", icon: "📈", role: "소싱팀", desc: "네이버 DataLab 트렌드 키워드 수집", file: "", status: "개발중", skills: ["DataLab API", "트렌드 분석", "키워드 수집"], permission: "RO" },
+      { name: "셀러", nameEn: "Seller", icon: "🛒", role: "소싱팀", desc: "셀러라이프 상품 데이터 수집", file: "", status: "개발중", skills: ["셀러라이프", "상품 수집", "가격 분석"], permission: "RO" },
+      { name: "스코어러", nameEn: "Scorer", icon: "🎯", role: "소싱팀", desc: "4가지 점수 계산 (트렌드/마진/시즌/채널적합)", file: "", status: "개발중", skills: ["점수 계산", "가중치 분석", "채널 매칭"], permission: "RO" },
+      { name: "리포터", nameEn: "Reporter", icon: "📊", role: "소싱팀", desc: "채널별 Excel 리포트 생성 + 추천", file: "", status: "개발중", skills: ["Excel 리포트", "채널별 추천", "데이터 시각화"], permission: "RW" },
+    ],
   },
   {
-    name: "세일즈 유튜버",
-    nameEn: "Sales YouTuber",
-    icon: "🎬",
-    role: "마케팅팀",
-    desc: "유튜브 쇼핑 채널 운영 및 영상 커머스 전략 에이전트",
-    file: "",
-    status: "예정",
-    skills: ["유튜브 쇼핑", "채널 운영", "영상 기획"],
-    permission: "RW",
+    name: "콘텐츠팀",
+    color: "bg-green-100 border-green-300",
+    members: [
+      { name: "블로거", nameEn: "Blogger", icon: "✍️", role: "콘텐츠팀", desc: "SEO 최적화 블로그 콘텐츠 기획·작성·발행", file: ".claude/agents/tubeping-blogger.md", status: "활성", skills: ["키워드 리서치", "SEO 최적화", "콘텐츠 작성", "E-E-A-T"], permission: "RW" },
+      { name: "리뷰엉이", nameEn: "Review Owl", icon: "🦉", role: "콘텐츠팀", desc: "노써치 스타일 상품 리뷰·추천 사이트 구축", file: ".claude/agents/review-owl.md", status: "활성", skills: ["상품 리뷰", "점수 시스템", "구매가이드", "랭킹"], permission: "RW" },
+      { name: "키워디", nameEn: "Keywordy", icon: "🔑", role: "콘텐츠팀", desc: "키워드 리서치 + 경쟁 분석", file: "", status: "예정", skills: ["키워드 분석", "검색량 조회", "경쟁도 분석"], permission: "RO" },
+      { name: "머시니", nameEn: "Machiny", icon: "⚙️", role: "콘텐츠팀", desc: "콘텐츠 머신 대기열 자동 처리", file: "", status: "예정", skills: ["자동 발행", "대기열 관리", "스케줄링"], permission: "RW" },
+      { name: "썸네일러", nameEn: "Thumbnailer", icon: "🎨", role: "콘텐츠팀", desc: "상품 이미지/배너 자동 생성", file: "", status: "예정", skills: ["이미지 생성", "배너 디자인", "썸네일"], permission: "RW" },
+    ],
   },
   {
-    name: "소싱봇",
-    nameEn: "Sourcing Bot",
-    icon: "📊",
-    role: "데이터팀",
-    desc: "네이버 DataLab + 셀러라이프 데이터 수집 및 소싱 점수 계산",
-    file: "",
-    status: "개발중",
-    skills: ["트렌드 수집", "상품 수집", "점수 계산", "Excel 리포트"],
-    permission: "RO",
+    name: "영업팀",
+    color: "bg-yellow-100 border-yellow-300",
+    members: [
+      { name: "세일즈", nameEn: "Sales YouTuber", icon: "🎬", role: "영업팀", desc: "유튜브 쇼핑 채널 운영 + 영상 커머스 전략", file: "", status: "예정", skills: ["유튜브 쇼핑", "채널 운영", "영상 기획"], permission: "RW" },
+      { name: "아웃리처", nameEn: "Outreacher", icon: "📧", role: "영업팀", desc: "유튜버 이메일 수집 + 아웃리치 메일 발송", file: "", status: "예정", skills: ["이메일 수집", "아웃리치", "템플릿 관리"], permission: "RW" },
+      { name: "시알엠", nameEn: "CRM Agent", icon: "🤝", role: "영업팀", desc: "유튜버 CRM 관리 + 팔로업 자동화", file: "", status: "예정", skills: ["CRM 관리", "팔로업", "파이프라인"], permission: "RW" },
+    ],
+  },
+  {
+    name: "커머스팀",
+    color: "bg-orange-100 border-orange-300",
+    members: [
+      { name: "프로덕터", nameEn: "Producter", icon: "📦", role: "커머스팀", desc: "상품 등록/수정/재고 관리", file: "", status: "예정", skills: ["상품 등록", "재고 관리", "카테고리"], permission: "RW" },
+      { name: "오더러", nameEn: "Orderer", icon: "🚚", role: "커머스팀", desc: "발주 자동화 + 배송 추적", file: "", status: "예정", skills: ["발주 관리", "배송 추적", "자동 발주"], permission: "RW" },
+      { name: "정산이", nameEn: "Settler", icon: "💰", role: "커머스팀", desc: "수수료 계산 + 정산서 생성", file: "", status: "예정", skills: ["수수료 계산", "정산서", "매출 집계"], permission: "RO" },
+    ],
+  },
+  {
+    name: "분석팀",
+    color: "bg-pink-100 border-pink-300",
+    members: [
+      { name: "대시보더", nameEn: "Dashboarder", icon: "📉", role: "분석팀", desc: "KPI 대시보드 데이터 집계", file: "", status: "예정", skills: ["KPI 집계", "대시보드", "지표 관리"], permission: "RO" },
+      { name: "인사이터", nameEn: "Insighter", icon: "💡", role: "분석팀", desc: "일간/주간 성장 인사이트 생성", file: "", status: "예정", skills: ["성장 분석", "인사이트", "리포트"], permission: "RO" },
+      { name: "모니터", nameEn: "Monitor", icon: "🔔", role: "분석팀", desc: "재고 부족/미정산/이상 징후 알림", file: "", status: "예정", skills: ["알림", "모니터링", "이상 탐지"], permission: "RO" },
+    ],
+  },
+  {
+    name: "개발팀",
+    color: "bg-cyan-100 border-cyan-300",
+    members: [
+      { name: "빌더", nameEn: "Builder", icon: "💻", role: "개발팀", desc: "프론트/백엔드 코드 구현", file: "", status: "예정", skills: ["Next.js", "TypeScript", "Tailwind", "API"], permission: "RW" },
+      { name: "테스터", nameEn: "Tester", icon: "🧪", role: "개발팀", desc: "빌드 검증 + E2E 테스트", file: "", status: "예정", skills: ["tsc 검증", "E2E 테스트", "빌드 체크"], permission: "RO" },
+      { name: "리뷰어", nameEn: "Reviewer", icon: "🔎", role: "개발팀", desc: "코드 리뷰 + 보안 점검", file: "", status: "예정", skills: ["코드 리뷰", "보안 점검", "품질 관리"], permission: "RO" },
+      { name: "디플로이", nameEn: "Deployer", icon: "🚀", role: "개발팀", desc: "Vercel 배포 + 모니터링", file: "", status: "예정", skills: ["배포", "Vercel", "CI/CD"], permission: "RW" },
+    ],
   },
 ];
+
+const ALL_AGENTS = TEAMS.flatMap((t) => t.members);
 
 const AGENT_STATUS_STYLE: Record<string, string> = {
   "활성": "bg-green-100 text-green-700",
@@ -192,17 +224,21 @@ const TYPOGRAPHY = [
 function AgentTab() {
   const [selected, setSelected] = useState<Agent | null>(null);
 
-  const activeCount = AGENTS.filter((a) => a.status === "활성").length;
-  const devCount = AGENTS.filter((a) => a.status === "개발중").length;
-  const plannedCount = AGENTS.filter((a) => a.status === "예정").length;
+  const activeCount = ALL_AGENTS.filter((a) => a.status === "활성").length;
+  const devCount = ALL_AGENTS.filter((a) => a.status === "개발중").length;
+  const plannedCount = ALL_AGENTS.filter((a) => a.status === "예정").length;
 
   return (
     <>
       {/* 요약 */}
-      <div className="grid grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-5 gap-4 mb-6">
         <div className="bg-white rounded-xl border border-gray-200 p-4 text-center">
-          <p className="text-3xl font-bold text-foreground">{AGENTS.length}</p>
+          <p className="text-3xl font-bold text-foreground">{ALL_AGENTS.length}<span className="text-base font-normal text-text-secondary ml-0.5">명</span></p>
           <p className="text-xs text-[#C41E1E] font-medium mt-1">전체 에이전트</p>
+        </div>
+        <div className="bg-white rounded-xl border border-gray-200 p-4 text-center">
+          <p className="text-3xl font-bold text-foreground">{TEAMS.length}<span className="text-base font-normal text-text-secondary ml-0.5">개</span></p>
+          <p className="text-xs text-[#C41E1E] font-medium mt-1">팀</p>
         </div>
         <div className="bg-white rounded-xl border border-gray-200 p-4 text-center">
           <p className="text-3xl font-bold text-green-600">{activeCount}</p>
@@ -218,50 +254,63 @@ function AgentTab() {
         </div>
       </div>
 
-      {/* 조직도 */}
+      {/* 조직도 — oh-car 스타일 */}
       <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
-        <h3 className="text-base font-bold text-foreground mb-6">AI 에이전트 조직도</h3>
-        <div className="flex flex-col items-center">
-          {/* Claude Code */}
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-base font-bold text-foreground">
+            AI 조직도 <span className="text-xs font-normal text-[#C41E1E] ml-2">{ALL_AGENTS.length}명</span>
+          </h3>
+        </div>
+
+        {/* CTO */}
+        <div className="flex justify-center mb-4">
           <div className="bg-[#C41E1E] text-white rounded-2xl px-8 py-4 text-center shadow-sm">
             <p className="text-2xl mb-1">🏗️</p>
-            <p className="text-sm font-bold">Claude Code</p>
-            <p className="text-[10px] opacity-80">오케스트레이터 · 기획 · 위임</p>
+            <p className="text-sm font-bold">Claude Code (CTO)</p>
+            <p className="text-[10px] opacity-80">설계 · 기획 · 위임</p>
           </div>
-          <div className="w-px h-6 bg-gray-300" />
-          <div className="w-[70%] h-px bg-gray-300" />
+        </div>
 
-          {/* Agent cards */}
-          <div className="grid grid-cols-4 gap-4 w-full mt-0">
-            {AGENTS.map((agent) => (
-              <div key={agent.name} className="flex flex-col items-center">
-                <div className="w-px h-6 bg-gray-300" />
-                <button
-                  onClick={() => setSelected(selected?.name === agent.name ? null : agent)}
-                  className={`w-full rounded-xl border-2 p-4 text-center transition-all cursor-pointer ${
-                    selected?.name === agent.name
-                      ? "border-[#C41E1E] bg-primary-light shadow-sm"
-                      : agent.status === "예정"
-                        ? "border-dashed border-gray-300 bg-gray-50"
-                        : "border-gray-200 bg-white hover:border-gray-300"
-                  }`}
-                >
-                  <span className="text-3xl">{agent.icon}</span>
-                  <p className="text-xs font-bold text-foreground mt-2">{agent.name}</p>
-                  <p className="text-[10px] text-text-tertiary mt-0.5">{agent.role}</p>
-                  <span className={`inline-block text-[9px] font-medium px-2 py-0.5 rounded-full mt-2 ${AGENT_STATUS_STYLE[agent.status]}`}>
-                    {agent.status}
-                  </span>
-                </button>
+        <div className="w-px h-6 bg-gray-300 mx-auto" />
+        <div className="w-[90%] h-px bg-gray-300 mx-auto" />
+
+        {/* Team cards — oh-car 스타일 */}
+        <div className="grid grid-cols-7 gap-3 mt-0">
+          {TEAMS.map((team) => (
+            <div key={team.name} className="flex flex-col items-center">
+              <div className="w-px h-6 bg-gray-300" />
+              <div className={`w-full rounded-xl border-2 ${team.color} p-3 min-h-[200px]`}>
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="text-xs font-bold text-foreground">{team.name}</h4>
+                  <span className="text-[10px] text-[#C41E1E] font-bold">{team.members.length}명</span>
+                </div>
+                <div className="space-y-1.5">
+                  {team.members.map((m) => (
+                    <button
+                      key={m.name}
+                      onClick={() => setSelected(selected?.name === m.name ? null : m)}
+                      className={`w-full flex items-center gap-1.5 p-1.5 rounded-lg text-left transition-all cursor-pointer ${
+                        selected?.name === m.name
+                          ? "bg-[#FFF0F3] border border-[#C41E1E]/30"
+                          : "hover:bg-white/80"
+                      }`}
+                    >
+                      <span className="text-sm">{m.icon}</span>
+                      <span className={`text-[11px] ${m.status === "활성" ? "font-bold text-foreground" : m.status === "개발중" ? "font-medium text-blue-700" : "text-text-tertiary"}`}>
+                        {m.name}
+                      </span>
+                    </button>
+                  ))}
+                </div>
               </div>
-            ))}
-          </div>
+            </div>
+          ))}
         </div>
       </div>
 
       {/* 선택된 에이전트 상세 */}
       {selected && (
-        <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6 animate-in">
+        <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
           <div className="flex items-start justify-between mb-4">
             <div className="flex items-center gap-3">
               <span className="text-4xl">{selected.icon}</span>
@@ -329,7 +378,7 @@ function AgentTab() {
             </tr>
           </thead>
           <tbody>
-            {AGENTS.map((agent) => (
+            {ALL_AGENTS.map((agent) => (
               <tr key={agent.name} className="border-b border-gray-50 last:border-0 hover:bg-gray-50/50">
                 <td className="px-6 py-3">
                   <div className="flex items-center gap-2">

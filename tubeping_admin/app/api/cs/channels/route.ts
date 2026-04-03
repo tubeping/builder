@@ -60,8 +60,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  // 웹훅 URL 업데이트 (id가 필요하므로 insert 후 업데이트)
-  const webhookUrl = `${baseUrl}/api/navertalk/webhook?channel_id=${data.id}`;
+  // 웹훅 URL 업데이트 (채널 타입별 경로)
+  const webhookPath = channel_type === "kakao" ? "kakaotalk" : "navertalk";
+  const webhookUrl = `${baseUrl}/api/${webhookPath}/webhook?channel_id=${data.id}`;
   await sb.from("cs_channels").update({ webhook_url: webhookUrl }).eq("id", data.id);
   data.webhook_url = webhookUrl;
 

@@ -112,6 +112,7 @@ export default function CSPage() {
 
   // 채널 등록 폼
   const [showAddChannel, setShowAddChannel] = useState(false);
+  const [addChannelType, setAddChannelType] = useState<"naver_talk" | "kakao">("naver_talk");
   const [channelForm, setChannelForm] = useState({ name: "", account_id: "", auth_key: "", store_id: "", memo: "" });
 
   // 필터
@@ -159,7 +160,7 @@ export default function CSPage() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        channel_type: "naver_talk",
+        channel_type: addChannelType,
         name: channelForm.name,
         account_id: channelForm.account_id,
         auth_key: channelForm.auth_key || null,
@@ -208,9 +209,10 @@ export default function CSPage() {
     if (!selectedTicket || !replyText.trim()) return;
     setReplying(true);
 
-    // 네이버톡톡이면 전용 발송 API 사용
-    if (selectedTicket.channel === "naver_talk") {
-      const res = await fetch("/admin/api/navertalk/send", {
+    // 네이버톡톡 / 카카오톡이면 전용 발송 API 사용
+    if (selectedTicket.channel === "naver_talk" || selectedTicket.channel === "kakao") {
+      const apiPath = selectedTicket.channel === "kakao" ? "/admin/api/kakaotalk/send" : "/admin/api/navertalk/send";
+      const res = await fetch(apiPath, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ticket_id: selectedTicket.id, message: replyText }),
@@ -220,6 +222,7 @@ export default function CSPage() {
         setSelectedTicket({ ...selectedTicket, reply: replyText, status: "replied", replied_at: new Date().toISOString() });
         setReplyText("");
         fetchTickets();
+        if (data.note) alert(data.note);
       } else {
         alert(`발송 실패: ${data.error}`);
       }
@@ -313,12 +316,20 @@ export default function CSPage() {
           </div>
         )}
         {activeTab === "channels" && (
-          <button
-            onClick={() => setShowAddChannel(true)}
-            className="px-4 py-2.5 bg-[#C41E1E] text-white text-sm font-medium rounded-lg hover:bg-[#A01818] cursor-pointer"
-          >
-            + 네이버톡톡 계정 추가
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={() => { setAddChannelType("naver_talk"); setShowAddChannel(true); }}
+              className="px-4 py-2.5 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700 cursor-pointer"
+            >
+              + 네이버톡톡
+            </button>
+            <button
+              onClick={() => { setAddChannelType("kakao"); setShowAddChannel(true); }}
+              className="px-4 py-2.5 bg-yellow-500 text-white text-sm font-medium rounded-lg hover:bg-yellow-600 cursor-pointer"
+            >
+              + 카카오톡
+            </button>
+          </div>
         )}
       </div>
 
@@ -353,38 +364,48 @@ export default function CSPage() {
           {/* 등록 폼 */}
           {showAddChannel && (
             <div className="mb-6 bg-white rounded-xl border border-gray-200 p-6">
-              <h2 className="text-base font-semibold text-gray-900 mb-4">네이버톡톡 계정 등록</h2>
+              <h2 className="text-base font-semibold text-gray-900 mb-4">
+                {addChannelType === "kakao" ? "카카오톡 채널 등록" : "네이버톡톡 계정 등록"}
+              </h2>
               <div className="grid grid-cols-2 gap-4 mb-4">
                 <div>
                   <label className="block text-xs font-medium text-gray-500 mb-1">계정 이름 *</label>
                   <input
                     type="text"
-                    placeholder="예: 신산 네이버톡톡"
+                    placeholder={addChannelType === "kakao" ? "예: 신산 카카오채널" : "예: 신산 네이버톡톡"}
                     value={channelForm.name}
                     onChange={(e) => setChannelForm({ ...channelForm, name: e.target.value })}
                     className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C41E1E]/20 focus:border-[#C41E1E]"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">파트너 ID *</label>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">
+                    {addChannelType === "kakao" ? "봇 ID / 채널 ID *" : "파트너 ID *"}
+                  </label>
                   <input
                     type="text"
-                    placeholder="파트너센터 > 개발자도구 > 챗봇API"
+                    placeholder={addChannelType === "kakao" ? "카카오 i 오픈빌더 > 설정 > 봇 ID" : "파트너센터 > 개발자도구 > 챗봇API"}
                     value={channelForm.account_id}
                     onChange={(e) => setChannelForm({ ...channelForm, account_id: e.target.value })}
                     className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C41E1E]/20 focus:border-[#C41E1E]"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">Authorization 키</label>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">
+                    {addChannelType === "kakao" ? "REST API 키" : "Authorization 키"}
+                  </label>
                   <input
                     type="password"
-                    placeholder="보내기 API 인증 키"
+                    placeholder={addChannelType === "kakao" ? "카카오 디벨로퍼스 > 앱 설정 > REST API 키" : "보내기 API 인증 키"}
                     value={channelForm.auth_key}
                     onChange={(e) => setChannelForm({ ...channelForm, auth_key: e.target.value })}
                     className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C41E1E]/20 focus:border-[#C41E1E]"
                   />
-                  <p className="text-[10px] text-gray-400 mt-1">파트너센터 &gt; API 설정 &gt; 보내기 API에서 확인</p>
+                  <p className="text-[10px] text-gray-400 mt-1">
+                    {addChannelType === "kakao"
+                      ? "developers.kakao.com > 내 애플리케이션 > 앱 키"
+                      : "파트너센터 > API 설정 > 보내기 API에서 확인"}
+                  </p>
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-500 mb-1">연결 스토어</label>
@@ -429,8 +450,8 @@ export default function CSPage() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
                 </svg>
               </div>
-              <p className="text-gray-500 text-sm mb-2">등록된 네이버톡톡 계정이 없습니다</p>
-              <p className="text-gray-400 text-xs">위의 &quot;+ 네이버톡톡 계정 추가&quot; 버튼으로 등록하세요</p>
+              <p className="text-gray-500 text-sm mb-2">등록된 채널 계정이 없습니다</p>
+              <p className="text-gray-400 text-xs">위의 &quot;+ 네이버톡톡&quot; 또는 &quot;+ 카카오톡&quot; 버튼으로 등록하세요</p>
             </div>
           ) : (
             <div className="space-y-4">
@@ -438,14 +459,21 @@ export default function CSPage() {
                 <div key={ch.id} className="bg-white rounded-xl border border-gray-200 p-5">
                   <div className="flex items-start justify-between">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-lg bg-emerald-100 flex items-center justify-center">
-                        <svg className="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                        ch.channel_type === "kakao" ? "bg-yellow-100" : "bg-emerald-100"
+                      }`}>
+                        <svg className={`w-5 h-5 ${ch.channel_type === "kakao" ? "text-yellow-600" : "text-emerald-600"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
                         </svg>
                       </div>
                       <div>
                         <div className="flex items-center gap-2">
                           <h3 className="text-sm font-bold text-gray-900">{ch.name}</h3>
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                            ch.channel_type === "kakao" ? "bg-yellow-100 text-yellow-800" : "bg-emerald-100 text-emerald-700"
+                          }`}>
+                            {ch.channel_type === "kakao" ? "카카오톡" : "네이버톡톡"}
+                          </span>
                           <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${
                             ch.status === "active" ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"
                           }`}>
@@ -453,7 +481,7 @@ export default function CSPage() {
                           </span>
                         </div>
                         <div className="flex items-center gap-3 mt-1 text-xs text-gray-500">
-                          <span>파트너ID: <span className="font-mono text-gray-700">{ch.account_id}</span></span>
+                          <span>{ch.channel_type === "kakao" ? "봇 ID" : "파트너ID"}: <span className="font-mono text-gray-700">{ch.account_id}</span></span>
                           {ch.stores?.name && <span>· {ch.stores.name}</span>}
                           {ch.memo && <span>· {ch.memo}</span>}
                         </div>
@@ -483,7 +511,9 @@ export default function CSPage() {
                   {ch.webhook_url && (
                     <div className="mt-3 bg-gray-50 rounded-lg p-3 flex items-center justify-between">
                       <div>
-                        <p className="text-[10px] font-medium text-gray-500 mb-0.5">웹훅 URL (파트너센터에 등록)</p>
+                        <p className="text-[10px] font-medium text-gray-500 mb-0.5">
+                          {ch.channel_type === "kakao" ? "스킬 서버 URL (오픈빌더에 등록)" : "웹훅 URL (파트너센터에 등록)"}
+                        </p>
                         <p className="text-xs font-mono text-gray-700 break-all">{ch.webhook_url}</p>
                       </div>
                       <button
@@ -503,23 +533,24 @@ export default function CSPage() {
           )}
 
           {/* 연동 안내 */}
-          <div className="mt-6 bg-[#FFF0F5] rounded-xl border border-[#C41E1E]/10 p-6">
-            <h3 className="text-sm font-bold text-[#C41E1E] mb-3">네이버톡톡 연동 방법</h3>
-            <div className="grid grid-cols-4 gap-4">
-              {[
-                { step: "1", title: "계정 추가", desc: "파트너 ID + Auth 키 입력" },
-                { step: "2", title: "웹훅 등록", desc: "생성된 URL을 파트너센터에 등록" },
-                { step: "3", title: "이벤트 선택", desc: "파트너센터에서 send 이벤트 활성화" },
-                { step: "4", title: "자동 수신", desc: "고객 메시지가 CS 관리에 자동 표시" },
-              ].map((item) => (
-                <div key={item.step} className="text-center">
-                  <div className="w-8 h-8 rounded-full bg-[#C41E1E] text-white font-bold text-sm flex items-center justify-center mx-auto mb-2">
-                    {item.step}
-                  </div>
-                  <p className="text-sm font-semibold text-gray-900">{item.title}</p>
-                  <p className="text-xs text-gray-500 mt-1">{item.desc}</p>
-                </div>
-              ))}
+          <div className="mt-6 grid grid-cols-2 gap-4">
+            <div className="bg-emerald-50 rounded-xl border border-emerald-200/50 p-5">
+              <h3 className="text-sm font-bold text-emerald-700 mb-3">네이버톡톡 연동</h3>
+              <ol className="space-y-2 text-xs text-gray-600">
+                <li><span className="font-bold text-emerald-700">1.</span> 위에서 계정 추가 (파트너 ID + Auth 키)</li>
+                <li><span className="font-bold text-emerald-700">2.</span> 생성된 웹훅 URL → 파트너센터에 등록</li>
+                <li><span className="font-bold text-emerald-700">3.</span> 파트너센터에서 send 이벤트 활성화</li>
+                <li><span className="font-bold text-emerald-700">4.</span> 고객 메시지 자동 수신 → 답변 자동 발송</li>
+              </ol>
+            </div>
+            <div className="bg-yellow-50 rounded-xl border border-yellow-200/50 p-5">
+              <h3 className="text-sm font-bold text-yellow-700 mb-3">카카오톡 연동</h3>
+              <ol className="space-y-2 text-xs text-gray-600">
+                <li><span className="font-bold text-yellow-700">1.</span> 위에서 계정 추가 (봇 ID + REST API 키)</li>
+                <li><span className="font-bold text-yellow-700">2.</span> 생성된 스킬 URL → 오픈빌더 스킬에 등록</li>
+                <li><span className="font-bold text-yellow-700">3.</span> 시나리오 블록에서 스킬 연결</li>
+                <li><span className="font-bold text-yellow-700">4.</span> 고객 메시지 자동 수신 → 접수 안내 자동 응답</li>
+              </ol>
             </div>
           </div>
         </>
@@ -803,6 +834,8 @@ export default function CSPage() {
                     ? "카페24 게시판에도 자동 동기화됩니다"
                     : selectedTicket.channel === "naver_talk"
                     ? "네이버톡톡으로 자동 발송됩니다"
+                    : selectedTicket.channel === "kakao"
+                    ? "카카오톡 콜백으로 발송 시도됩니다"
                     : "DB에만 저장됩니다"}
                 </p>
                 <button

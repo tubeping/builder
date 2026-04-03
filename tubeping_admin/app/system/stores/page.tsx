@@ -177,26 +177,6 @@ export default function StoresPage() {
                 className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C41E1E]/20 focus:border-[#C41E1E]"
               />
             </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">유튜브 채널</label>
-              <input
-                type="text"
-                placeholder="예: @comicmart"
-                value={addForm.channel}
-                onChange={(e) => setAddForm({ ...addForm, channel: e.target.value })}
-                className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C41E1E]/20 focus:border-[#C41E1E]"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">구독자 수</label>
-              <input
-                type="number"
-                placeholder="예: 1000000"
-                value={addForm.subscribers}
-                onChange={(e) => setAddForm({ ...addForm, subscribers: e.target.value })}
-                className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C41E1E]/20 focus:border-[#C41E1E]"
-              />
-            </div>
           </div>
           {addError && <p className="text-xs text-red-500 mb-3">{addError}</p>}
           <div className="flex items-center gap-2">

@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
 
   let query = sb
     .from("products")
-    .select("*, product_cafe24_mappings(id, store_id, cafe24_product_no, cafe24_product_code, sync_status, last_sync_at)", { count: "exact" })
+    .select("*, product_cafe24_mappings(id, store_id, cafe24_product_no, cafe24_product_code, sync_status, last_sync_at), product_variants(id, variant_code, option_name, option_value, price, quantity, display, selling)", { count: "exact" })
     .order("created_at", { ascending: false })
     .range(offset, offset + limit - 1);
 

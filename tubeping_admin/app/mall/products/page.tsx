@@ -15,6 +15,17 @@ type Cafe24Mapping = {
   last_sync_at: string | null;
 };
 
+type Variant = {
+  id: string;
+  variant_code: string | null;
+  option_name: string | null;
+  option_value: string | null;
+  price: number;
+  quantity: number;
+  display: string;
+  selling: string;
+};
+
 type Product = {
   id: string;
   tp_code: string;
@@ -27,9 +38,12 @@ type Product = {
   category: string | null;
   description: string | null;
   memo: string | null;
+  supplier: string | null;
+  total_stock: number;
   created_at: string;
   updated_at: string;
   product_cafe24_mappings: Cafe24Mapping[];
+  product_variants: Variant[];
 };
 
 type Store = {
@@ -581,6 +595,7 @@ export default function ProductsPage() {
                     <th className="text-right px-3 py-3 font-medium cursor-pointer hover:text-gray-900 select-none" onClick={() => handleSort("margin")}>
                       마진<SortIcon field="margin" />
                     </th>
+                    <th className="text-right px-3 py-3 font-medium">재고</th>
                     <th className="text-center px-3 py-3 font-medium">상태</th>
                     <th className="text-center px-3 py-3 font-medium">카페24 매핑</th>
                     <th className="text-center px-4 py-3 font-medium w-16">관리</th>
@@ -588,7 +603,7 @@ export default function ProductsPage() {
                 </thead>
                 <tbody>
                   {loading && products.length === 0 ? (
-                    <tr><td colSpan={10} className="px-6 py-16 text-center text-sm text-gray-400">상품 로딩 중...</td></tr>
+                    <tr><td colSpan={11} className="px-6 py-16 text-center text-sm text-gray-400">상품 로딩 중...</td></tr>
                   ) : sortedProducts.length === 0 ? (
                     <tr><td colSpan={10} className="px-6 py-16 text-center text-sm text-gray-400">
                       등록된 상품이 없습니다. &quot;상품 등록&quot; 버튼으로 첫 상품을 추가하세요.
@@ -625,6 +640,14 @@ export default function ProductsPage() {
                           <span className={`text-sm font-medium ${mr >= 30 ? "text-green-600" : mr >= 20 ? "text-blue-600" : "text-gray-500"}`}>
                             {marginRate(p.price, p.supply_price)}
                           </span>
+                        </td>
+                        <td className="px-3 py-2.5 text-right">
+                          <span className={`text-sm font-medium ${p.total_stock <= 0 ? "text-red-500" : p.total_stock < 10 ? "text-yellow-600" : "text-gray-700"}`}>
+                            {p.total_stock}
+                          </span>
+                          {(p.product_variants || []).length > 0 && (
+                            <span className="text-[10px] text-gray-400 ml-1">({(p.product_variants || []).length}옵션)</span>
+                          )}
                         </td>
                         <td className="px-3 py-2.5 text-center">
                           <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${p.selling === "T" ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
@@ -924,10 +947,22 @@ function EditProductModal({
     description: product.description || "",
     memo: product.memo || "",
   });
+  const [variants, setVariants] = useState<Variant[]>(product.product_variants || []);
+  const [deleteVariantIds, setDeleteVariantIds] = useState<string[]>([]);
+  const [activeTab, setActiveTab] = useState<"basic" | "variants" | "mappings">("basic");
   const [saving, setSaving] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState("");
   const [saveMsg, setSaveMsg] = useState("");
+
+  const buildSaveBody = () => ({
+    ...form,
+    price: Number(form.price) || 0,
+    supply_price: Number(form.supply_price) || 0,
+    retail_price: Number(form.retail_price) || 0,
+    variants: variants,
+    delete_variant_ids: deleteVariantIds,
+  });
 
   const handleSave = async () => {
     setSaving(true);
@@ -937,12 +972,7 @@ function EditProductModal({
       const res = await fetch(`/admin/api/products/${product.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...form,
-          price: Number(form.price) || 0,
-          supply_price: Number(form.supply_price) || 0,
-          retail_price: Number(form.retail_price) || 0,
-        }),
+        body: JSON.stringify(buildSaveBody()),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
@@ -966,12 +996,7 @@ function EditProductModal({
       const saveRes = await fetch(`/admin/api/products/${product.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...form,
-          price: Number(form.price) || 0,
-          supply_price: Number(form.supply_price) || 0,
-          retail_price: Number(form.retail_price) || 0,
-        }),
+        body: JSON.stringify(buildSaveBody()),
       });
       if (!saveRes.ok) throw new Error("저장 실패");
 
@@ -1056,80 +1081,176 @@ function EditProductModal({
             </div>
           </div>
 
-          {/* 기본 정보 */}
-          <Field label="상품명">
-            <input type="text" value={form.product_name} onChange={(e) => setForm({ ...form, product_name: e.target.value })} className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C41E1E]/20 focus:border-[#C41E1E]" />
-          </Field>
-
-          <div className="grid grid-cols-3 gap-4">
-            <Field label="판매가">
-              <div className="relative">
-                <span className="absolute left-3 top-2.5 text-sm text-gray-400">₩</span>
-                <input type="number" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} className="w-full pl-8 pr-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C41E1E]/20 focus:border-[#C41E1E]" />
-              </div>
-            </Field>
-            <Field label="공급가">
-              <div className="relative">
-                <span className="absolute left-3 top-2.5 text-sm text-gray-400">₩</span>
-                <input type="number" value={form.supply_price} onChange={(e) => setForm({ ...form, supply_price: e.target.value })} className="w-full pl-8 pr-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C41E1E]/20 focus:border-[#C41E1E]" />
-              </div>
-            </Field>
-            <Field label="소비자가">
-              <div className="relative">
-                <span className="absolute left-3 top-2.5 text-sm text-gray-400">₩</span>
-                <input type="number" value={form.retail_price} onChange={(e) => setForm({ ...form, retail_price: e.target.value })} className="w-full pl-8 pr-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C41E1E]/20 focus:border-[#C41E1E]" />
-              </div>
-            </Field>
+          {/* 탭 */}
+          <div className="flex gap-1 border-b border-gray-200">
+            {([
+              { key: "basic" as const, label: "기본 정보" },
+              { key: "variants" as const, label: `옵션/재고 (${variants.length})` },
+              { key: "mappings" as const, label: `카페24 매핑 (${mappings.length})` },
+            ]).map((t) => (
+              <button key={t.key} onClick={() => setActiveTab(t.key)} className={`px-4 py-2.5 text-sm font-medium cursor-pointer rounded-t-lg transition-colors ${activeTab === t.key ? "text-[#C41E1E] bg-white border border-gray-200 border-b-white -mb-px" : "text-gray-500 hover:text-gray-900"}`}>
+                {t.label}
+              </button>
+            ))}
           </div>
 
-          <div className="p-3 bg-gray-50 rounded-lg flex items-center gap-6">
-            <div className="text-xs text-gray-500">마진: <span className={`font-bold text-sm ${Number(margin) >= 30 ? "text-green-600" : Number(margin) >= 20 ? "text-blue-600" : "text-red-500"}`}>{margin}%</span></div>
-            <div className="text-xs text-gray-500">마진액: <span className="font-bold text-sm text-gray-900">₩{(Number(form.price) - Number(form.supply_price)).toLocaleString()}</span></div>
-          </div>
+          {/* ── 기본 정보 탭 ── */}
+          {activeTab === "basic" && (
+            <div className="space-y-4">
+              <Field label="상품명">
+                <input type="text" value={form.product_name} onChange={(e) => setForm({ ...form, product_name: e.target.value })} className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C41E1E]/20 focus:border-[#C41E1E]" />
+              </Field>
 
-          <Field label="판매 상태">
-            <select value={form.selling} onChange={(e) => setForm({ ...form, selling: e.target.value })} className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none cursor-pointer">
-              <option value="T">판매중</option>
-              <option value="F">미판매</option>
-            </select>
-          </Field>
-
-          <Field label="대표 이미지 URL">
-            <input type="text" value={form.image_url} onChange={(e) => setForm({ ...form, image_url: e.target.value })} placeholder="https://..." className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C41E1E]/20 focus:border-[#C41E1E]" />
-          </Field>
-
-          <Field label="카테고리">
-            <input type="text" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C41E1E]/20 focus:border-[#C41E1E]" />
-          </Field>
-
-          <Field label="상품 설명">
-            <textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={3} className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C41E1E]/20 focus:border-[#C41E1E]" />
-          </Field>
-
-          <Field label="관리자 메모">
-            <textarea value={form.memo} onChange={(e) => setForm({ ...form, memo: e.target.value })} rows={2} className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C41E1E]/20 focus:border-[#C41E1E]" />
-          </Field>
-
-          {/* 카페24 매핑 현황 */}
-          {mappings.length > 0 && (
-            <div>
-              <h3 className="text-xs font-medium text-gray-500 mb-2">카페24 매핑 ({mappings.length}개)</h3>
-              <div className="space-y-2">
-                {mappings.map((m) => (
-                  <div key={m.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                    <div>
-                      <p className="text-sm font-medium text-gray-900">{getStoreName(m.store_id)}</p>
-                      <p className="text-[10px] text-gray-400">
-                        {m.cafe24_product_code ? `코드: ${m.cafe24_product_code}` : ""}
-                        {m.cafe24_product_no ? ` · No: ${m.cafe24_product_no}` : ""}
-                      </p>
-                    </div>
-                    <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${SYNC_STATUS[m.sync_status]?.cls || "bg-gray-100 text-gray-500"}`}>
-                      {SYNC_STATUS[m.sync_status]?.label || m.sync_status}
-                    </span>
+              <div className="grid grid-cols-3 gap-4">
+                <Field label="판매가">
+                  <div className="relative">
+                    <span className="absolute left-3 top-2.5 text-sm text-gray-400">₩</span>
+                    <input type="number" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} className="w-full pl-8 pr-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C41E1E]/20 focus:border-[#C41E1E]" />
                   </div>
-                ))}
+                </Field>
+                <Field label="공급가">
+                  <div className="relative">
+                    <span className="absolute left-3 top-2.5 text-sm text-gray-400">₩</span>
+                    <input type="number" value={form.supply_price} onChange={(e) => setForm({ ...form, supply_price: e.target.value })} className="w-full pl-8 pr-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C41E1E]/20 focus:border-[#C41E1E]" />
+                  </div>
+                </Field>
+                <Field label="소비자가">
+                  <div className="relative">
+                    <span className="absolute left-3 top-2.5 text-sm text-gray-400">₩</span>
+                    <input type="number" value={form.retail_price} onChange={(e) => setForm({ ...form, retail_price: e.target.value })} className="w-full pl-8 pr-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C41E1E]/20 focus:border-[#C41E1E]" />
+                  </div>
+                </Field>
               </div>
+
+              <div className="p-3 bg-gray-50 rounded-lg flex items-center gap-6">
+                <div className="text-xs text-gray-500">마진: <span className={`font-bold text-sm ${Number(margin) >= 30 ? "text-green-600" : Number(margin) >= 20 ? "text-blue-600" : "text-red-500"}`}>{margin}%</span></div>
+                <div className="text-xs text-gray-500">마진액: <span className="font-bold text-sm text-gray-900">₩{(Number(form.price) - Number(form.supply_price)).toLocaleString()}</span></div>
+              </div>
+
+              <Field label="판매 상태">
+                <select value={form.selling} onChange={(e) => setForm({ ...form, selling: e.target.value })} className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none cursor-pointer">
+                  <option value="T">판매중</option>
+                  <option value="F">미판매</option>
+                </select>
+              </Field>
+
+              <Field label="대표 이미지 URL">
+                <input type="text" value={form.image_url} onChange={(e) => setForm({ ...form, image_url: e.target.value })} placeholder="https://..." className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C41E1E]/20 focus:border-[#C41E1E]" />
+              </Field>
+
+              <Field label="카테고리">
+                <input type="text" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C41E1E]/20 focus:border-[#C41E1E]" />
+              </Field>
+
+              <Field label="상품 설명">
+                <textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={3} className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C41E1E]/20 focus:border-[#C41E1E]" />
+              </Field>
+
+              <Field label="관리자 메모">
+                <textarea value={form.memo} onChange={(e) => setForm({ ...form, memo: e.target.value })} rows={2} className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C41E1E]/20 focus:border-[#C41E1E]" />
+              </Field>
+            </div>
+          )}
+
+          {/* ── 옵션/재고 탭 ── */}
+          {activeTab === "variants" && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-gray-500">옵션별 가격/재고를 관리합니다.</p>
+                <button
+                  onClick={() => setVariants([...variants, { id: "", variant_code: null, option_name: "", option_value: "", price: Number(form.price) || 0, quantity: 0, display: "T", selling: "T" } as Variant])}
+                  className="px-3 py-1.5 text-xs font-medium text-[#C41E1E] bg-[#FFF0F5] border border-[#C41E1E]/20 rounded-lg hover:bg-[#C41E1E]/10 cursor-pointer"
+                >
+                  + 옵션 추가
+                </button>
+              </div>
+
+              {variants.length === 0 ? (
+                <div className="py-8 text-center text-sm text-gray-400">등록된 옵션이 없습니다.</div>
+              ) : (
+                <div className="bg-white rounded-xl border border-gray-200">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="text-xs text-gray-500 border-b border-gray-100">
+                        <th className="text-left px-4 py-3 font-medium">옵션명</th>
+                        <th className="text-left px-3 py-3 font-medium">옵션값</th>
+                        <th className="text-right px-3 py-3 font-medium w-28">가격</th>
+                        <th className="text-right px-3 py-3 font-medium w-24">재고</th>
+                        <th className="text-center px-3 py-3 font-medium w-16">판매</th>
+                        <th className="text-center px-4 py-3 font-medium w-12">삭제</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {variants.map((v, idx) => (
+                        <tr key={v.id || `new-${idx}`} className="border-b border-gray-50 last:border-0">
+                          <td className="px-4 py-2.5">
+                            <input type="text" value={v.option_name || ""} onChange={(e) => { const next = [...variants]; next[idx] = { ...next[idx], option_name: e.target.value }; setVariants(next); }} placeholder="색상, 사이즈..." className="w-full px-2 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#C41E1E]/30" />
+                          </td>
+                          <td className="px-3 py-2.5">
+                            <input type="text" value={v.option_value || ""} onChange={(e) => { const next = [...variants]; next[idx] = { ...next[idx], option_value: e.target.value }; setVariants(next); }} placeholder="블랙, L..." className="w-full px-2 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#C41E1E]/30" />
+                          </td>
+                          <td className="px-3 py-2.5">
+                            <input type="number" value={v.price} onChange={(e) => { const next = [...variants]; next[idx] = { ...next[idx], price: Number(e.target.value) || 0 }; setVariants(next); }} className="w-full px-2 py-1.5 text-sm text-right border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#C41E1E]/30" />
+                          </td>
+                          <td className="px-3 py-2.5">
+                            <input type="number" value={v.quantity} onChange={(e) => { const next = [...variants]; next[idx] = { ...next[idx], quantity: Number(e.target.value) || 0 }; setVariants(next); }} className={`w-full px-2 py-1.5 text-sm text-right border rounded-lg focus:outline-none focus:ring-1 focus:ring-[#C41E1E]/30 ${v.quantity <= 0 ? "border-red-300 bg-red-50" : v.quantity < 10 ? "border-yellow-300 bg-yellow-50" : "border-gray-200"}`} />
+                          </td>
+                          <td className="px-3 py-2.5 text-center">
+                            <select value={v.selling} onChange={(e) => { const next = [...variants]; next[idx] = { ...next[idx], selling: e.target.value }; setVariants(next); }} className="text-xs border border-gray-200 rounded px-2 py-1.5 cursor-pointer focus:outline-none">
+                              <option value="T">판매</option>
+                              <option value="F">중지</option>
+                            </select>
+                          </td>
+                          <td className="px-4 py-2.5 text-center">
+                            <button onClick={() => {
+                              if (v.id) setDeleteVariantIds([...deleteVariantIds, v.id]);
+                              setVariants(variants.filter((_, i) => i !== idx));
+                            }} className="text-xs text-gray-400 hover:text-red-500 cursor-pointer">
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+
+                  <div className="px-4 py-3 border-t border-gray-100 bg-gray-50 rounded-b-xl flex items-center justify-between">
+                    <span className="text-xs text-gray-500">총 {variants.length}개 옵션</span>
+                    <div className="flex items-center gap-4 text-xs">
+                      <span className="text-gray-500">총 재고: <span className="font-bold text-gray-900">{variants.reduce((s, v) => s + v.quantity, 0)}</span></span>
+                      {variants.some((v) => v.quantity <= 0) && (
+                        <span className="text-red-500 font-medium">품절 {variants.filter((v) => v.quantity <= 0).length}개</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── 카페24 매핑 탭 ── */}
+          {activeTab === "mappings" && (
+            <div className="space-y-4">
+              {mappings.length === 0 ? (
+                <div className="py-8 text-center text-sm text-gray-400">매핑된 스토어가 없습니다. 인벤토리에서 &quot;스토어 매핑&quot;으로 추가하세요.</div>
+              ) : (
+                <div className="space-y-2">
+                  {mappings.map((m) => (
+                    <div key={m.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">{getStoreName(m.store_id)}</p>
+                        <p className="text-[10px] text-gray-400">
+                          {m.cafe24_product_code ? `코드: ${m.cafe24_product_code}` : ""}
+                          {m.cafe24_product_no ? ` · No: ${m.cafe24_product_no}` : ""}
+                        </p>
+                      </div>
+                      <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${SYNC_STATUS[m.sync_status]?.cls || "bg-gray-100 text-gray-500"}`}>
+                        {SYNC_STATUS[m.sync_status]?.label || m.sync_status}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 

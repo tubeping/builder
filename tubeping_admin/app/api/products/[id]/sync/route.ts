@@ -84,6 +84,19 @@ async function cafe24Put(mallId: string, token: string, productNo: number, updat
   return { ok: res.ok, status: res.status };
 }
 
+async function cafe24PutVariant(mallId: string, token: string, productNo: number, variantCode: string, update: Record<string, unknown>) {
+  const res = await fetch(`https://${mallId}.cafe24api.com/api/v2/admin/products/${productNo}/variants/${variantCode}`, {
+    method: "PUT",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+      "X-Cafe24-Api-Version": API_VERSION,
+    },
+    body: JSON.stringify({ shop_no: 1, request: update }),
+  });
+  return { ok: res.ok, status: res.status };
+}
+
 /**
  * POST /api/products/[id]/sync
  * TubePing 상품 → 매핑된 모든 카페24 스토어에 동기화
@@ -97,10 +110,10 @@ export async function POST(
   const { id } = await params;
   const sb = getServiceClient();
 
-  // 1. TubePing 상품 정보 조회
+  // 1. TubePing 상품 정보 조회 (배리언트 포함)
   const { data: product, error: pErr } = await sb
     .from("products")
-    .select("*, product_cafe24_mappings(*)")
+    .select("*, product_cafe24_mappings(*), product_variants(*)")
     .eq("id", id)
     .single();
 
@@ -159,8 +172,23 @@ export async function POST(
       continue;
     }
 
-    // 카페24 API로 상품 수정
+    // 카페24 API로 상품 기본 정보 수정
     const res = await cafe24Put(store.mall_id, token, mapping.cafe24_product_no, syncData);
+
+    // 배리언트(재고/옵션) 동기화
+    const tpVariants = product.product_variants || [];
+    if (res.ok && tpVariants.length > 0) {
+      for (const v of tpVariants) {
+        if (!v.variant_code) continue;
+        const variantUpdate: Record<string, unknown> = {
+          quantity: v.quantity,
+          price: String(v.price),
+          display: v.display,
+          selling: v.selling,
+        };
+        await cafe24PutVariant(store.mall_id, token, mapping.cafe24_product_no, v.variant_code, variantUpdate);
+      }
+    }
 
     if (res.ok) {
       await sb.from("product_cafe24_mappings").update({

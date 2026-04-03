@@ -126,6 +126,21 @@ export async function POST(request: NextRequest) {
       // 새로 등록
       const img = p.list_image || p.detail_image || p.small_image || null;
 
+      // 배리언트 정보 가져오기
+      let variants: { variant_code: string; options: { name: string; value: string }[]; price: string; quantity: number; display: string; selling: string }[] = [];
+      try {
+        const detailData = await cafe24Fetch(
+          `https://${MALL_ID}.cafe24api.com/api/v2/admin/products/${p.product_no}?embed=options,variants`
+        );
+        if (detailData?.product?.variants) {
+          variants = detailData.product.variants;
+        }
+      } catch { /* skip variant fetch */ }
+
+      const totalStock = variants.length > 0
+        ? variants.reduce((sum: number, v: { quantity: number }) => sum + (v.quantity || 0), 0)
+        : 0;
+
       const { data: newProduct, error } = await sb
         .from("products")
         .insert({
@@ -137,6 +152,8 @@ export async function POST(request: NextRequest) {
           image_url: img,
           selling: p.selling === "T" ? "T" : "F",
           description: p.simple_description || null,
+          supplier: p.supplier_name || null,
+          total_stock: totalStock,
         })
         .select("id")
         .single();
@@ -146,9 +163,23 @@ export async function POST(request: NextRequest) {
         continue;
       }
 
-      // 매핑 생성 (마스터몰)
+      // 배리언트 저장
+      if (newProduct && variants.length > 0) {
+        const variantRows = variants.map((v) => ({
+          product_id: newProduct.id,
+          variant_code: v.variant_code || null,
+          option_name: v.options?.length > 0 ? v.options.map((o) => o.name).join("/") : null,
+          option_value: v.options?.length > 0 ? v.options.map((o) => o.value).join("/") : null,
+          price: Number(v.price) || 0,
+          quantity: v.quantity || 0,
+          display: v.display || "T",
+          selling: v.selling || "T",
+        }));
+        await sb.from("product_variants").insert(variantRows);
+      }
+
+      // 매핑 생성
       if (newProduct) {
-        // 마스터몰 매핑은 storeId가 있으면 해당 스토어로
         if (storeId) {
           await sb
             .from("product_cafe24_mappings")

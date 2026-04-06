@@ -1,73 +1,61 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServiceClient } from "@/lib/supabase";
 
-const MASTER_MALL_ID = process.env.CAFE24_MALL_ID || "";
-const MASTER_CLIENT_ID = process.env.CAFE24_CLIENT_ID || "";
-const MASTER_CLIENT_SECRET = process.env.CAFE24_CLIENT_SECRET || "";
 const API_VERSION = "2026-03-01";
 
-/* ── 마스터 토큰 ── */
-let masterToken = {
-  access: process.env.CAFE24_ACCESS_TOKEN || "",
-  refresh: process.env.CAFE24_REFRESH_TOKEN || "",
-  expiresAt: Date.now() + 2 * 60 * 60 * 1000,
-};
+// 두 앱 모두 시도 (앱마다 설치된 몰이 다름)
+const APP_CREDENTIALS = [
+  { id: process.env.CAFE24_CLIENT_ID || "z87I2H98I55vjYfonHPPhC", secret: process.env.CAFE24_CLIENT_SECRET || "sMdTZQkKLF1kNlBRqsdUTD" },
+  { id: "5hl56sAYGJMmmrzCgZqwcC", secret: "vJghZUxLL9tgGmRFvs83BB" },
+];
 
-async function refreshMasterToken(): Promise<string> {
-  const res = await fetch(`https://${MASTER_MALL_ID}.cafe24api.com/api/v2/oauth/token`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
-      Authorization: `Basic ${Buffer.from(`${MASTER_CLIENT_ID}:${MASTER_CLIENT_SECRET}`).toString("base64")}`,
-    },
-    body: new URLSearchParams({ grant_type: "refresh_token", refresh_token: masterToken.refresh }),
-  });
-  if (!res.ok) throw new Error(`Master token refresh failed: ${res.status}`);
-  const data = await res.json();
-  masterToken = { access: data.access_token, refresh: data.refresh_token, expiresAt: new Date(data.expires_at).getTime() };
-  return data.access_token;
-}
-
-async function getMasterToken(): Promise<string> {
-  if (masterToken.access && masterToken.expiresAt > Date.now() + 60000) return masterToken.access;
-  return refreshMasterToken();
-}
-
-/* ── 스토어별 토큰 (DB에서 로드) ── */
+/* ── 통합 토큰 관리 (전부 DB 기반) ── */
 async function getStoreToken(store: { mall_id: string; access_token: string; refresh_token: string; token_expires_at: string | null; id: string }): Promise<string | null> {
   if (!store.access_token) return null;
 
+  // 1. 만료 전이면 현재 토큰 그대로 사용
   const expiresAt = store.token_expires_at ? new Date(store.token_expires_at).getTime() : 0;
   if (expiresAt > Date.now() + 60000) return store.access_token;
 
-  // 리프레시 시도
+  // 2. API 호출로 유효성 테스트
+  const testRes = await fetch(`https://${store.mall_id}.cafe24api.com/api/v2/admin/products?limit=1`, {
+    headers: { Authorization: `Bearer ${store.access_token}`, "X-Cafe24-Api-Version": API_VERSION },
+  });
+  if (testRes.ok) return store.access_token;
+
+  // 3. 만료됐으면 리프레시 시도 (두 앱 모두 시도)
   if (!store.refresh_token) return null;
 
-  try {
-    const res = await fetch(`https://${store.mall_id}.cafe24api.com/api/v2/oauth/token`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-        Authorization: `Basic ${Buffer.from(`${MASTER_CLIENT_ID}:${MASTER_CLIENT_SECRET}`).toString("base64")}`,
-      },
-      body: new URLSearchParams({ grant_type: "refresh_token", refresh_token: store.refresh_token }),
-    });
-    if (!res.ok) return null;
-    const data = await res.json();
+  for (const app of APP_CREDENTIALS) {
+    try {
+      const res = await fetch(`https://${store.mall_id}.cafe24api.com/api/v2/oauth/token`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          Authorization: `Basic ${Buffer.from(`${app.id}:${app.secret}`).toString("base64")}`,
+        },
+        body: new URLSearchParams({ grant_type: "refresh_token", refresh_token: store.refresh_token }),
+      });
+      if (!res.ok) continue;
+      const data = await res.json();
+      if (!data.access_token) continue;
 
-    // DB에 새 토큰 저장
-    const sb = getServiceClient();
-    await sb.from("stores").update({
-      access_token: data.access_token,
-      refresh_token: data.refresh_token,
-      token_expires_at: data.expires_at,
-      updated_at: new Date().toISOString(),
-    }).eq("id", store.id);
+      // DB에 새 토큰 저장
+      const sb = getServiceClient();
+      await sb.from("stores").update({
+        access_token: data.access_token,
+        refresh_token: data.refresh_token,
+        token_expires_at: data.expires_at,
+        updated_at: new Date().toISOString(),
+      }).eq("id", store.id);
 
-    return data.access_token;
-  } catch {
-    return null;
+      return data.access_token;
+    } catch {
+      continue;
+    }
   }
+
+  return null;
 }
 
 /* ── 카페24 API 호출 ── */
@@ -166,13 +154,8 @@ export async function POST(
       continue;
     }
 
-    // 토큰 가져오기
-    let token: string | null = null;
-    if (store.mall_id === MASTER_MALL_ID) {
-      try { token = await getMasterToken(); } catch { token = null; }
-    } else {
-      token = await getStoreToken(store);
-    }
+    // 토큰 가져오기 (DB 기반 자동 갱신)
+    const token = await getStoreToken(store);
 
     if (!token) {
       await sb.from("product_cafe24_mappings").update({ sync_status: "error" }).eq("id", mapping.id);

@@ -1,66 +1,69 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServiceClient } from "@/lib/supabase";
 
-const MALL_ID = process.env.CAFE24_MALL_ID || "";
-const CLIENT_ID = process.env.CAFE24_CLIENT_ID || "";
-const CLIENT_SECRET = process.env.CAFE24_CLIENT_SECRET || "";
+const MALL_ID = process.env.CAFE24_MALL_ID || "tubeping";
 const API_VERSION = "2026-03-01";
 
-let cachedToken = {
-  access: process.env.CAFE24_ACCESS_TOKEN || "",
-  refresh: process.env.CAFE24_REFRESH_TOKEN || "",
-  expiresAt: Date.now() + 2 * 60 * 60 * 1000,
-};
+const APP_CREDENTIALS = [
+  { id: process.env.CAFE24_CLIENT_ID || "z87I2H98I55vjYfonHPPhC", secret: process.env.CAFE24_CLIENT_SECRET || "sMdTZQkKLF1kNlBRqsdUTD" },
+  { id: "5hl56sAYGJMmmrzCgZqwcC", secret: "vJghZUxLL9tgGmRFvs83BB" },
+];
 
-async function refreshToken(): Promise<string> {
-  const res = await fetch(
-    `https://${MALL_ID}.cafe24api.com/api/v2/oauth/token`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-        Authorization: `Basic ${Buffer.from(`${CLIENT_ID}:${CLIENT_SECRET}`).toString("base64")}`,
-      },
-      body: new URLSearchParams({
-        grant_type: "refresh_token",
-        refresh_token: cachedToken.refresh,
-      }),
-    }
-  );
-  if (!res.ok) throw new Error(`Token refresh failed: ${res.status}`);
-  const data = await res.json();
-  cachedToken = {
-    access: data.access_token,
-    refresh: data.refresh_token,
-    expiresAt: new Date(data.expires_at).getTime(),
-  };
-  return data.access_token;
-}
+/* ── DB 기반 토큰 관리 ── */
+async function getTokenFromDB(): Promise<string | null> {
+  const sb = getServiceClient();
+  const { data: store } = await sb.from("stores").select("id, access_token, refresh_token, token_expires_at, mall_id")
+    .eq("mall_id", MALL_ID).single();
+  if (!store) return null;
 
-async function getToken(): Promise<string> {
-  if (cachedToken.access && cachedToken.expiresAt > Date.now() + 60000) {
-    return cachedToken.access;
+  // 만료 전이면 그대로
+  const expiresAt = store.token_expires_at ? new Date(store.token_expires_at).getTime() : 0;
+  if (store.access_token && expiresAt > Date.now() + 60000) return store.access_token;
+
+  // API 테스트
+  if (store.access_token) {
+    const testRes = await fetch(`https://${MALL_ID}.cafe24api.com/api/v2/admin/products?limit=1`, {
+      headers: { Authorization: `Bearer ${store.access_token}`, "X-Cafe24-Api-Version": API_VERSION },
+    });
+    if (testRes.ok) return store.access_token;
   }
-  return refreshToken();
+
+  // 리프레시
+  if (!store.refresh_token) return null;
+  for (const app of APP_CREDENTIALS) {
+    try {
+      const res = await fetch(`https://${MALL_ID}.cafe24api.com/api/v2/oauth/token`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          Authorization: `Basic ${Buffer.from(`${app.id}:${app.secret}`).toString("base64")}`,
+        },
+        body: new URLSearchParams({ grant_type: "refresh_token", refresh_token: store.refresh_token }),
+      });
+      if (!res.ok) continue;
+      const data = await res.json();
+      if (!data.access_token) continue;
+      await sb.from("stores").update({
+        access_token: data.access_token, refresh_token: data.refresh_token,
+        token_expires_at: data.expires_at, updated_at: new Date().toISOString(),
+      }).eq("id", store.id);
+      return data.access_token;
+    } catch { continue; }
+  }
+  return null;
 }
 
 async function cafe24Fetch(url: string) {
-  const token = await getToken();
+  const token = await getTokenFromDB();
+  if (!token) return null;
+
   const headers = {
     Authorization: `Bearer ${token}`,
     "Content-Type": "application/json",
     "X-Cafe24-Api-Version": API_VERSION,
   };
 
-  let res = await fetch(url, { headers });
-
-  if (res.status === 401) {
-    const newToken = await refreshToken();
-    res = await fetch(url, {
-      headers: { ...headers, Authorization: `Bearer ${newToken}` },
-    });
-  }
-
+  const res = await fetch(url, { headers });
   if (!res.ok) return null;
   return res.json();
 }

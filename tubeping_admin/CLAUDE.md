@@ -1,7 +1,7 @@
 # TubePing Admin — Claude 작업 지침
 
 ## 프로젝트 개요
-TubePing 운영 어드민 허브. 대시보드, 마케팅(블로그/콘텐츠머신/리뷰엉이), 종합몰(상품/발주/정산), 영업(유튜버 아웃리치), 시스템(작업관리/조직관리), 디자인시스템.
+TubePing 운영 어드민 허브. 대시보드, 영업/마케팅(컨텐츠·이메일영업), 종합몰(상품/발주/정산), 시스템(작업관리/조직관리), 디자인시스템.
 운영사: ㈜신산애널리틱스 / 서비스명: 튜핑(TubePing)
 
 ## 기술 스택
@@ -26,11 +26,17 @@ app/
 ├── _components/
 │   ├── sidebar.tsx         ← 네비게이션 사이드바
 │   └── admin-shell.tsx     ← 사이드바+메인 래퍼 (서브페이지용)
-├── marketing/
+├── marketing/              ← 영업/마케팅 > 컨텐츠
 │   ├── layout.tsx          ← AdminShell 래퍼
+│   ├── content/page.tsx    ← 컨텐츠 허브 (블로그+콘텐츠머신+리뷰엉이 탭)
 │   ├── blog/page.tsx
 │   ├── content-machine/page.tsx
 │   └── review-owl/
+│       ├── page.tsx
+│       └── _components/
+├── sales/                  ← 영업/마케팅 > 이메일 영업
+│   ├── layout.tsx
+│   └── outreach/
 │       ├── page.tsx
 │       └── _components/
 ├── mall/
@@ -38,11 +44,6 @@ app/
 │   ├── products/page.tsx
 │   ├── orders/page.tsx
 │   └── settlement/page.tsx
-├── sales/
-│   ├── layout.tsx
-│   └── outreach/
-│       ├── page.tsx
-│       └── _components/
 ├── system/
 │   ├── layout.tsx
 │   ├── tasks/page.tsx

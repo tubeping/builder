@@ -195,11 +195,9 @@ export default function CSPage() {
     try {
       const res = await fetch("/admin/api/cafe24/cs");
       const data = await res.json();
-      const total = data.total_synced || 0;
-      alert(`카페24 CS 수집 완료: ${total}건 동기화`);
       await fetchTickets();
     } catch {
-      alert("수집 실패");
+      // 수집 실패
     }
     setSyncing(false);
   };
@@ -222,9 +220,6 @@ export default function CSPage() {
         setSelectedTicket({ ...selectedTicket, reply: replyText, status: "replied", replied_at: new Date().toISOString() });
         setReplyText("");
         fetchTickets();
-        if (data.note) alert(data.note);
-      } else {
-        alert(`발송 실패: ${data.error}`);
       }
     } else {
       // 카페24/기타 기존 로직
@@ -238,7 +233,6 @@ export default function CSPage() {
         setSelectedTicket({ ...selectedTicket, reply: replyText, status: "replied", replied_at: new Date().toISOString() });
         setReplyText("");
         fetchTickets();
-        if (data.cafe24_synced) alert("답변 등록 + 카페24 동기화 완료");
       }
     }
     setReplying(false);
@@ -519,7 +513,6 @@ export default function CSPage() {
                       <button
                         onClick={() => {
                           navigator.clipboard.writeText(ch.webhook_url || "");
-                          alert("복사되었습니다");
                         }}
                         className="text-xs text-[#C41E1E] font-medium hover:underline cursor-pointer shrink-0 ml-3"
                       >

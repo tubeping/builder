@@ -27,6 +27,8 @@ interface Order {
   cafe24_shipping_synced: boolean;
   supplier_id: string | null;
   purchase_order_id: string | null;
+  auto_assign_status: string | null;
+  supplier_candidates: { supplier: string; supplierId: string; tpCode: string; productName: string; score: number }[] | null;
   stores: { name: string; mall_id: string } | null;
   suppliers: { name: string; email: string } | null;
 }
@@ -77,6 +79,7 @@ export default function OrdersPage() {
     params.set("limit", "500");
 
     const res = await fetch(`/admin/api/orders?${params}`);
+    if (!res.ok) { setLoading(false); return; }
     const data = await res.json();
     let list: Order[] = data.orders || [];
 
@@ -101,6 +104,9 @@ export default function OrdersPage() {
   }, [filterStatus, filterStore, filterSupplier, filterNoTracking, filterNoSupplier, dateFrom, dateTo, poTab, searchKeyword]);
 
   const fetchStores = async () => { const r = await fetch("/admin/api/stores"); const d = await r.json(); setStores(d.stores || []); };
+  const sb_patch = async (orderId: string, status: string) => {
+    await fetch("/admin/api/orders", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids: [orderId], updates: { auto_assign_status: status } }) });
+  };
   const fetchSuppliers = async () => { const r = await fetch("/admin/api/suppliers?status=active"); const d = await r.json(); setSuppliers(d.suppliers || []); };
 
   useEffect(() => { fetchOrders(); fetchStores(); fetchSuppliers(); }, [fetchOrders]);
@@ -147,6 +153,12 @@ export default function OrdersPage() {
   const handleCreatePOAndSend = async (supplierId: string) => {
     const orderIds = Array.from(selected);
     if (orderIds.length === 0) return;
+
+    // 이미 발주서가 있는 주문 체크
+    const alreadyPO = orders.filter(o => orderIds.includes(o.id) && o.purchase_order_id);
+    if (alreadyPO.length > 0) {
+      if (!confirm(`${alreadyPO.length}건은 이미 발주서가 생성되어 있습니다.\n중복 생성하시겠습니까?`)) return;
+    }
     const res = await fetch("/admin/api/purchase-orders", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -299,7 +311,7 @@ export default function OrdersPage() {
       </div>
 
       {/* 상단 요약 카드 */}
-      <div className="grid grid-cols-7 gap-3 mb-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3 mb-4">
         {[
           { label: "주문수량", value: `${stats.totalQty}개` },
           { label: "주문금액", value: `₩${stats.totalAmount.toLocaleString()}` },
@@ -385,11 +397,52 @@ export default function OrdersPage() {
               <option value="">공급사 배정</option>
               {suppliers.map((s) => (<option key={s.id} value={s.id}>{s.name}</option>))}
             </select>
-            <select onChange={(e) => { if (e.target.value) handleCreatePOAndSend(e.target.value); e.target.value = ""; }}
-              className="text-xs border border-blue-400 text-blue-700 bg-blue-50 rounded-lg px-2 py-1.5">
-              <option value="">발주서 생성+발송</option>
-              {suppliers.map((s) => (<option key={s.id} value={s.id}>{s.name}</option>))}
-            </select>
+            <button
+              onClick={() => {
+                // 선택된 주문의 공급사 확인
+                const selectedOrders = orders.filter(o => selected.has(o.id));
+                const supplierIds = [...new Set(selectedOrders.map(o => o.supplier_id).filter(Boolean))];
+
+                if (supplierIds.length === 0) {
+                  alert("선택한 주문에 배정된 공급사가 없습니다.\n먼저 공급사를 배정해주세요.");
+                  return;
+                }
+
+                if (supplierIds.length > 1) {
+                  // 여러 공급사 → 공급사별로 자동 분리
+                  const groups: Record<string, string[]> = {};
+                  for (const o of selectedOrders) {
+                    if (!o.supplier_id) continue;
+                    if (!groups[o.supplier_id]) groups[o.supplier_id] = [];
+                    groups[o.supplier_id].push(o.id);
+                  }
+                  const summary = Object.entries(groups).map(([sid, ids]) => {
+                    const sup = suppliers.find(s => s.id === sid);
+                    return `${sup?.name}: ${ids.length}건`;
+                  }).join("\n");
+
+                  if (!confirm(`공급사별로 발주서를 생성합니다.\n\n${summary}\n\n진행하시겠습니까?`)) return;
+
+                  (async () => {
+                    for (const [sid, ids] of Object.entries(groups)) {
+                      setSelected(new Set(ids));
+                      await handleCreatePOAndSend(sid);
+                    }
+                    setSelected(new Set());
+                    fetchOrders();
+                  })();
+                } else {
+                  // 단일 공급사
+                  const sup = suppliers.find(s => s.id === supplierIds[0]);
+                  if (confirm(`발주서를 생성하고 메일을 발송합니다.\n\n공급사: ${sup?.name}\n주문: ${selected.size}건\n\n진행하시겠습니까?`)) {
+                    handleCreatePOAndSend(supplierIds[0] as string);
+                  }
+                }
+              }}
+              className="px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded-lg hover:bg-blue-700 cursor-pointer"
+            >
+              선택 발주 ({selected.size})
+            </button>
           </>
         )}
       </div>
@@ -454,9 +507,30 @@ export default function OrdersPage() {
                       )}
                     </td>
                     <td className="px-2 py-2.5 text-xs text-gray-500 whitespace-nowrap">{o.stores?.name || "-"}</td>
-                    <td className="px-2 py-2.5 whitespace-nowrap">
+                    <td className="px-2 py-2.5 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                       {o.suppliers?.name ? (
-                        <span className="text-xs text-gray-700">{o.suppliers.name}</span>
+                        <span className="text-xs text-gray-700">{o.suppliers.name}
+                          {o.auto_assign_status === "auto" && <span className="text-[10px] text-green-500 ml-1">자동</span>}
+                        </span>
+                      ) : o.auto_assign_status === "review" && o.supplier_candidates && o.supplier_candidates.length > 0 ? (
+                        <div className="flex flex-col gap-0.5">
+                          <span className="text-[10px] text-orange-500 font-medium">확인필요</span>
+                          {o.supplier_candidates.map((c, ci) => (
+                            <button key={ci} onClick={async () => {
+                              await fetch("/admin/api/orders", {
+                                method: "PATCH", headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ ids: [o.id], updates: { supplier_id: c.supplierId } }),
+                              });
+                              await sb_patch(o.id, "manual");
+                              fetchOrders();
+                            }}
+                              className="text-[11px] text-left text-blue-600 hover:underline cursor-pointer truncate max-w-[120px]"
+                              title={`${c.supplier} (${c.score}점) - ${c.productName}`}
+                            >
+                              {c.supplier} ({c.score}점)
+                            </button>
+                          ))}
+                        </div>
                       ) : (
                         <span className="text-[11px] text-red-400 font-medium">미배정</span>
                       )}

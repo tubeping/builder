@@ -128,7 +128,7 @@ export default function SellersPage() {
       </div>
 
       {/* Summary */}
-      <div className="grid grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         {[
           { label: "전체 판매자", value: `${sellers.length}개` },
           { label: "활성", value: `${activeSellers}개` },
@@ -146,7 +146,7 @@ export default function SellersPage() {
       {showForm && (
         <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
           <h3 className="text-sm font-semibold text-gray-900 mb-4">새 판매자 등록</h3>
-          <div className="grid grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {[
               { key: "name", label: "판매자명 *", ph: "완선몰" },
               { key: "mall_id", label: "카페24 Mall ID", ph: "shinsan006" },
@@ -170,6 +170,8 @@ export default function SellersPage() {
       <div className="bg-white rounded-xl border border-gray-200">
         {loading ? (
           <div className="p-12 text-center text-gray-400">불러오는 중...</div>
+        ) : sellers.length === 0 ? (
+          <div className="p-12 text-center text-gray-400">등록된 판매자가 없습니다. 위의 &quot;+ 판매자 추가&quot; 버튼으로 추가하세요.</div>
         ) : (
           <table className="w-full">
             <thead>

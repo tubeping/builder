@@ -452,7 +452,7 @@ export default function ProductsPage() {
       )}
 
       {/* Stats */}
-      <div className="grid grid-cols-5 gap-4 mb-6">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
         {[
           { label: "전체 상품", value: total, color: "text-gray-900" },
           { label: "판매중", value: sellingCount, color: "text-green-600" },
@@ -740,7 +740,7 @@ export default function ProductsPage() {
           {/* 카드 뷰 */}
           {viewMode === "card" && (
             <div>
-              <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                 {sortedProducts.map((p) => {
                   const isSelected = selectedProducts.has(p.id);
                   const mr = marginNum(p.price, p.supply_price);
@@ -930,7 +930,7 @@ function AddProductModal({ onClose, onCreated, stores }: { onClose: () => void; 
   return (
     <div className="fixed inset-0 z-50 flex">
       <div className="flex-1 bg-black/30" onClick={onClose} />
-      <div className="w-[560px] bg-white h-full overflow-y-auto shadow-xl border-l border-gray-200">
+      <div className="w-full sm:w-[560px] bg-white h-full overflow-y-auto shadow-xl border-l border-gray-200">
         <div className="sticky top-0 z-10 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <button onClick={onClose} className="p-1.5 hover:bg-gray-100 rounded-lg cursor-pointer">
@@ -1138,7 +1138,7 @@ function EditProductModal({
   return (
     <div className="fixed inset-0 z-50 flex">
       <div className="flex-1 bg-black/30" onClick={onClose} />
-      <div className="w-[600px] bg-white h-full overflow-y-auto shadow-xl border-l border-gray-200">
+      <div className="w-full sm:w-[600px] bg-white h-full overflow-y-auto shadow-xl border-l border-gray-200">
         <div className="sticky top-0 z-10 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <button onClick={onClose} className="p-1.5 hover:bg-gray-100 rounded-lg cursor-pointer">
@@ -1713,7 +1713,7 @@ function OverviewTab({
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-4 lg:grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         {[
           { label: "전체 상품", value: products.length, color: "text-gray-900" },
           { label: "판매중", value: sellingCount, color: "text-green-600" },
@@ -1777,7 +1777,7 @@ function OverviewTab({
 
       <div className="bg-[#FFF0F5] rounded-xl border border-[#C41E1E]/10 p-6">
         <h3 className="text-sm font-bold text-[#C41E1E] mb-3">운영 흐름</h3>
-        <div className="grid grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {[
             { step: "1", title: "상품 등록", desc: "TubePing 자체코드(TP-XXXX)로 상품 통합 관리" },
             { step: "2", title: "카페24 매핑", desc: "자체 상품을 여러 카페24 스토어에 매핑" },

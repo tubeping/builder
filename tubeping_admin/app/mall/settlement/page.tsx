@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, Fragment } from "react";
 import * as XLSX from "xlsx";
 
 // ─── Types ───
@@ -188,13 +188,20 @@ export default function SettlementPage() {
 
   const fetchSettlements = useCallback(async () => {
     setLoading(true);
-    const params = new URLSearchParams();
-    if (period) params.set("period", period);
-    if (filterStore) params.set("store_id", filterStore);
-    const res = await fetch(`/admin/api/settlements?${params}`);
-    const data = await res.json();
-    setSettlements(data.settlements || []);
-    setLoading(false);
+    try {
+      const params = new URLSearchParams();
+      if (period) params.set("period", period);
+      if (filterStore) params.set("store_id", filterStore);
+      const res = await fetch(`/admin/api/settlements?${params}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      setSettlements(data.settlements || []);
+    } catch (err) {
+      console.error("정산 로드 실패:", err);
+      setSettlements([]);
+    } finally {
+      setLoading(false);
+    }
   }, [period, filterStore]);
 
   const fetchSupplierSummary = useCallback(async () => {
@@ -324,7 +331,7 @@ export default function SettlementPage() {
         </div>
 
         {detailTab === "summary" && (
-          <div className="grid grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="bg-white rounded-xl border border-gray-200 p-6">
               <h3 className="text-sm font-semibold text-gray-900 mb-4">매출</h3>
               <div className="space-y-3">
@@ -574,7 +581,7 @@ export default function SettlementPage() {
             </select>
           </div>
 
-          <div className="grid grid-cols-4 gap-4 mb-6">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
             {[
               { label: "총 순매출", value: W(totalSales) },
               { label: "총 순익", value: W(totalProfit) },
@@ -645,7 +652,7 @@ export default function SettlementPage() {
             )}
           </div>
 
-          <div className="grid grid-cols-3 gap-4 mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
             {[
               { label: "공급사 수", value: `${supplierData.length}개` },
               { label: "공급가+배송비 합계", value: W(supTotalAmount) },
@@ -679,8 +686,8 @@ export default function SettlementPage() {
                 </thead>
                 <tbody>
                   {supplierData.map((sup) => (
-                    <>
-                      <tr key={sup.supplier_id} className="border-b border-gray-50 hover:bg-gray-50/50">
+                    <Fragment key={sup.supplier_id}>
+                      <tr className="border-b border-gray-50 hover:bg-gray-50/50">
                         <td className="px-6 py-3.5 text-sm font-medium text-gray-900">{sup.supplier_name}</td>
                         <td className="px-3 py-3.5 text-sm text-gray-700 text-right">{sup.item_count}건</td>
                         <td className="px-3 py-3.5 text-sm text-gray-700 text-right">{sup.total_quantity}개</td>
@@ -706,7 +713,7 @@ export default function SettlementPage() {
                           <td className="px-6 py-2.5"></td>
                         </tr>
                       ))}
-                    </>
+                    </Fragment>
                   ))}
                 </tbody>
               </table>

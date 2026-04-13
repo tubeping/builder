@@ -136,10 +136,17 @@ export default function CSPage() {
     if (filterType) params.set("ticket_type", filterType);
     if (keyword) params.set("keyword", keyword);
 
-    const res = await fetch(`/admin/api/cs?${params}`);
-    const data = await res.json();
-    setTickets(data.tickets || []);
-    setLoading(false);
+    try {
+      const res = await fetch(`/admin/api/cs?${params}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      setTickets(data.tickets || []);
+    } catch (err) {
+      console.error("CS 로드 실패:", err);
+      setTickets([]);
+    } finally {
+      setLoading(false);
+    }
   }, [filterChannel, filterStatus, filterStore, filterType, keyword]);
 
   const fetchStores = async () => {
@@ -655,7 +662,7 @@ export default function CSPage() {
       {/* Main Content — List + Detail Split */}
       <div className="flex gap-4">
         {/* Ticket List */}
-        <div className={`bg-white rounded-xl border border-gray-200 overflow-hidden ${selectedTicket ? "w-1/2" : "w-full"}`}>
+        <div className={`bg-white rounded-xl border border-gray-200 overflow-hidden ${selectedTicket ? "hidden lg:block lg:w-1/2" : "w-full"}`}>
           {loading ? (
             <div className="p-12 text-center text-gray-400">불러오는 중...</div>
           ) : tickets.length === 0 ? (
@@ -717,11 +724,12 @@ export default function CSPage() {
 
         {/* Detail Panel */}
         {selectedTicket && (
-          <div className="w-1/2 bg-white rounded-xl border border-gray-200 overflow-hidden flex flex-col">
+          <div className="w-full lg:w-1/2 bg-white rounded-xl border border-gray-200 overflow-hidden flex flex-col">
             {/* Detail Header */}
             <div className="px-5 py-4 border-b border-gray-100">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
+                  <button onClick={() => setSelectedTicket(null)} className="lg:hidden p-1 hover:bg-gray-100 rounded text-gray-400 cursor-pointer">←</button>
                   <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${CHANNEL_STYLE[selectedTicket.channel]}`}>
                     {CHANNEL_LABEL[selectedTicket.channel] || selectedTicket.channel}
                   </span>

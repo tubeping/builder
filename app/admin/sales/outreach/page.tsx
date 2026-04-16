@@ -4,10 +4,14 @@ import { useState } from "react";
 import EmailCollector from "./_components/email-collector";
 import EmailSender from "./_components/email-sender";
 import CrmManager from "./_components/crm-manager";
+import SentList from "./_components/sent-list";
+import ContractList from "./_components/contract-list";
 
 const TABS = [
   { key: "collect", label: "이메일 수집", icon: "🔍" },
   { key: "send", label: "메일 발송", icon: "✉️" },
+  { key: "sent", label: "발송 완료", icon: "📬" },
+  { key: "contract", label: "계약 목록", icon: "📝" },
   { key: "crm", label: "CRM 관리", icon: "📊" },
 ] as const;
 
@@ -47,6 +51,8 @@ export default function OutreachPage() {
       {/* Tab Content */}
       {activeTab === "collect" && <EmailCollector />}
       {activeTab === "send" && <EmailSender />}
+      {activeTab === "sent" && <SentList />}
+      {activeTab === "contract" && <ContractList />}
       {activeTab === "crm" && <CrmManager />}
     </div>
   );

@@ -149,6 +149,51 @@ const DUMMY_RECOMMENDATIONS: Record<string, RecommendProduct[]> = {
   "식품": [
     { id: "r14", keyword: "그릭요거트 무가당", category: "식품", stars: 4.5, score: 74.6, searchVolume: 55800, clicks: 6400, ctr: 2.6, isShopping: true, contentScore: 75, purchaseScore: 72, demandScore: 70, trendScore: 78, audienceScore: 80, trendTag: "급상승" },
     { id: "r15", keyword: "곤약젤리 다이어트", category: "식품", stars: 4, score: 63.2, searchVolume: 42100, clicks: 4900, ctr: 2.3, isShopping: true, contentScore: 65, purchaseScore: 60, demandScore: 62, trendScore: 65, audienceScore: 68 },
+    { id: "r16", keyword: "닭가슴살 스테이크", category: "식품", stars: 4.5, score: 70.1, searchVolume: 68200, clicks: 7100, ctr: 2.4, isShopping: true, contentScore: 72, purchaseScore: 68, demandScore: 72, trendScore: 65, audienceScore: 75 },
+    { id: "r17", keyword: "프로틴바 저당", category: "식품", stars: 4, score: 65.8, searchVolume: 51300, clicks: 5800, ctr: 2.2, isShopping: true, contentScore: 68, purchaseScore: 62, demandScore: 65, trendScore: 70, audienceScore: 68, trendTag: "급상승" },
+    { id: "r18", keyword: "수제 그래놀라", category: "식품", stars: 4, score: 58.4, searchVolume: 32400, clicks: 3700, ctr: 1.9, isShopping: true, contentScore: 60, purchaseScore: 55, demandScore: 52, trendScore: 62, audienceScore: 65 },
+  ],
+  "패션의류": [
+    { id: "f1", keyword: "오버핏 반팔티", category: "패션의류", stars: 5, score: 82.3, searchVolume: 125000, clicks: 14200, ctr: 3.1, isShopping: true, contentScore: 80, purchaseScore: 85, demandScore: 88, trendScore: 78, audienceScore: 82, trendTag: "급상승" },
+    { id: "f2", keyword: "와이드 데님팬츠", category: "패션의류", stars: 4.5, score: 76.8, searchVolume: 89300, clicks: 10100, ctr: 2.8, isShopping: true, contentScore: 78, purchaseScore: 75, demandScore: 80, trendScore: 72, audienceScore: 78 },
+    { id: "f3", keyword: "린넨 셔츠 남성", category: "패션의류", stars: 4.5, score: 71.2, searchVolume: 52400, clicks: 6100, ctr: 2.5, isShopping: true, contentScore: 72, purchaseScore: 70, demandScore: 68, trendScore: 75, audienceScore: 72, trendTag: "시즌" },
+    { id: "f4", keyword: "스포츠 레깅스", category: "패션의류", stars: 4, score: 67.5, searchVolume: 71200, clicks: 8200, ctr: 2.6, isShopping: true, contentScore: 65, purchaseScore: 68, demandScore: 72, trendScore: 62, audienceScore: 70 },
+    { id: "f5", keyword: "경량 패딩조끼", category: "패션의류", stars: 4, score: 61.9, searchVolume: 44500, clicks: 5000, ctr: 2.1, isShopping: true, contentScore: 62, purchaseScore: 60, demandScore: 58, trendScore: 68, audienceScore: 65, trendTag: "시즌" },
+  ],
+  "디지털/가전": [
+    { id: "d1", keyword: "무선 이어폰 노이즈캔슬링", category: "디지털/가전", stars: 5, score: 86.7, searchVolume: 142000, clicks: 16500, ctr: 3.4, isShopping: true, contentScore: 88, purchaseScore: 85, demandScore: 90, trendScore: 82, audienceScore: 88, trendTag: "급상승" },
+    { id: "d2", keyword: "로봇청소기 물걸레", category: "디지털/가전", stars: 5, score: 81.4, searchVolume: 98700, clicks: 11300, ctr: 3.0, isShopping: true, contentScore: 82, purchaseScore: 80, demandScore: 82, trendScore: 78, audienceScore: 85 },
+    { id: "d3", keyword: "4K 빔프로젝터", category: "디지털/가전", stars: 4.5, score: 74.2, searchVolume: 67800, clicks: 7800, ctr: 2.7, isShopping: true, contentScore: 75, purchaseScore: 72, demandScore: 70, trendScore: 75, audienceScore: 80 },
+    { id: "d4", keyword: "전기포트 온도조절", category: "디지털/가전", stars: 4, score: 66.8, searchVolume: 45600, clicks: 5200, ctr: 2.3, isShopping: true, contentScore: 68, purchaseScore: 65, demandScore: 65, trendScore: 62, audienceScore: 72 },
+    { id: "d5", keyword: "미니PC 데스크탑", category: "디지털/가전", stars: 4, score: 62.3, searchVolume: 38900, clicks: 4500, ctr: 2.1, isShopping: true, contentScore: 65, purchaseScore: 60, demandScore: 58, trendScore: 65, audienceScore: 68, trendTag: "급상승" },
+  ],
+  "출산/육아": [
+    { id: "b1", keyword: "아기 물티슈 저자극", category: "출산/육아", stars: 5, score: 84.5, searchVolume: 88200, clicks: 10100, ctr: 3.2, isShopping: true, contentScore: 85, purchaseScore: 88, demandScore: 82, trendScore: 78, audienceScore: 90 },
+    { id: "b2", keyword: "유아 선크림", category: "출산/육아", stars: 4.5, score: 77.3, searchVolume: 62400, clicks: 7200, ctr: 2.8, isShopping: true, contentScore: 78, purchaseScore: 75, demandScore: 72, trendScore: 82, audienceScore: 80, trendTag: "시즌" },
+    { id: "b3", keyword: "이유식 마스터기", category: "출산/육아", stars: 4.5, score: 72.1, searchVolume: 51800, clicks: 5900, ctr: 2.5, isShopping: true, contentScore: 72, purchaseScore: 70, demandScore: 70, trendScore: 68, audienceScore: 78 },
+    { id: "b4", keyword: "아기 수면조끼", category: "출산/육아", stars: 4, score: 65.4, searchVolume: 35600, clicks: 4100, ctr: 2.2, isShopping: true, contentScore: 65, purchaseScore: 62, demandScore: 60, trendScore: 72, audienceScore: 70, trendTag: "시즌" },
+    { id: "b5", keyword: "유아 식판 실리콘", category: "출산/육아", stars: 4, score: 60.8, searchVolume: 29400, clicks: 3400, ctr: 2.0, isShopping: true, contentScore: 62, purchaseScore: 58, demandScore: 55, trendScore: 65, audienceScore: 68 },
+  ],
+  "스포츠/레저": [
+    { id: "s1", keyword: "폼롤러 마사지", category: "스포츠/레저", stars: 5, score: 79.6, searchVolume: 72100, clicks: 8300, ctr: 2.9, isShopping: true, contentScore: 80, purchaseScore: 78, demandScore: 75, trendScore: 82, audienceScore: 85, trendTag: "급상승" },
+    { id: "s2", keyword: "등산 스틱 접이식", category: "스포츠/레저", stars: 4.5, score: 73.4, searchVolume: 55600, clicks: 6400, ctr: 2.6, isShopping: true, contentScore: 72, purchaseScore: 72, demandScore: 70, trendScore: 75, audienceScore: 78, trendTag: "시즌" },
+    { id: "s3", keyword: "요가매트 두꺼운", category: "스포츠/레저", stars: 4.5, score: 69.8, searchVolume: 48200, clicks: 5500, ctr: 2.4, isShopping: true, contentScore: 70, purchaseScore: 68, demandScore: 65, trendScore: 72, audienceScore: 75 },
+    { id: "s4", keyword: "헬스장갑 리프팅", category: "스포츠/레저", stars: 4, score: 63.5, searchVolume: 34800, clicks: 4000, ctr: 2.1, isShopping: true, contentScore: 65, purchaseScore: 62, demandScore: 58, trendScore: 68, audienceScore: 70 },
+    { id: "s5", keyword: "런닝화 쿠션", category: "스포츠/레저", stars: 4, score: 59.2, searchVolume: 92500, clicks: 10800, ctr: 2.0, isShopping: true, contentScore: 58, purchaseScore: 55, demandScore: 65, trendScore: 55, audienceScore: 62 },
+  ],
+  "반려동물": [
+    { id: "p1", keyword: "강아지 간식 수제", category: "반려동물", stars: 5, score: 83.2, searchVolume: 78400, clicks: 9000, ctr: 3.1, isShopping: true, contentScore: 85, purchaseScore: 82, demandScore: 80, trendScore: 85, audienceScore: 88, trendTag: "급상승" },
+    { id: "p2", keyword: "고양이 자동급식기", category: "반려동물", stars: 4.5, score: 76.5, searchVolume: 61200, clicks: 7100, ctr: 2.7, isShopping: true, contentScore: 78, purchaseScore: 75, demandScore: 72, trendScore: 78, audienceScore: 80 },
+    { id: "p3", keyword: "반려견 치석제거", category: "반려동물", stars: 4.5, score: 70.3, searchVolume: 42800, clicks: 4900, ctr: 2.4, isShopping: true, contentScore: 72, purchaseScore: 68, demandScore: 65, trendScore: 72, audienceScore: 75 },
+    { id: "p4", keyword: "고양이 스크래처", category: "반려동물", stars: 4, score: 64.7, searchVolume: 38500, clicks: 4400, ctr: 2.2, isShopping: true, contentScore: 65, purchaseScore: 62, demandScore: 60, trendScore: 68, audienceScore: 72 },
+    { id: "p5", keyword: "강아지 하네스 산책", category: "반려동물", stars: 4, score: 58.9, searchVolume: 31200, clicks: 3600, ctr: 1.9, isShopping: true, contentScore: 60, purchaseScore: 55, demandScore: 52, trendScore: 62, audienceScore: 65 },
+  ],
+  "가구/인테리어": [
+    { id: "i1", keyword: "LED 간접조명", category: "가구/인테리어", stars: 5, score: 80.8, searchVolume: 85600, clicks: 9800, ctr: 3.0, isShopping: true, contentScore: 82, purchaseScore: 80, demandScore: 78, trendScore: 82, audienceScore: 85, trendTag: "급상승" },
+    { id: "i2", keyword: "수납 선반 철제", category: "가구/인테리어", stars: 4.5, score: 74.1, searchVolume: 58900, clicks: 6800, ctr: 2.6, isShopping: true, contentScore: 75, purchaseScore: 72, demandScore: 72, trendScore: 70, audienceScore: 78 },
+    { id: "i3", keyword: "커튼 암막 방한", category: "가구/인테리어", stars: 4.5, score: 68.5, searchVolume: 72300, clicks: 8200, ctr: 2.4, isShopping: true, contentScore: 70, purchaseScore: 65, demandScore: 72, trendScore: 65, audienceScore: 72, trendTag: "시즌" },
+    { id: "i4", keyword: "메모리폼 베개", category: "가구/인테리어", stars: 4, score: 63.9, searchVolume: 45100, clicks: 5200, ctr: 2.2, isShopping: true, contentScore: 65, purchaseScore: 62, demandScore: 60, trendScore: 68, audienceScore: 70 },
+    { id: "i5", keyword: "디퓨저 고급향", category: "가구/인테리어", stars: 4, score: 59.5, searchVolume: 52800, clicks: 6100, ctr: 2.0, isShopping: true, contentScore: 58, purchaseScore: 58, demandScore: 62, trendScore: 55, audienceScore: 65 },
   ],
 };
 

@@ -1,17 +1,32 @@
 import { NextResponse } from "next/server";
+import { getServiceClient } from "@/lib/supabase";
 
-const MALL_ID = process.env.CAFE24_MALL_ID || "";
-const CLIENT_ID = process.env.CAFE24_CLIENT_ID || "";
-const CLIENT_SECRET = process.env.CAFE24_CLIENT_SECRET || "";
+const CLIENT_ID = (process.env.CAFE24_CLIENT_ID || "").trim();
+const CLIENT_SECRET = (process.env.CAFE24_CLIENT_SECRET || "").trim();
+const MALL_ID = process.env.CAFE24_MALL_ID || "tubeping";
 const API_VERSION = "2026-03-01";
 
-let cachedToken = {
-  access: process.env.CAFE24_ACCESS_TOKEN || "",
-  refresh: process.env.CAFE24_REFRESH_TOKEN || "",
-  expiresAt: Date.now() + 2 * 60 * 60 * 1000,
-};
+async function getToken(): Promise<string> {
+  const sb = getServiceClient();
+  const { data, error } = await sb
+    .from("stores")
+    .select("id, access_token, refresh_token, token_expires_at")
+    .eq("mall_id", MALL_ID)
+    .eq("status", "active")
+    .limit(1)
+    .single();
 
-async function refreshToken(): Promise<string> {
+  if (error || !data) throw new Error(`stores에서 ${MALL_ID} 조회 실패`);
+
+  const expiresAt = data.token_expires_at
+    ? new Date(data.token_expires_at).getTime()
+    : Date.now() + 2 * 60 * 60 * 1000;
+
+  if (expiresAt > Date.now() + 60_000) {
+    return data.access_token;
+  }
+
+  // 만료 임박 → 리프레시
   const res = await fetch(
     `https://${MALL_ID}.cafe24api.com/api/v2/oauth/token`,
     {
@@ -22,29 +37,36 @@ async function refreshToken(): Promise<string> {
       },
       body: new URLSearchParams({
         grant_type: "refresh_token",
-        refresh_token: cachedToken.refresh,
+        refresh_token: data.refresh_token,
       }),
     }
   );
   if (!res.ok) throw new Error(`Token refresh failed: ${res.status}`);
-  const data = await res.json();
-  cachedToken = {
-    access: data.access_token,
-    refresh: data.refresh_token,
-    expiresAt: new Date(data.expires_at).getTime(),
-  };
-  return data.access_token;
-}
+  const tokenData = await res.json();
 
-async function getToken(): Promise<string> {
-  if (cachedToken.access && cachedToken.expiresAt > Date.now() + 60000) {
-    return cachedToken.access;
-  }
-  return refreshToken();
+  await sb
+    .from("stores")
+    .update({
+      access_token: tokenData.access_token,
+      refresh_token: tokenData.refresh_token,
+      token_expires_at: tokenData.expires_at,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", data.id);
+
+  return tokenData.access_token;
 }
 
 export async function GET() {
-  const token = await getToken();
+  let token: string;
+  try {
+    token = await getToken();
+  } catch (e) {
+    return NextResponse.json(
+      { error: "토큰 조회 실패", detail: e instanceof Error ? e.message : "" },
+      { status: 500 }
+    );
+  }
 
   const res = await fetch(
     `https://${MALL_ID}.cafe24api.com/api/v2/admin/categories?limit=100`,

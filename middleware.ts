@@ -29,7 +29,7 @@ async function getSlugByDomain(hostname: string): Promise<string | null> {
 }
 
 // TubePing 기본 도메인 목록
-const DEFAULT_DOMAINS = ["localhost", "tubeping.com", "tubeping.shop", "tpng.kr", "vercel.app"];
+const DEFAULT_DOMAINS = ["localhost", "tubeping.com", "tubeping.shop", "tubeping.site", "tpng.kr", "vercel.app"];
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;

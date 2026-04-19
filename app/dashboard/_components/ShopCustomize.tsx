@@ -50,12 +50,27 @@ let blockCounter = 100;
 function newId() { return "b" + (++blockCounter) + "_" + Date.now(); }
 
 // ─── 드래그 가능 블록 ───
-function SortableBlock({ block, isSelected, onSelect, onDelete }: {
-  block: ShopBlock; isSelected: boolean; onSelect: () => void; onDelete: () => void;
+function SortableBlock({ block, isSelected, onSelect, onDelete, compact }: {
+  block: ShopBlock; isSelected: boolean; onSelect: () => void; onDelete: () => void; compact?: boolean;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: block.id });
   const style = { transform: CSS.Transform.toString(transform), transition, zIndex: isDragging ? 50 : undefined, opacity: isDragging ? 0.5 : 1 };
   const meta = BLOCK_TYPES.find(t => t.type === block.type);
+
+  if (compact) {
+    return (
+      <div ref={setNodeRef} style={style} onClick={onSelect} {...attributes} {...listeners}
+        title={meta?.label}
+        className={`relative flex h-10 w-10 items-center justify-center rounded-lg border transition-all cursor-pointer active:cursor-grabbing ${
+          isSelected ? "border-[#C41E1E] bg-[#FFF5F5] shadow-sm" : "border-gray-200 bg-white hover:border-gray-300"
+        }`}>
+        <span className="text-base">{meta?.icon}</span>
+        {isSelected && (
+          <span className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-[#C41E1E]" />
+        )}
+      </div>
+    );
+  }
 
   return (
     <div ref={setNodeRef} style={style} onClick={onSelect}
@@ -236,32 +251,73 @@ export default function ShopCustomize() {
   }, []);
 
   return (
-    <div className="flex h-full bg-[#FAFAFA]">
-      <div className="w-[340px] shrink-0 bg-white border-r border-gray-100 flex flex-col">
-        <div className="flex-1 overflow-y-auto p-4">
-          <div className="flex items-center justify-between mb-4">
-            <div><h3 className="text-sm font-bold text-gray-900">블록 구성</h3><p className="text-[10px] text-gray-400 mt-0.5">드래그로 순서 변경</p></div>
-            <button onClick={() => setShowPalette(!showPalette)} className={`cursor-pointer rounded-lg px-3 py-1.5 text-xs font-bold transition-all ${showPalette ? "bg-gray-900 text-white" : "bg-[#C41E1E] text-white hover:bg-[#A01818] shadow-sm"}`}>
-              {showPalette ? "✕ 닫기" : "+ 블록 추가"}
-            </button>
+    <div className="flex h-full bg-[#FAFAFA] relative">
+      {/* ─────────── Col 1: 블록 리스트 (PC 전체 / Mobile 아이콘) ─────────── */}
+      <div className="w-[64px] md:w-[220px] shrink-0 bg-white border-r border-gray-100 flex flex-col">
+        {/* 헤더 + 추가 버튼 */}
+        <div className="p-2 md:p-4 border-b border-gray-100 flex md:block flex-col items-center gap-2">
+          <div className="hidden md:block mb-3">
+            <h3 className="text-sm font-bold text-gray-900">블록 구성</h3>
+            <p className="text-[10px] text-gray-400 mt-0.5">드래그로 순서 변경</p>
           </div>
+          <button onClick={() => setShowPalette(!showPalette)}
+            title="블록 추가"
+            className={`cursor-pointer flex items-center justify-center rounded-lg md:w-full h-10 md:h-auto w-10 md:px-3 md:py-2 text-xs font-bold transition-all ${
+              showPalette ? "bg-gray-900 text-white" : "bg-[#C41E1E] text-white hover:bg-[#A01818] shadow-sm"
+            }`}>
+            <span className="md:hidden text-lg">{showPalette ? "✕" : "+"}</span>
+            <span className="hidden md:inline">{showPalette ? "✕ 닫기" : "+ 블록 추가"}</span>
+          </button>
+        </div>
 
-          {showPalette && (
-            <div className="mb-4 rounded-2xl border border-gray-100 bg-gradient-to-b from-gray-50 to-white p-4 shadow-sm">
+        {/* 팔레트 (모바일: 오버레이, PC: 인라인) */}
+        {showPalette && (
+          <>
+            {/* 모바일: 아래에서 올라오는 시트 */}
+            <div className="md:hidden fixed inset-0 z-50 bg-black/40" onClick={() => setShowPalette(false)}>
+              <div className="absolute inset-x-0 bottom-0 rounded-t-2xl bg-white p-5 shadow-2xl" onClick={e => e.stopPropagation()}>
+                <div className="mb-3 flex items-center justify-between">
+                  <h4 className="text-sm font-bold text-gray-900">블록 추가</h4>
+                  <button onClick={() => setShowPalette(false)} className="cursor-pointer text-gray-400 hover:text-gray-600 text-lg">✕</button>
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  {BLOCK_TYPES.map(bt => (
+                    <button key={bt.type} onClick={() => addBlock(bt.type)} className="cursor-pointer flex flex-col items-center gap-1.5 rounded-xl border border-gray-100 bg-white p-3 hover:border-[#C41E1E] hover:shadow-md transition-all group">
+                      <span className="text-xl">{bt.icon}</span>
+                      <span className="text-[10px] font-bold text-gray-600">{bt.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* PC: 인라인 팔레트 */}
+            <div className="hidden md:block p-4 border-b border-gray-100 bg-gradient-to-b from-gray-50 to-white">
               <div className="grid grid-cols-3 gap-2">
                 {BLOCK_TYPES.map(bt => (
-                  <button key={bt.type} onClick={() => addBlock(bt.type)} className="cursor-pointer flex flex-col items-center gap-1.5 rounded-xl border border-gray-100 bg-white p-3 hover:border-[#C41E1E] hover:shadow-md transition-all group">
-                    <span className="text-xl group-hover:scale-110 transition-transform">{bt.icon}</span>
+                  <button key={bt.type} onClick={() => addBlock(bt.type)} className="cursor-pointer flex flex-col items-center gap-1.5 rounded-xl border border-gray-100 bg-white p-2.5 hover:border-[#C41E1E] hover:shadow-md transition-all group">
+                    <span className="text-lg group-hover:scale-110 transition-transform">{bt.icon}</span>
                     <span className="text-[10px] font-bold text-gray-600 group-hover:text-[#C41E1E]">{bt.label}</span>
                   </button>
                 ))}
               </div>
             </div>
-          )}
+          </>
+        )}
 
+        {/* 블록 리스트 */}
+        <div className="flex-1 overflow-y-auto p-2 md:p-4">
           <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
             <SortableContext items={blocks.map(b => b.id)} strategy={verticalListSortingStrategy}>
-              <div className="space-y-1.5">
+              {/* 모바일: 아이콘 버전 */}
+              <div className="md:hidden flex flex-col items-center gap-2">
+                {blocks.map(block => (
+                  <SortableBlock key={block.id} block={block} isSelected={selectedId === block.id} compact
+                    onSelect={() => setSelectedId(block.id)} onDelete={() => { setBlocks(prev => prev.filter(b => b.id !== block.id)); if (selectedId === block.id) setSelectedId(null); }} />
+                ))}
+              </div>
+              {/* PC: 전체 버전 */}
+              <div className="hidden md:block space-y-1.5">
                 {blocks.map(block => (
                   <SortableBlock key={block.id} block={block} isSelected={selectedId === block.id}
                     onSelect={() => setSelectedId(block.id)} onDelete={() => { setBlocks(prev => prev.filter(b => b.id !== block.id)); if (selectedId === block.id) setSelectedId(null); }} />
@@ -271,23 +327,42 @@ export default function ShopCustomize() {
           </DndContext>
         </div>
 
-        {selectedBlock && (
-          <div className="border-t border-gray-100 p-4 max-h-[45%] overflow-y-auto bg-white">
-            <BlockEditor block={selectedBlock} onChange={data => setBlocks(prev => prev.map(b => b.id === selectedBlock.id ? { ...b, data } : b))} />
-          </div>
-        )}
-
-        <div className="border-t border-gray-100 p-4 bg-white space-y-2">
-          <button className="cursor-pointer w-full rounded-xl bg-[#C41E1E] py-3 text-sm font-bold text-white hover:bg-[#A01818] shadow-sm">저장</button>
-          <a href="/shop/gwibinjeong" target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2 w-full rounded-xl border border-gray-200 py-2.5 text-xs font-medium text-gray-600 hover:bg-gray-50">
+        {/* 하단 저장 버튼 */}
+        <div className="border-t border-gray-100 p-2 md:p-4 bg-white space-y-2">
+          <button title="저장"
+            className="cursor-pointer w-full flex items-center justify-center rounded-xl bg-[#C41E1E] h-10 md:py-3 text-sm font-bold text-white hover:bg-[#A01818] shadow-sm">
+            <span className="md:hidden">💾</span>
+            <span className="hidden md:inline">저장</span>
+          </button>
+          <a href="/shop/gwibinjeong" target="_blank" rel="noopener noreferrer"
+            title="내 쇼핑몰 보기"
+            className="flex items-center justify-center gap-2 w-full rounded-xl border border-gray-200 h-10 md:py-2.5 text-xs font-medium text-gray-600 hover:bg-gray-50">
             <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
-            내 쇼핑몰 보기
+            <span className="hidden md:inline">내 쇼핑몰 보기</span>
           </a>
         </div>
       </div>
 
-      <div className="flex-1 flex items-start justify-center p-8 overflow-y-auto">
-        <div className="w-[320px] rounded-[3rem] border-[10px] border-gray-900 bg-gray-900 shadow-2xl overflow-hidden">
+      {/* ─────────── Col 2: 편집 패널 (PC only) ─────────── */}
+      <div className="hidden md:flex md:w-[320px] shrink-0 bg-white border-r border-gray-100 flex-col">
+        {selectedBlock ? (
+          <div className="flex-1 overflow-y-auto p-5">
+            <BlockEditor block={selectedBlock} onChange={data => setBlocks(prev => prev.map(b => b.id === selectedBlock.id ? { ...b, data } : b))} />
+          </div>
+        ) : (
+          <div className="flex-1 flex items-center justify-center p-6 text-center">
+            <div>
+              <p className="text-3xl mb-3">👈</p>
+              <p className="text-sm font-medium text-gray-900">블록을 선택하세요</p>
+              <p className="text-xs text-gray-400 mt-1">왼쪽에서 편집할 블록을<br />클릭하면 여기에 표시됩니다</p>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ─────────── Col 3: 미리보기 ─────────── */}
+      <div className="flex-1 flex items-start justify-center p-4 md:p-8 overflow-y-auto pb-24 md:pb-8">
+        <div className="w-[280px] md:w-[320px] rounded-[3rem] border-[10px] border-gray-900 bg-gray-900 shadow-2xl overflow-hidden">
           <div className="flex justify-center bg-gray-900 pt-2 pb-1.5"><div className="h-[24px] w-[90px] rounded-full bg-black" /></div>
           <div className="h-[620px] bg-white overflow-y-auto">
             {blocks.map(block => (
@@ -301,6 +376,30 @@ export default function ShopCustomize() {
           <div className="flex justify-center bg-gray-900 py-2"><div className="h-[4px] w-[80px] rounded-full bg-gray-600" /></div>
         </div>
       </div>
+
+      {/* ─────────── Mobile 바텀시트: 편집 패널 ─────────── */}
+      {selectedBlock && (
+        <div className="md:hidden fixed inset-x-0 bottom-0 z-40 bg-white border-t border-gray-200 rounded-t-2xl shadow-2xl max-h-[65vh] flex flex-col">
+          <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-100">
+            <div className="flex items-center gap-2">
+              <span className="text-lg">{BLOCK_TYPES.find(t => t.type === selectedBlock.type)?.icon}</span>
+              <span className="text-sm font-bold text-gray-900">{BLOCK_TYPES.find(t => t.type === selectedBlock.type)?.label} 설정</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <button onClick={() => { setBlocks(prev => prev.filter(b => b.id !== selectedBlock.id)); setSelectedId(null); }}
+                className="cursor-pointer rounded-md p-1.5 text-gray-400 hover:text-[#C41E1E] hover:bg-red-50">
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+              </button>
+              <button onClick={() => setSelectedId(null)} className="cursor-pointer rounded-md p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100">
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+          </div>
+          <div className="flex-1 overflow-y-auto px-4 pt-3 pb-5">
+            <BlockEditor block={selectedBlock} onChange={data => setBlocks(prev => prev.map(b => b.id === selectedBlock.id ? { ...b, data } : b))} />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

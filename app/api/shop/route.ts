@@ -42,19 +42,30 @@ export async function GET(request: NextRequest) {
     .order("created_at", { ascending: false })
     .limit(10);
 
-  // 활성 캠페인 조회
+  // 캠페인 전체 조회 (공구 캘린더용 — 진행 중 + 예정 + 최근 종료)
   const { data: campaigns } = await supabaseAdmin
     .from("campaigns")
-    .select("*")
+    .select(`
+      id, status, type, target_gmv, actual_gmv, commission_rate,
+      proposed_at, approved_at, started_at, settled_at,
+      products ( id, product_name, image_url, price )
+    `)
     .eq("creator_id", creator.id)
-    .in("status", ["approved", "running"])
-    .limit(1);
+    .in("status", ["proposed", "approved", "running", "completed"])
+    .order("started_at", { ascending: false, nullsFirst: false })
+    .limit(50);
+
+  // 기존 호환: activeCampaign은 첫 번째 running/approved
+  const activeCampaign = campaigns?.find((c) =>
+    c.status === "approved" || c.status === "running"
+  ) || null;
 
   return NextResponse.json({
     creator,
     shop: shop || null,
     picks: picks || [],
     reviews: reviews || [],
-    activeCampaign: campaigns?.[0] || null,
+    campaigns: campaigns || [],
+    activeCampaign,
   });
 }

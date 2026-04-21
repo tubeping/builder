@@ -38,8 +38,27 @@ interface LinkBlock {
 }
 
 interface ShopBlock {
-  type: "hero" | "text" | "image" | "gallery" | "banner" | "links" | "picks" | "video" | "divider" | "reviews" | "newsletter" | "html";
+  type: "hero" | "text" | "image" | "gallery" | "banner" | "links" | "picks" | "video" | "divider" | "reviews" | "newsletter" | "html" | "calendar";
   data: Record<string, unknown>;
+}
+
+interface ShopCampaign {
+  id: string;
+  status: string;
+  type: string;
+  target_gmv: number;
+  actual_gmv: number;
+  commission_rate: number;
+  started_at: string | null;
+  settled_at: string | null;
+  proposed_at: string | null;
+  approved_at: string | null;
+  products?: {
+    id: string;
+    product_name: string;
+    image_url: string | null;
+    price: number;
+  } | null;
 }
 
 interface ShopApiResponse {
@@ -62,6 +81,7 @@ interface ShopApiResponse {
   } | null;
   picks: ShopPick[];
   reviews: ShopReview[];
+  campaigns: ShopCampaign[];
   activeCampaign: {
     id: string;
     product_id: string;
@@ -299,6 +319,278 @@ function DividerBlock() {
   );
 }
 
+// ─── 공구 캘린더 블록 ───
+interface CalendarEvent {
+  id: string;
+  title: string;
+  image: string | null;
+  start_date: string; // ISO
+  end_date: string;   // ISO
+  price?: number;
+  status: "upcoming" | "active" | "ended";
+  link_url?: string;
+}
+
+function CalendarBlock({ data, campaigns, slug }: { data: Record<string, unknown>; campaigns: ShopCampaign[]; slug: string }) {
+  const [viewMonth, setViewMonth] = useState(() => {
+    const d = new Date();
+    d.setDate(1);
+    return d;
+  });
+
+  // 공구 기간 기본값 (일수) — settled_at 없을 때 started_at + N일로 추정
+  const defaultDurationDays = (data.default_duration_days as number) || 7;
+  const manualEvents = (data.manual_events as CalendarEvent[]) || [];
+
+  // campaigns → CalendarEvent 변환
+  const autoEvents: CalendarEvent[] = campaigns
+    .filter((c) => c.started_at)
+    .map((c) => {
+      const start = new Date(c.started_at!);
+      const end = c.settled_at
+        ? new Date(c.settled_at)
+        : new Date(start.getTime() + defaultDurationDays * 24 * 60 * 60 * 1000);
+      const now = new Date();
+      let status: CalendarEvent["status"] = "upcoming";
+      if (now >= start && now <= end) status = "active";
+      else if (now > end) status = "ended";
+
+      return {
+        id: c.id,
+        title: c.products?.product_name || "공구",
+        image: c.products?.image_url || null,
+        start_date: start.toISOString(),
+        end_date: end.toISOString(),
+        price: c.products?.price,
+        status,
+        link_url: `/shop/${slug}#campaign-${c.id}`,
+      };
+    });
+
+  const events = [...autoEvents, ...manualEvents];
+
+  const year = viewMonth.getFullYear();
+  const month = viewMonth.getMonth();
+  const firstDay = new Date(year, month, 1);
+  const lastDay = new Date(year, month + 1, 0);
+  const startDayOfWeek = firstDay.getDay(); // 0=일
+  const daysInMonth = lastDay.getDate();
+
+  // 월 그리드 (42칸 = 6주 × 7일)
+  const cells: { date: Date | null }[] = [];
+  for (let i = 0; i < startDayOfWeek; i++) cells.push({ date: null });
+  for (let d = 1; d <= daysInMonth; d++) cells.push({ date: new Date(year, month, d) });
+  while (cells.length < 42) cells.push({ date: null });
+
+  // 날짜별 이벤트 매핑
+  const eventsOnDate = (date: Date) => {
+    const t = date.getTime();
+    return events.filter((e) => {
+      const s = new Date(e.start_date).setHours(0, 0, 0, 0);
+      const en = new Date(e.end_date).setHours(23, 59, 59, 999);
+      return t >= s && t <= en;
+    });
+  };
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const selectedEvents = selectedDate ? eventsOnDate(selectedDate) : [];
+
+  const goPrevMonth = () => setViewMonth(new Date(year, month - 1, 1));
+  const goNextMonth = () => setViewMonth(new Date(year, month + 1, 1));
+
+  // 월의 이벤트 요약 (달성률 등)
+  const monthEvents = events.filter((e) => {
+    const s = new Date(e.start_date);
+    const en = new Date(e.end_date);
+    const mStart = new Date(year, month, 1);
+    const mEnd = new Date(year, month + 1, 0, 23, 59, 59);
+    return s <= mEnd && en >= mStart;
+  });
+
+  if (events.length === 0 && manualEvents.length === 0) {
+    return null; // 공구 없으면 블록 자체 숨김
+  }
+
+  const statusBadge = (status: CalendarEvent["status"]) => {
+    if (status === "active") return { label: "진행중", style: "bg-[#C41E1E] text-white" };
+    if (status === "upcoming") return { label: "예정", style: "bg-blue-500 text-white" };
+    return { label: "종료", style: "bg-gray-400 text-white" };
+  };
+
+  return (
+    <section className="mx-auto max-w-2xl px-3 sm:px-4 py-3">
+      <div className="flex items-center gap-2 mb-3">
+        <span className="text-xl">📅</span>
+        <h2 className="text-base font-bold text-gray-900">공구 캘린더</h2>
+        {monthEvents.length > 0 && (
+          <span className="ml-auto text-xs text-gray-400">{monthEvents.length}건 예정</span>
+        )}
+      </div>
+
+      <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white">
+        {/* 월 네비게이션 */}
+        <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3">
+          <button onClick={goPrevMonth} className="cursor-pointer rounded-lg p-1.5 text-gray-500 hover:bg-gray-50">
+            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
+          <p className="text-sm font-bold text-gray-900">
+            {year}년 {month + 1}월
+          </p>
+          <button onClick={goNextMonth} className="cursor-pointer rounded-lg p-1.5 text-gray-500 hover:bg-gray-50">
+            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
+        </div>
+
+        {/* 요일 헤더 */}
+        <div className="grid grid-cols-7 border-b border-gray-100">
+          {["일", "월", "화", "수", "목", "금", "토"].map((d, i) => (
+            <div key={d} className={`py-2 text-center text-[11px] font-medium ${i === 0 ? "text-red-500" : i === 6 ? "text-blue-500" : "text-gray-500"}`}>
+              {d}
+            </div>
+          ))}
+        </div>
+
+        {/* 날짜 그리드 */}
+        <div className="grid grid-cols-7">
+          {cells.map((cell, i) => {
+            if (!cell.date) {
+              return <div key={i} className="min-h-[56px] border-r border-b border-gray-50 last:border-r-0" />;
+            }
+            const date = cell.date;
+            const isToday = date.getTime() === today.getTime();
+            const cellEvents = eventsOnDate(date);
+            const hasActive = cellEvents.some((e) => e.status === "active");
+            const hasUpcoming = cellEvents.some((e) => e.status === "upcoming");
+            const dayOfWeek = date.getDay();
+            const isSelected = selectedDate?.getTime() === date.getTime();
+
+            return (
+              <button
+                key={i}
+                onClick={() => setSelectedDate(cellEvents.length > 0 ? date : null)}
+                disabled={cellEvents.length === 0}
+                className={`relative min-h-[56px] cursor-pointer border-r border-b border-gray-50 p-1 text-left transition-colors last:border-r-0 ${
+                  cellEvents.length > 0 ? "hover:bg-gray-50" : "cursor-default"
+                } ${isSelected ? "bg-[#fff0f0]" : ""}`}
+              >
+                <div className="flex items-center justify-between">
+                  <span
+                    className={`flex h-5 w-5 items-center justify-center text-[11px] font-medium ${
+                      isToday
+                        ? "rounded-full bg-[#C41E1E] text-white"
+                        : dayOfWeek === 0
+                        ? "text-red-500"
+                        : dayOfWeek === 6
+                        ? "text-blue-500"
+                        : "text-gray-700"
+                    }`}
+                  >
+                    {date.getDate()}
+                  </span>
+                </div>
+                {/* 이벤트 표시 */}
+                {cellEvents.length > 0 && (
+                  <div className="mt-0.5 space-y-0.5">
+                    {cellEvents.slice(0, 2).map((e, idx) => (
+                      <div
+                        key={idx}
+                        className={`truncate rounded px-1 py-0.5 text-[9px] font-medium ${
+                          e.status === "active"
+                            ? "bg-[#C41E1E] text-white"
+                            : e.status === "upcoming"
+                            ? "bg-blue-100 text-blue-700"
+                            : "bg-gray-100 text-gray-500"
+                        }`}
+                      >
+                        {e.title}
+                      </div>
+                    ))}
+                    {cellEvents.length > 2 && (
+                      <div className="text-[9px] text-gray-400">+{cellEvents.length - 2}</div>
+                    )}
+                  </div>
+                )}
+                {/* 점 인디케이터 (공간 부족할 때 폴백) */}
+                {cellEvents.length > 0 && (hasActive || hasUpcoming) && (
+                  <div className="absolute bottom-1 right-1 flex gap-0.5">
+                    {hasActive && <span className="h-1.5 w-1.5 rounded-full bg-[#C41E1E]" />}
+                    {hasUpcoming && !hasActive && <span className="h-1.5 w-1.5 rounded-full bg-blue-400" />}
+                  </div>
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* 선택된 날짜 이벤트 상세 */}
+        {selectedDate && selectedEvents.length > 0 && (
+          <div className="border-t border-gray-100 bg-gray-50 p-4">
+            <p className="mb-2 text-xs font-medium text-gray-500">
+              {selectedDate.getMonth() + 1}월 {selectedDate.getDate()}일 ({["일", "월", "화", "수", "목", "금", "토"][selectedDate.getDay()]})
+            </p>
+            <div className="space-y-2">
+              {selectedEvents.map((e) => {
+                const badge = statusBadge(e.status);
+                return (
+                  <a
+                    key={e.id}
+                    href={e.link_url ? addUtm(e.link_url, slug) : "#"}
+                    className="flex items-center gap-3 rounded-lg border border-gray-200 bg-white p-3 hover:border-gray-300 hover:shadow-sm transition-all"
+                  >
+                    <div className="h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-gray-100">
+                      {e.image ? (
+                        <img src={e.image} alt="" className="h-full w-full object-cover" />
+                      ) : (
+                        <div className="flex h-full items-center justify-center text-gray-300">
+                          <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                          </svg>
+                        </div>
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5">
+                        <span className={`rounded-full px-1.5 py-0.5 text-[9px] font-medium ${badge.style}`}>{badge.label}</span>
+                      </div>
+                      <p className="mt-1 line-clamp-1 text-sm font-medium text-gray-900">{e.title}</p>
+                      <p className="text-[10px] text-gray-400">
+                        {new Date(e.start_date).getMonth() + 1}/{new Date(e.start_date).getDate()}
+                        {" ~ "}
+                        {new Date(e.end_date).getMonth() + 1}/{new Date(e.end_date).getDate()}
+                        {e.price ? ` · ${formatPrice(e.price)}` : ""}
+                      </p>
+                    </div>
+                  </a>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* 범례 */}
+        <div className="flex items-center gap-3 border-t border-gray-100 px-4 py-2.5 text-[10px] text-gray-400">
+          <span className="flex items-center gap-1">
+            <span className="h-2 w-2 rounded-full bg-[#C41E1E]" /> 진행중
+          </span>
+          <span className="flex items-center gap-1">
+            <span className="h-2 w-2 rounded-full bg-blue-400" /> 예정
+          </span>
+          <span className="flex items-center gap-1">
+            <span className="h-2 w-2 rounded-full bg-gray-400" /> 종료
+          </span>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function ReviewsBlock({ reviews }: { reviews: ShopReview[] }) {
   if (reviews.length === 0) return null;
   return (
@@ -433,12 +725,13 @@ function PicksBlock({ picks, slug }: { picks: DisplayPick[]; slug: string }) {
 }
 
 // ─── 블록 디스패처 ───
-function BlockRenderer({ block, creator, shop, picks, reviews, slug }: {
+function BlockRenderer({ block, creator, shop, picks, reviews, campaigns, slug }: {
   block: ShopBlock;
   creator: ShopApiResponse["creator"];
   shop: ShopApiResponse["shop"];
   picks: DisplayPick[];
   reviews: ShopReview[];
+  campaigns: ShopCampaign[];
   slug: string;
 }) {
   switch (block.type) {
@@ -454,17 +747,21 @@ function BlockRenderer({ block, creator, shop, picks, reviews, slug }: {
     case "reviews": return <ReviewsBlock reviews={reviews} />;
     case "newsletter": return <NewsletterBlock />;
     case "html": return <HtmlBlock data={block.data} />;
+    case "calendar": return <CalendarBlock data={block.data} campaigns={campaigns} slug={slug} />;
     default: return null;
   }
 }
 
 // ─── 기본 블록 레이아웃 (blocks 미설정 시 폴백) ───
-function defaultBlocks(shop: ShopApiResponse["shop"]): ShopBlock[] {
+function defaultBlocks(shop: ShopApiResponse["shop"], hasCampaigns: boolean): ShopBlock[] {
   const blocks: ShopBlock[] = [
     { type: "hero", data: {} },
   ];
   if (shop?.link_blocks && shop.link_blocks.length > 0) {
     blocks.push({ type: "links", data: { items: shop.link_blocks } });
+  }
+  if (hasCampaigns) {
+    blocks.push({ type: "calendar", data: {} });
   }
   blocks.push({ type: "picks", data: {} });
   blocks.push({ type: "reviews", data: {} });
@@ -508,7 +805,8 @@ export default function ShopPage({ params }: { params: Promise<{ slug: string }>
     );
   }
 
-  const { creator, shop, picks, reviews } = data;
+  const { creator, shop, picks, reviews, campaigns } = data;
+  const safeCampaigns = campaigns || [];
 
   // PICK 데이터 변환
   const displayPicks: DisplayPick[] = picks.length > 0
@@ -527,7 +825,7 @@ export default function ShopPage({ params }: { params: Promise<{ slug: string }>
   // 블록 결정: DB에 blocks가 있으면 사용, 없으면 기본 레이아웃
   const blocks: ShopBlock[] = (shop?.blocks && Array.isArray(shop.blocks) && shop.blocks.length > 0)
     ? shop.blocks
-    : defaultBlocks(shop);
+    : defaultBlocks(shop, safeCampaigns.length > 0);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -539,6 +837,7 @@ export default function ShopPage({ params }: { params: Promise<{ slug: string }>
           shop={shop}
           picks={displayPicks}
           reviews={reviews}
+          campaigns={safeCampaigns}
           slug={slug}
         />
       ))}

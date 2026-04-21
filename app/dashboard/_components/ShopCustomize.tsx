@@ -22,7 +22,7 @@ import { CSS } from "@dnd-kit/utilities";
 // ─── 타입 ───
 interface ShopBlock {
   id: string;
-  type: "hero" | "text" | "image" | "banner" | "links" | "picks" | "video" | "divider" | "gallery";
+  type: "hero" | "text" | "image" | "banner" | "links" | "picks" | "video" | "divider" | "gallery" | "calendar";
   data: Record<string, unknown>;
 }
 
@@ -33,6 +33,7 @@ const BLOCK_TYPES: { type: ShopBlock["type"]; label: string; icon: string; desc:
   { type: "text", label: "텍스트", icon: "📝", desc: "자유 텍스트" },
   { type: "image", label: "이미지", icon: "🖼️", desc: "이미지 + 캡션" },
   { type: "banner", label: "배너", icon: "🔥", desc: "공구/이벤트" },
+  { type: "calendar", label: "공구 캘린더", icon: "📅", desc: "월별 공구 일정" },
   { type: "links", label: "링크", icon: "🔗", desc: "SNS·외부 링크" },
   { type: "picks", label: "상품", icon: "📦", desc: "내 PICK" },
   { type: "video", label: "영상", icon: "▶️", desc: "유튜브" },

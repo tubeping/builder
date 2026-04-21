@@ -38,7 +38,7 @@ interface LinkBlock {
 }
 
 interface ShopBlock {
-  type: "hero" | "text" | "image" | "gallery" | "banner" | "links" | "picks" | "video" | "divider" | "reviews" | "newsletter" | "html" | "calendar";
+  type: "hero" | "text" | "image" | "gallery" | "banner" | "links" | "picks" | "video" | "divider" | "reviews" | "newsletter" | "html" | "calendar" | "campaign_live";
   data: Record<string, unknown>;
 }
 
@@ -724,6 +724,183 @@ function PicksBlock({ picks, slug }: { picks: DisplayPick[]; slug: string }) {
   );
 }
 
+// ─── 공구 라이브 블록 (진행률 + 카운트다운) ───
+function CampaignLiveBlock({ data, campaigns, slug }: { data: Record<string, unknown>; campaigns: ShopCampaign[]; slug: string }) {
+  const defaultDurationDays = (data.default_duration_days as number) || 7;
+  const specificId = data.campaign_id as string | undefined;
+
+  // 표시할 캠페인 선택
+  const now = Date.now();
+  const activeCampaigns = campaigns
+    .filter((c) => (c.status === "running" || c.status === "approved") && c.started_at)
+    .map((c) => {
+      const start = new Date(c.started_at!).getTime();
+      const end = c.settled_at
+        ? new Date(c.settled_at).getTime()
+        : start + defaultDurationDays * 24 * 60 * 60 * 1000;
+      return { ...c, _start: start, _end: end };
+    })
+    .filter((c) => now >= c._start && now <= c._end)
+    .sort((a, b) => b._start - a._start);
+
+  const campaign = specificId
+    ? activeCampaigns.find((c) => c.id === specificId)
+    : activeCampaigns[0];
+
+  // 카운트다운 state (실시간 갱신)
+  const [timeLeft, setTimeLeft] = useState<{ d: number; h: number; m: number; s: number } | null>(null);
+
+  useEffect(() => {
+    if (!campaign) return;
+    const tick = () => {
+      const diff = campaign._end - Date.now();
+      if (diff <= 0) {
+        setTimeLeft({ d: 0, h: 0, m: 0, s: 0 });
+        return;
+      }
+      const d = Math.floor(diff / (1000 * 60 * 60 * 24));
+      const h = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+      const m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      const s = Math.floor((diff % (1000 * 60)) / 1000);
+      setTimeLeft({ d, h, m, s });
+    };
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [campaign]);
+
+  if (!campaign || !campaign.products) return null;
+
+  const product = campaign.products;
+  const targetGmv = Number(campaign.target_gmv) || 0;
+  const actualGmv = Number(campaign.actual_gmv) || 0;
+  const progressPct = targetGmv > 0 ? Math.min(100, (actualGmv / targetGmv) * 100) : 0;
+  const soldCount = product.price > 0 ? Math.floor(actualGmv / product.price) : 0;
+  const targetCount = product.price > 0 && targetGmv > 0 ? Math.floor(targetGmv / product.price) : 0;
+
+  const isUrgent = timeLeft && timeLeft.d === 0 && timeLeft.h < 24;
+  const isEnded = timeLeft && timeLeft.d === 0 && timeLeft.h === 0 && timeLeft.m === 0 && timeLeft.s === 0;
+
+  const buyUrl = (data.buy_url as string) || `#campaign-${campaign.id}`;
+
+  return (
+    <section className="mx-auto max-w-2xl px-3 sm:px-4 py-3">
+      <div className={`overflow-hidden rounded-2xl border ${isUrgent ? "border-[#C41E1E] shadow-lg shadow-red-100" : "border-gray-200"} bg-white`}>
+        {/* 상단 라이브 배지 */}
+        <div className={`flex items-center gap-2 px-4 py-2 text-white text-xs font-bold ${isUrgent ? "bg-[#C41E1E] animate-pulse" : "bg-[#C41E1E]"}`}>
+          <span className="relative flex h-2 w-2">
+            <span className="absolute inset-0 animate-ping rounded-full bg-white opacity-75" />
+            <span className="relative h-2 w-2 rounded-full bg-white" />
+          </span>
+          {isUrgent ? "⚡ 마감 임박!" : "🔴 LIVE 공구중"}
+          {isUrgent && timeLeft && (
+            <span className="ml-auto tabular-nums">
+              {String(timeLeft.h).padStart(2, "0")}:{String(timeLeft.m).padStart(2, "0")}:{String(timeLeft.s).padStart(2, "0")}
+            </span>
+          )}
+        </div>
+
+        <div className="p-4">
+          {/* 상품 정보 */}
+          <div className="flex gap-3">
+            <div className="h-24 w-24 shrink-0 overflow-hidden rounded-xl bg-gray-100">
+              {product.image_url ? (
+                <img src={product.image_url} alt="" className="h-full w-full object-cover" />
+              ) : (
+                <div className="flex h-full items-center justify-center text-gray-300">
+                  <svg className="h-8 w-8" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                </div>
+              )}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="line-clamp-2 text-sm font-bold text-gray-900 leading-snug">{product.product_name}</p>
+              <p className="mt-1 text-xl font-extrabold text-[#C41E1E]">{formatPrice(product.price)}</p>
+              {soldCount > 0 && (
+                <p className="mt-0.5 text-[11px] text-gray-500">
+                  🔥 지금까지 <b className="text-gray-900">{soldCount}명</b>이 구매했어요
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* 카운트다운 (큰 화면) */}
+          {!isUrgent && timeLeft && !isEnded && (
+            <div className="mt-4 flex items-center justify-center gap-2">
+              <div className="flex-1 rounded-lg bg-gray-50 py-2 text-center">
+                <div className="text-xl font-extrabold tabular-nums text-gray-900">{timeLeft.d}</div>
+                <div className="text-[10px] text-gray-500">DAYS</div>
+              </div>
+              <div className="flex-1 rounded-lg bg-gray-50 py-2 text-center">
+                <div className="text-xl font-extrabold tabular-nums text-gray-900">{String(timeLeft.h).padStart(2, "0")}</div>
+                <div className="text-[10px] text-gray-500">HOURS</div>
+              </div>
+              <div className="flex-1 rounded-lg bg-gray-50 py-2 text-center">
+                <div className="text-xl font-extrabold tabular-nums text-gray-900">{String(timeLeft.m).padStart(2, "0")}</div>
+                <div className="text-[10px] text-gray-500">MIN</div>
+              </div>
+              <div className="flex-1 rounded-lg bg-gray-50 py-2 text-center">
+                <div className="text-xl font-extrabold tabular-nums text-gray-900">{String(timeLeft.s).padStart(2, "0")}</div>
+                <div className="text-[10px] text-gray-500">SEC</div>
+              </div>
+            </div>
+          )}
+
+          {/* 마감 임박 배너 */}
+          {isUrgent && !isEnded && (
+            <div className="mt-3 rounded-lg bg-red-50 p-3 text-center">
+              <p className="text-xs font-bold text-[#C41E1E]">⏰ 놓치면 후회할 마지막 기회</p>
+            </div>
+          )}
+
+          {isEnded && (
+            <div className="mt-3 rounded-lg bg-gray-100 p-3 text-center">
+              <p className="text-xs font-bold text-gray-600">공구가 마감되었습니다</p>
+            </div>
+          )}
+
+          {/* 진행률 바 */}
+          {targetCount > 0 && (
+            <div className="mt-4">
+              <div className="mb-1.5 flex items-center justify-between text-[11px]">
+                <span className="font-medium text-gray-700">목표 수량</span>
+                <span className="font-bold text-[#C41E1E]">
+                  {soldCount} / {targetCount}개 ({progressPct.toFixed(0)}%)
+                </span>
+              </div>
+              <div className="h-2.5 w-full overflow-hidden rounded-full bg-gray-100">
+                <div
+                  className="h-full bg-gradient-to-r from-[#C41E1E] to-[#FF6B6B] transition-all duration-500"
+                  style={{ width: `${progressPct}%` }}
+                />
+              </div>
+              {progressPct >= 100 && (
+                <p className="mt-1.5 text-[11px] font-medium text-green-600">🎉 목표 달성!</p>
+              )}
+              {progressPct >= 80 && progressPct < 100 && (
+                <p className="mt-1.5 text-[11px] font-medium text-[#C41E1E]">🔥 목표 달성 임박!</p>
+              )}
+            </div>
+          )}
+
+          {/* CTA */}
+          {!isEnded && (
+            <a
+              href={addUtm(buyUrl, slug)}
+              target={buyUrl.startsWith("http") ? "_blank" : undefined}
+              rel="noopener noreferrer"
+              className="mt-4 block w-full rounded-xl bg-[#C41E1E] py-3 text-center text-sm font-bold text-white hover:bg-[#A01818] transition-colors"
+            >
+              바로 구매하기 →
+            </a>
+          )}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 // ─── 블록 디스패처 ───
 function BlockRenderer({ block, creator, shop, picks, reviews, campaigns, slug }: {
   block: ShopBlock;
@@ -748,15 +925,20 @@ function BlockRenderer({ block, creator, shop, picks, reviews, campaigns, slug }
     case "newsletter": return <NewsletterBlock />;
     case "html": return <HtmlBlock data={block.data} />;
     case "calendar": return <CalendarBlock data={block.data} campaigns={campaigns} slug={slug} />;
+    case "campaign_live": return <CampaignLiveBlock data={block.data} campaigns={campaigns} slug={slug} />;
     default: return null;
   }
 }
 
 // ─── 기본 블록 레이아웃 (blocks 미설정 시 폴백) ───
-function defaultBlocks(shop: ShopApiResponse["shop"], hasCampaigns: boolean): ShopBlock[] {
+function defaultBlocks(shop: ShopApiResponse["shop"], hasCampaigns: boolean, hasActiveCampaign: boolean): ShopBlock[] {
   const blocks: ShopBlock[] = [
     { type: "hero", data: {} },
   ];
+  // 진행중인 공구 있으면 최상단에 라이브 블록
+  if (hasActiveCampaign) {
+    blocks.push({ type: "campaign_live", data: {} });
+  }
   if (shop?.link_blocks && shop.link_blocks.length > 0) {
     blocks.push({ type: "links", data: { items: shop.link_blocks } });
   }
@@ -822,10 +1004,21 @@ export default function ShopPage({ params }: { params: Promise<{ slug: string }>
       }))
     : FALLBACK_PICKS;
 
+  // 진행중 캠페인 여부
+  const hasActiveCampaign = safeCampaigns.some((c) => {
+    if (!c.started_at) return false;
+    const start = new Date(c.started_at).getTime();
+    const end = c.settled_at
+      ? new Date(c.settled_at).getTime()
+      : start + 7 * 24 * 60 * 60 * 1000;
+    const now = Date.now();
+    return (c.status === "running" || c.status === "approved") && now >= start && now <= end;
+  });
+
   // 블록 결정: DB에 blocks가 있으면 사용, 없으면 기본 레이아웃
   const blocks: ShopBlock[] = (shop?.blocks && Array.isArray(shop.blocks) && shop.blocks.length > 0)
     ? shop.blocks
-    : defaultBlocks(shop, safeCampaigns.length > 0);
+    : defaultBlocks(shop, safeCampaigns.length > 0, hasActiveCampaign);
 
   return (
     <div className="min-h-screen bg-gray-50">

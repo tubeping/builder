@@ -3,7 +3,7 @@ import { getServiceClient } from "@/lib/supabase";
 
 const CLIENT_ID = (process.env.CAFE24_CLIENT_ID || "").trim();
 const CLIENT_SECRET = (process.env.CAFE24_CLIENT_SECRET || "").trim();
-const MALL_ID = process.env.CAFE24_MALL_ID || "tubeping";
+const MALL_ID = (process.env.CAFE24_MALL_ID || "tubeping").trim();
 const API_VERSION = "2026-03-01";
 
 async function getToken(): Promise<string> {

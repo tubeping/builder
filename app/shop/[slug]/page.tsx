@@ -281,14 +281,12 @@ function LinksBlock({ data, slug }: { data: Record<string, unknown>; slug: strin
   if (items.length === 0) return null;
   return (
     <section className="mx-auto max-w-2xl px-3 sm:px-4 py-3">
-      <div className="flex items-center gap-2 mb-3">
-        <span className="text-xl">🔗</span>
-        <h2 className="text-base font-bold">링크</h2>
-      </div>
-      <div className="space-y-2">
+      <div className="flex flex-wrap items-center justify-center gap-2.5">
         {items.map((link) => (
           <a key={link.id} href={addUtm(link.url, slug)} target="_blank" rel="noopener noreferrer"
-            className="flex items-center gap-3 p-3 hover:opacity-90 transition-all"
+            title={link.label}
+            aria-label={link.label}
+            className="flex h-11 w-11 items-center justify-center hover:opacity-75 transition-opacity"
             style={{
               borderRadius: "var(--block-radius)",
               border: "1px solid var(--card-border)",
@@ -296,11 +294,7 @@ function LinksBlock({ data, slug }: { data: Record<string, unknown>; slug: strin
               boxShadow: "var(--block-shadow)",
             }}
           >
-            <span className="text-xl">{link.icon}</span>
-            <span className="flex-1 text-sm font-medium">{link.label}</span>
-            <svg className="h-4 w-4" style={{ color: "var(--muted-soft)" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-            </svg>
+            <span className="text-lg">{link.icon}</span>
           </a>
         ))}
       </div>

@@ -118,20 +118,30 @@ function BlockEditor({ block, onChange }: { block: ShopBlock; onChange: (data: R
         {block.type === "hero" && (<>
           <div><label className={lc}>쇼핑몰 이름</label><input type="text" value={(d.name as string) || ""} onChange={e => onChange({ ...d, name: e.target.value })} className={ic} /></div>
           <div><label className={lc}>소개글</label><textarea value={(d.bio as string) || ""} onChange={e => onChange({ ...d, bio: e.target.value })} rows={3} placeholder="나를 소개하는 글" className={ic + " resize-none"} /></div>
-          <div><label className={lc}>커버 이미지</label><input type="url" value={(d.cover_url as string) || ""} onChange={e => onChange({ ...d, cover_url: e.target.value })} placeholder="https://..." className={ic} /></div>
-          <div><label className={lc}>프로필 이미지</label><input type="url" value={(d.profile_url as string) || ""} onChange={e => onChange({ ...d, profile_url: e.target.value })} placeholder="https://..." className={ic} /></div>
+          <div>
+            <label className={lc}>커버 이미지 <span className="text-[10px] font-normal text-gray-400">16:9 권장</span></label>
+            <ImageUpload value={(d.cover_url as string) || ""} onChange={(url) => onChange({ ...d, cover_url: url })} aspect="16/9" label="커버" />
+          </div>
+          <div>
+            <label className={lc}>프로필 이미지 <span className="text-[10px] font-normal text-gray-400">정사각형 · 원형 크롭</span></label>
+            <ImageUpload value={(d.profile_url as string) || ""} onChange={(url) => onChange({ ...d, profile_url: url })} aspect="1/1" rounded label="프로필" />
+          </div>
         </>)}
         {block.type === "text" && (<div><label className={lc}>내용</label><textarea value={(d.content as string) || ""} onChange={e => onChange({ ...d, content: e.target.value })} rows={6} placeholder="자유롭게 텍스트를 입력하세요" className={ic + " resize-none"} /></div>)}
         {block.type === "image" && (<>
-          <div><label className={lc}>이미지 URL</label><input type="url" value={(d.url as string) || ""} onChange={e => onChange({ ...d, url: e.target.value })} placeholder="https://..." className={ic} /></div>
+          <div>
+            <label className={lc}>이미지</label>
+            <ImageUpload value={(d.url as string) || ""} onChange={(url) => onChange({ ...d, url })} aspect="4/3" label="이미지" />
+          </div>
           <div><label className={lc}>캡션</label><input type="text" value={(d.caption as string) || ""} onChange={e => onChange({ ...d, caption: e.target.value })} className={ic} /></div>
         </>)}
         {block.type === "banner" && (<>
           <div><label className={lc}>배너 제목</label><input type="text" value={(d.title as string) || ""} onChange={e => onChange({ ...d, title: e.target.value })} placeholder="이번 주 공구!" className={ic} /></div>
           <div><label className={lc}>부제목</label><input type="text" value={(d.subtitle as string) || ""} onChange={e => onChange({ ...d, subtitle: e.target.value })} className={ic} /></div>
-          <div className="grid grid-cols-2 gap-3">
-            <div><label className={lc}>D-day</label><input type="number" value={(d.dday as number) ?? ""} onChange={e => onChange({ ...d, dday: parseInt(e.target.value) || 0 })} className={ic} /></div>
-            <div><label className={lc}>배너 이미지</label><input type="url" value={(d.image_url as string) || ""} onChange={e => onChange({ ...d, image_url: e.target.value })} placeholder="https://..." className={ic} /></div>
+          <div><label className={lc}>D-day</label><input type="number" value={(d.dday as number) ?? ""} onChange={e => onChange({ ...d, dday: parseInt(e.target.value) || 0 })} className={`${ic} w-24`} /></div>
+          <div>
+            <label className={lc}>배너 이미지</label>
+            <ImageUpload value={(d.image_url as string) || ""} onChange={(url) => onChange({ ...d, image_url: url })} aspect="1/1" label="배너" />
           </div>
           <div><label className={lc}>링크 URL</label><input type="url" value={(d.link_url as string) || ""} onChange={e => onChange({ ...d, link_url: e.target.value })} className={ic} /></div>
         </>)}
@@ -160,10 +170,31 @@ function BlockEditor({ block, onChange }: { block: ShopBlock; onChange: (data: R
           <p className="text-xs text-gray-500 bg-gray-50 rounded-lg p-3">내 PICK에 등록된 상품이 자동 표시됩니다</p>
           <div><label className={lc}>표시 개수</label><input type="number" value={(d.limit as number) || 12} onChange={e => onChange({ ...d, limit: parseInt(e.target.value) || 12 })} min={1} max={50} className="w-24 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm outline-none focus:border-[#C41E1E]" /></div>
         </>)}
-        {block.type === "gallery" && (<>
-          <div><label className={lc}>이미지 URL (줄바꿈 구분)</label><textarea value={((d.images as string[]) || []).join("\n")} onChange={e => onChange({ ...d, images: e.target.value.split("\n").filter(Boolean) })} rows={4} placeholder={"https://image1.jpg\nhttps://image2.jpg"} className={ic + " resize-none font-mono text-xs"} /></div>
-          <div><label className={lc}>열 수</label><div className="flex gap-2">{[2, 3, 4].map(n => (<button key={n} onClick={() => onChange({ ...d, columns: n })} className={`cursor-pointer rounded-lg px-4 py-2 text-xs font-bold transition-all ${(d.columns || 2) === n ? "bg-[#C41E1E] text-white shadow-sm" : "bg-gray-100 text-gray-500 hover:bg-gray-200"}`}>{n}열</button>))}</div></div>
-        </>)}
+        {block.type === "gallery" && (() => {
+          const imgs = (d.images as string[]) || [];
+          return (<>
+            <div>
+              <label className={lc}>갤러리 이미지 <span className="text-[10px] font-normal text-gray-400">· {imgs.length}장</span></label>
+              <div className="grid grid-cols-3 gap-2">
+                {imgs.map((src, i) => (
+                  <div key={i} className="relative group">
+                    <div className="aspect-square overflow-hidden rounded-lg border border-gray-200 bg-gray-100">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={src} alt="" className="w-full h-full object-cover" />
+                    </div>
+                    <button type="button"
+                      onClick={() => onChange({ ...d, images: imgs.filter((_, j) => j !== i) })}
+                      className="absolute top-1 right-1 h-5 w-5 rounded-full bg-black/60 text-white text-[10px] cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity">
+                      ✕
+                    </button>
+                  </div>
+                ))}
+                <ImageUpload value="" onChange={(url) => { if (url) onChange({ ...d, images: [...imgs, url] }); }} aspect="1/1" label="추가" />
+              </div>
+            </div>
+            <div><label className={lc}>열 수</label><div className="flex gap-2">{[2, 3, 4].map(n => (<button key={n} onClick={() => onChange({ ...d, columns: n })} className={`cursor-pointer rounded-lg px-4 py-2 text-xs font-bold transition-all ${(d.columns || 2) === n ? "bg-[#C41E1E] text-white shadow-sm" : "bg-gray-100 text-gray-500 hover:bg-gray-200"}`}>{n}열</button>))}</div></div>
+          </>);
+        })()}
         {block.type === "divider" && (<p className="text-xs text-gray-400 bg-gray-50 rounded-lg p-3 text-center">설정 없음</p>)}
         {block.type === "calendar" && (() => {
           interface ManualEvent {
@@ -308,10 +339,12 @@ function BlockEditor({ block, onChange }: { block: ShopBlock; onChange: (data: R
                             onChange={e => update(i, { link_url: e.target.value })}
                             placeholder="공구 링크 (https://...)"
                             className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs outline-none focus:border-[#C41E1E]" />
-                          <input type="url" value={ev.image || ""}
-                            onChange={e => update(i, { image: e.target.value || null })}
-                            placeholder="대표 이미지 URL (선택)"
-                            className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs outline-none focus:border-[#C41E1E]" />
+                          <div>
+                            <label className="text-[9px] font-bold text-gray-400 uppercase">대표 이미지 (선택)</label>
+                            <div className="mt-0.5">
+                              <ImageUpload value={ev.image || ""} onChange={(url) => update(i, { image: url || null })} aspect="1/1" label="이미지" />
+                            </div>
+                          </div>
                         </div>
                       );
                     })}
@@ -369,8 +402,14 @@ function BlockPreview({ block, isSelected }: { block: ShopBlock; isSelected: boo
       </div>
     );
     case "links": { const items = (d.items as LinkItem[]) || []; return (
-      <div className={`px-3 py-2 space-y-1 ${ring}`}>
-        {items.slice(0, 3).map(item => (<div key={item.id} className="flex items-center gap-2 rounded-lg border border-gray-100 bg-white p-2 shadow-sm"><span className="text-xs">{item.icon}</span><span className="text-[8px] font-medium text-gray-700 flex-1">{item.label || "링크"}</span></div>))}
+      <div className={`px-3 py-2 ${ring}`}>
+        <div className="flex flex-wrap items-center justify-center gap-1.5">
+          {items.slice(0, 6).map(item => (
+            <div key={item.id} className="flex h-7 w-7 items-center justify-center rounded-lg border border-gray-100 bg-white shadow-sm">
+              <span className="text-[10px]">{item.icon}</span>
+            </div>
+          ))}
+        </div>
       </div>
     ); }
     case "picks": return (
@@ -427,6 +466,93 @@ function BlockPreview({ block, isSelected }: { block: ShopBlock; isSelected: boo
     ); }
     default: return null;
   }
+}
+
+// ─── 이미지 업로드 헬퍼 ───
+function ImageUpload({ value, onChange, aspect = "16/9", rounded = false, label = "이미지" }: {
+  value: string;
+  onChange: (url: string) => void;
+  aspect?: "16/9" | "4/3" | "1/1";
+  rounded?: boolean;
+  label?: string;
+}) {
+  const [uploading, setUploading] = useState(false);
+  const [err, setErr] = useState("");
+  const inputId = React.useId();
+
+  const aspectClass = aspect === "16/9" ? "aspect-video" : aspect === "4/3" ? "aspect-[4/3]" : "aspect-square";
+  const shapeClass = rounded ? "rounded-full" : "rounded-xl";
+
+  const handleFile = async (file: File) => {
+    if (!file.type.startsWith("image/")) { setErr("이미지 파일만 업로드 가능"); return; }
+    if (file.size > 5 * 1024 * 1024) { setErr("5MB 이하만 업로드 가능"); return; }
+    setErr(""); setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch("/api/upload", { method: "POST", body: fd });
+      const data = await res.json();
+      if (!res.ok || !data.url) {
+        setErr(data.error || "업로드 실패");
+        return;
+      }
+      onChange(data.url);
+    } catch {
+      setErr("네트워크 오류");
+    } finally {
+      setUploading(false);
+      setTimeout(() => setErr(""), 5000);
+    }
+  };
+
+  return (
+    <div>
+      <input
+        id={inputId}
+        type="file"
+        accept="image/png,image/jpeg,image/webp,image/gif,image/avif"
+        onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); e.target.value = ""; }}
+        className="hidden"
+      />
+      {value ? (
+        <div className="relative group">
+          <div className={`${aspectClass} ${shapeClass} overflow-hidden border border-gray-200 bg-gray-100 ${rounded ? "w-20 h-20 aspect-square" : "w-full"}`}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={value} alt="" className="w-full h-full object-cover" />
+          </div>
+          <div className="mt-1.5 flex gap-1.5">
+            <label htmlFor={inputId}
+              className="cursor-pointer flex-1 rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-center text-[11px] font-medium text-gray-600 hover:bg-gray-50">
+              {uploading ? "업로드 중…" : "변경"}
+            </label>
+            <button type="button" onClick={() => onChange("")}
+              className="cursor-pointer rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-[11px] font-medium text-gray-400 hover:bg-red-50 hover:text-red-500">
+              삭제
+            </button>
+          </div>
+        </div>
+      ) : (
+        <label htmlFor={inputId}
+          className={`${aspectClass} ${shapeClass} ${rounded ? "w-20 h-20 aspect-square" : "w-full"} flex flex-col items-center justify-center gap-1 cursor-pointer border-2 border-dashed border-gray-200 bg-gray-50 text-gray-400 hover:border-[#C41E1E] hover:bg-[#fff5f5] hover:text-[#C41E1E] transition-colors`}>
+          {uploading ? (
+            <>
+              <span className="h-4 w-4 animate-spin rounded-full border-2 border-gray-200 border-t-[#C41E1E]" />
+              <span className="text-[10px]">업로드 중…</span>
+            </>
+          ) : (
+            <>
+              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+              <span className="text-[10px] font-medium">{label} 추가</span>
+              <span className="text-[9px] opacity-60">클릭해서 업로드</span>
+            </>
+          )}
+        </label>
+      )}
+      {err && <p className="mt-1 text-[10px] text-red-500">{err}</p>}
+    </div>
+  );
 }
 
 // ─── 스타일 패널 (테마/배경/폰트/블록) ───
@@ -730,24 +856,29 @@ export default function ShopCustomize() {
         {/* 블록 리스트 OR 스타일 패널 */}
         <div className="flex-1 overflow-y-auto p-2 md:p-4">
           {sideTab === "blocks" ? (
-            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-              <SortableContext items={blocks.map(b => b.id)} strategy={verticalListSortingStrategy}>
-                {/* 모바일: 아이콘 버전 */}
-                <div className="md:hidden flex flex-col items-center gap-2">
-                  {blocks.map(block => (
-                    <SortableBlock key={block.id} block={block} isSelected={selectedId === block.id} compact
-                      onSelect={() => setSelectedId(block.id)} onDelete={() => { setBlocks(prev => prev.filter(b => b.id !== block.id)); if (selectedId === block.id) setSelectedId(null); }} />
-                  ))}
-                </div>
-                {/* PC: 전체 버전 */}
-                <div className="hidden md:block space-y-1.5">
-                  {blocks.map(block => (
-                    <SortableBlock key={block.id} block={block} isSelected={selectedId === block.id}
-                      onSelect={() => setSelectedId(block.id)} onDelete={() => { setBlocks(prev => prev.filter(b => b.id !== block.id)); if (selectedId === block.id) setSelectedId(null); }} />
-                  ))}
-                </div>
-              </SortableContext>
-            </DndContext>
+            <>
+              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                <SortableContext items={blocks.map(b => b.id)} strategy={verticalListSortingStrategy}>
+                  {/* 모바일: 아이콘 버전 */}
+                  <div className="md:hidden flex flex-col items-center gap-2">
+                    {blocks.map(block => (
+                      <SortableBlock key={block.id} block={block} isSelected={selectedId === block.id} compact
+                        onSelect={() => setSelectedId(block.id)} onDelete={() => { setBlocks(prev => prev.filter(b => b.id !== block.id)); if (selectedId === block.id) setSelectedId(null); }} />
+                    ))}
+                  </div>
+                  {/* PC: 전체 버전 */}
+                  <div className="hidden md:block space-y-1.5">
+                    {blocks.map(block => (
+                      <SortableBlock key={block.id} block={block} isSelected={selectedId === block.id}
+                        onSelect={() => setSelectedId(block.id)} onDelete={() => { setBlocks(prev => prev.filter(b => b.id !== block.id)); if (selectedId === block.id) setSelectedId(null); }} />
+                    ))}
+                  </div>
+                </SortableContext>
+              </DndContext>
+              <p className="hidden md:block mt-4 text-[10px] leading-relaxed text-gray-400">
+                💡 자유롭게 블록을 추가하고, <b>드래그로 위·아래 순서</b>를 조정하세요. 블록을 클릭하면 오른쪽에서 편집할 수 있어요.
+              </p>
+            </>
           ) : (
             <StylePanel theme={theme} setTheme={setTheme} applyPreset={applyPreset} />
           )}

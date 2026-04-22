@@ -1485,16 +1485,69 @@ function OwnProductTab({
   const [url, setUrl] = useState(""); const [name, setName] = useState(""); const [price, setPrice] = useState("");
   const [category, setCategory] = useState(""); const [imageUrl, setImageUrl] = useState(""); const [comment, setComment] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null); const [commentDraft, setCommentDraft] = useState("");
+  const [fetching, setFetching] = useState(false);
+  const [fetchError, setFetchError] = useState("");
+  const [sourceLabel, setSourceLabel] = useState<string>(""); // 쿠팡/네이버/스마트스토어 등
+
   const OWN_CATEGORIES = ["패션/의류", "뷰티/화장품", "식품", "생활용품", "디지털/가전", "굿즈/MD", "핸드메이드", "기타"];
 
-  const resetForm = () => { setUrl(""); setName(""); setPrice(""); setCategory(""); setImageUrl(""); setComment(""); };
+  const resetForm = () => {
+    setUrl(""); setName(""); setPrice(""); setCategory("");
+    setImageUrl(""); setComment(""); setFetchError(""); setSourceLabel("");
+  };
+
+  // 도메인 기반 사이트 라벨 추정 (badge)
+  const detectSource = (u: string): string => {
+    try {
+      const host = new URL(u).hostname.toLowerCase();
+      if (host.includes("coupang")) return "쿠팡";
+      if (host.includes("smartstore.naver") || host.includes("shopping.naver")) return "스마트스토어";
+      if (host.includes("11st")) return "11번가";
+      if (host.includes("gmarket")) return "G마켓";
+      if (host.includes("auction")) return "옥션";
+      if (host.includes("wadiz")) return "와디즈";
+      if (host.includes("tubeping")) return "튜핑";
+      if (host.includes("cafe24")) return "Cafe24";
+      return host.replace(/^www\./, "").split(".")[0];
+    } catch { return ""; }
+  };
+
+  // URL → 상품 정보 자동 추출 (/api/unfurl)
+  const handleFetchUrl = async () => {
+    const u = url.trim();
+    if (!u) { setFetchError("URL을 입력하세요"); return; }
+    try { new URL(u); } catch { setFetchError("유효하지 않은 URL"); return; }
+
+    setFetching(true); setFetchError("");
+    try {
+      const res = await fetch(`/api/unfurl?url=${encodeURIComponent(u)}`);
+      if (!res.ok) { setFetchError("상품 정보를 가져올 수 없습니다"); return; }
+      const data = await res.json();
+
+      if (data.title) setName(data.title);
+      if (data.image) setImageUrl(data.image);
+      if (data.price) setPrice(String(Math.round(data.price)));
+      setSourceLabel(detectSource(u));
+    } catch {
+      setFetchError("네트워크 오류. 다시 시도해주세요");
+    } finally {
+      setFetching(false);
+    }
+  };
 
   const handleSubmit = () => {
     if (!name.trim()) return;
     onAddPick({
       source_type: "own", name: name.trim(), price: parseInt(price) || 0, category: category || "기타",
       image: imageUrl.trim() || null, external_url: url.trim() || null, curation_comment: comment.trim(),
-      source_meta: { name: name.trim(), price: parseInt(price) || 0, image: imageUrl.trim() || null, category: category || "기타", custom_price: parseInt(price) || 0 },
+      source_meta: {
+        name: name.trim(),
+        price: parseInt(price) || 0,
+        image: imageUrl.trim() || null,
+        category: category || "기타",
+        custom_price: parseInt(price) || 0,
+        source_label: sourceLabel || undefined,
+      },
     });
     resetForm();
   };
@@ -1523,26 +1576,108 @@ function OwnProductTab({
       {/* 입력 폼 */}
       <div className="rounded-xl border border-gray-200 p-5 space-y-4">
         {mode === "url" && (
-          <div><label className="mb-1.5 block text-sm font-medium text-gray-700">판매 링크 *</label>
-            <input type="url" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://smartstore.naver.com/myshop/products/..." className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm outline-none focus:border-[#C41E1E]" /></div>
+          <>
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-gray-700">판매 링크 *</label>
+              <div className="flex gap-2">
+                <input
+                  type="url"
+                  value={url}
+                  onChange={(e) => setUrl(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") handleFetchUrl(); }}
+                  placeholder="쿠팡·네이버·스마트스토어·자사몰 등 모든 URL"
+                  className="flex-1 rounded-lg border border-gray-300 px-4 py-2.5 text-sm outline-none focus:border-[#C41E1E]"
+                />
+                <button
+                  onClick={handleFetchUrl}
+                  disabled={fetching || !url.trim()}
+                  className="cursor-pointer rounded-lg bg-[#111111] px-5 py-2.5 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-40 disabled:cursor-default whitespace-nowrap"
+                >
+                  {fetching ? (
+                    <span className="flex items-center gap-1.5">
+                      <span className="h-3 w-3 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                      분석 중
+                    </span>
+                  ) : "자동 가져오기"}
+                </button>
+              </div>
+              {fetchError && <p className="mt-1.5 text-xs text-red-500">{fetchError}</p>}
+              <p className="mt-1.5 text-[11px] text-gray-400">
+                링크만 붙여넣으면 이미지/상품명/가격을 자동으로 가져옵니다. 수정도 가능해요.
+              </p>
+            </div>
+
+            {/* 미리보기 카드 (네이버 상품 찾기 스타일) */}
+            {(imageUrl || name) && (
+              <div className="rounded-xl border-2 border-dashed border-[#C41E1E]/30 bg-gradient-to-br from-[#fff5f5] to-white p-3">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-[10px] font-bold text-[#C41E1E]">✨ 미리보기</span>
+                  {sourceLabel && (
+                    <span className="rounded-full bg-gray-900 px-2 py-0.5 text-[9px] font-medium text-white">
+                      {sourceLabel}
+                    </span>
+                  )}
+                </div>
+                <div className="flex gap-3">
+                  <div className="h-20 w-20 shrink-0 overflow-hidden rounded-lg bg-gray-100">
+                    {imageUrl ? (
+                      <img src={imageUrl} alt="" className="h-full w-full object-cover" />
+                    ) : (
+                      <div className="flex h-full items-center justify-center text-gray-300">
+                        <svg className="h-6 w-6" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                      </div>
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="line-clamp-2 text-sm font-medium text-gray-900 leading-snug">
+                      {name || "상품명을 입력하세요"}
+                    </p>
+                    {parseInt(price) > 0 && (
+                      <p className="mt-1 text-base font-bold text-[#C41E1E]">
+                        {formatPrice(parseInt(price))}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+          </>
         )}
-        <div><label className="mb-1.5 block text-sm font-medium text-gray-700">상품명 *</label>
-          <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="상품명을 입력하세요" className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm outline-none focus:border-[#C41E1E]" /></div>
+
+        <div>
+          <label className="mb-1.5 block text-sm font-medium text-gray-700">상품명 *</label>
+          <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="상품명을 입력하세요" className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm outline-none focus:border-[#C41E1E]" />
+        </div>
         <div className="grid grid-cols-2 gap-3">
-          <div><label className="mb-1.5 block text-sm font-medium text-gray-700">가격</label>
-            <input type="number" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="0" className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm outline-none focus:border-[#C41E1E]" /></div>
-          <div><label className="mb-1.5 block text-sm font-medium text-gray-700">카테고리</label>
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-gray-700">가격</label>
+            <input type="number" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="0" className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm outline-none focus:border-[#C41E1E]" />
+          </div>
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-gray-700">카테고리 *</label>
             <select value={category} onChange={(e) => setCategory(e.target.value)} className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm outline-none focus:border-[#C41E1E] bg-white">
               <option value="">선택하세요</option>
               {OWN_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
-            </select></div>
+            </select>
+          </div>
         </div>
-        <div><label className="mb-1.5 block text-sm font-medium text-gray-700">상품 이미지 URL</label>
-          <input type="url" value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} placeholder="https://..." className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm outline-none focus:border-[#C41E1E]" /></div>
-        <div><label className="mb-1.5 block text-sm font-medium text-gray-700">큐레이션 코멘트</label>
-          <input type="text" value={comment} onChange={(e) => setComment(e.target.value)} placeholder="이 상품을 추천하는 이유를 한 줄로" className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm outline-none focus:border-[#C41E1E]" /></div>
-        <div className="flex justify-end pt-1">
-          <button onClick={handleSubmit} disabled={!name.trim()} className="cursor-pointer rounded-lg bg-[#C41E1E] px-6 py-2.5 text-sm font-medium text-white hover:bg-[#A01818] disabled:opacity-40 disabled:cursor-default">PICK 추가</button>
+        <div>
+          <label className="mb-1.5 block text-sm font-medium text-gray-700">상품 이미지 URL {mode === "url" && <span className="text-[10px] text-gray-400">(자동 가져오기로 채워짐)</span>}</label>
+          <input type="url" value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} placeholder="https://..." className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm outline-none focus:border-[#C41E1E]" />
+        </div>
+        <div>
+          <label className="mb-1.5 block text-sm font-medium text-gray-700">큐레이션 코멘트</label>
+          <input type="text" value={comment} onChange={(e) => setComment(e.target.value)} placeholder="이 상품을 추천하는 이유를 한 줄로" className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm outline-none focus:border-[#C41E1E]" />
+        </div>
+        <div className="flex items-center justify-between pt-1">
+          <p className="text-[11px] text-gray-400">
+            판매는 원본 쇼핑몰에서 이루어집니다. 팬이 링크를 클릭하면 해당 페이지로 이동해요.
+          </p>
+          <button onClick={handleSubmit} disabled={!name.trim()} className="cursor-pointer rounded-lg bg-[#C41E1E] px-6 py-2.5 text-sm font-medium text-white hover:bg-[#A01818] disabled:opacity-40 disabled:cursor-default">
+            PICK 추가
+          </button>
         </div>
       </div>
 

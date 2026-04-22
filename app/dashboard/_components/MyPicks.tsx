@@ -1257,8 +1257,42 @@ function NaverTab({
   const [category, setCategory] = useState("");
   const [comment, setComment] = useState("");
   const [toastMessage, setToastMessage] = useState("");
+  const [fetching, setFetching] = useState(false);
+  const [fetchMsg, setFetchMsg] = useState("");
 
   const CATEGORIES = ["식품", "생활/건강", "뷰티/화장품", "패션/의류", "디지털/가전", "주방용품", "가구/인테리어", "유아동", "반려동물", "스포츠/레저", "기타"];
+
+  // Headless Chrome으로 자동 가져오기
+  const handleAutoFetch = async () => {
+    const u = url.trim();
+    if (!u) { setFetchMsg("판매 링크를 먼저 입력해주세요"); return; }
+    setFetching(true); setFetchMsg("");
+    try {
+      const res = await fetch(`/api/unfurl-headless?url=${encodeURIComponent(u)}`);
+      if (!res.ok) { setFetchMsg("자동 추출에 실패했어요. 수동으로 입력해주세요"); return; }
+      const data = await res.json();
+
+      const isGeneric = !data.title || /네이버\s*브랜드\s*커넥트/i.test(data.title);
+      const hasImage = !!data.image;
+
+      if (!isGeneric && data.title) setName(data.title);
+      if (hasImage) setImageUrl(data.image);
+      if (data.price > 0) setPrice(String(Math.round(data.price)));
+
+      if (!isGeneric && hasImage) {
+        setFetchMsg("✅ 자동 추출 성공!");
+      } else if (hasImage || !isGeneric) {
+        setFetchMsg("⚠️ 일부만 가져왔어요. 나머지는 수동으로 채워주세요");
+      } else {
+        setFetchMsg("자동 추출에 실패했어요. 수동으로 입력해주세요");
+      }
+    } catch {
+      setFetchMsg("네트워크 오류. 수동으로 입력해주세요");
+    } finally {
+      setFetching(false);
+      setTimeout(() => setFetchMsg(""), 5000);
+    }
+  };
 
   const naverPicks = picks.filter((p) => p.source_type === "naver");
 
@@ -1334,13 +1368,38 @@ function NaverTab({
             판매 링크 <span className="text-[#C41E1E]">*</span>
             <span className="ml-2 text-[10px] font-normal text-gray-400">네이버 발급 링크 그대로 붙여넣기</span>
           </label>
-          <input
-            type="url"
-            value={url}
-            onChange={(e) => setUrl(e.target.value)}
-            placeholder="https://naver.me/... 또는 brandconnect.naver.com/..."
-            className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm outline-none focus:border-[#03C75A]"
-          />
+          <div className="flex gap-2">
+            <input
+              type="url"
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              placeholder="https://naver.me/... 또는 brandconnect.naver.com/..."
+              className="flex-1 rounded-lg border border-gray-300 px-4 py-2.5 text-sm outline-none focus:border-[#03C75A]"
+            />
+            <button
+              onClick={handleAutoFetch}
+              disabled={fetching || !url.trim()}
+              className="cursor-pointer rounded-lg bg-[#111111] px-4 py-2.5 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-40 disabled:cursor-default whitespace-nowrap"
+              title="Headless Chrome이 실제 브라우저처럼 페이지를 열어 이미지/제목/가격을 자동으로 가져옵니다"
+            >
+              {fetching ? (
+                <span className="flex items-center gap-1.5">
+                  <span className="h-3 w-3 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                  가져오는 중
+                </span>
+              ) : "🤖 자동으로 채우기"}
+            </button>
+          </div>
+          {fetchMsg && (
+            <p className={`mt-1.5 text-xs ${
+              fetchMsg.startsWith("✅") ? "text-green-600" :
+              fetchMsg.startsWith("⚠️") ? "text-amber-600" :
+              "text-red-500"
+            }`}>{fetchMsg}</p>
+          )}
+          <p className="mt-1 text-[10px] text-gray-400">
+            ⏱️ 자동 가져오기는 3~10초 걸려요 (실제 브라우저로 로드해서 느려요). 안 되면 아래에 직접 입력.
+          </p>
         </div>
 
         <div>

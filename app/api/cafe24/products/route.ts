@@ -94,12 +94,30 @@ async function refreshToken(storeId: string, refreshTkn: string): Promise<string
   return data.access_token;
 }
 
+// In-memory 응답 캐시 (카테고리·키워드·페이지 조합별 5분 TTL)
+type CacheEntry = { data: unknown; expiresAt: number };
+const responseCache = new Map<string, CacheEntry>();
+const CACHE_TTL_MS = 5 * 60 * 1000;
+
 export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl;
   const limit = searchParams.get("limit") || "100";
   const offset = searchParams.get("offset") || "0";
   const keyword = searchParams.get("keyword") || "";
   const category = searchParams.get("category") || "";
+  const includeSoldOut = searchParams.get("include_sold_out") === "true";
+
+  // 캐시 키 (같은 검색 조건이면 재사용)
+  const cacheKey = JSON.stringify({ limit, offset, keyword, category, includeSoldOut });
+  const cached = responseCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) {
+    return NextResponse.json(cached.data, {
+      headers: {
+        "Cache-Control": "public, s-maxage=300, stale-while-revalidate=3600",
+        "X-Cache": "HIT",
+      },
+    });
+  }
 
   let token: string;
   try {
@@ -141,6 +159,27 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "카페24 API 오류" }, { status: res.status });
   }
 
-  const data = await res.json();
-  return NextResponse.json(data);
+  const rawData = await res.json();
+
+  // 품절 필터 (include_sold_out=true 아니면 제거)
+  let products = rawData.products || [];
+  if (!includeSoldOut) {
+    products = products.filter((p: { sold_out?: string }) => p.sold_out !== "T");
+  }
+  const data = { ...rawData, products };
+
+  // 캐시 저장
+  responseCache.set(cacheKey, { data, expiresAt: Date.now() + CACHE_TTL_MS });
+  // 캐시 크기 제한 (최대 50개 키)
+  if (responseCache.size > 50) {
+    const oldest = responseCache.keys().next().value;
+    if (oldest) responseCache.delete(oldest);
+  }
+
+  return NextResponse.json(data, {
+    headers: {
+      "Cache-Control": "public, s-maxage=300, stale-while-revalidate=3600",
+      "X-Cache": "MISS",
+    },
+  });
 }

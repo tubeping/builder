@@ -256,15 +256,36 @@ function GongguTab({
 
   const fetchProducts = useCallback(async (opts?: { keyword?: string; category?: number | null; append?: boolean }) => {
     const isAppend = opts?.append || false;
+    const nextOffset = isAppend ? offset + PAGE_SIZE : 0;
+    const params = new URLSearchParams({ limit: String(PAGE_SIZE), offset: String(isAppend ? nextOffset : 0) });
+    if (opts?.keyword?.trim()) params.set("keyword", opts.keyword.trim());
+    const cat = opts?.category !== undefined ? opts.category : selectedCategory;
+    if (cat) params.set("category", String(cat));
+    const cacheKey = `cafe24_products::${params.toString()}`;
+
+    // ── localStorage stale cache 즉시 표시 (재방문 UX) ──
+    if (!isAppend && typeof window !== "undefined") {
+      try {
+        const cachedRaw = localStorage.getItem(cacheKey);
+        if (cachedRaw) {
+          const { at, list } = JSON.parse(cachedRaw);
+          const ageMs = Date.now() - at;
+          // 10분 이내면 일단 화면에 바로 뿌림 (백그라운드 fetch로 갱신)
+          if (ageMs < 10 * 60 * 1000 && Array.isArray(list)) {
+            setProducts(list);
+            setHasMore(list.length >= PAGE_SIZE);
+            setLoaded(true);
+            setLoading(false);
+          }
+        }
+      } catch { /* ignore */ }
+    }
+
     if (isAppend) setLoadingMore(true);
-    else setLoading(true);
+    else if (!loaded) setLoading(true); // 최초 로드에만 풀스크린 로딩
     setError("");
+
     try {
-      const nextOffset = isAppend ? offset + PAGE_SIZE : 0;
-      const params = new URLSearchParams({ limit: String(PAGE_SIZE), offset: String(isAppend ? nextOffset : 0) });
-      if (opts?.keyword?.trim()) params.set("keyword", opts.keyword.trim());
-      const cat = opts?.category !== undefined ? opts.category : selectedCategory;
-      if (cat) params.set("category", String(cat));
       const res = await fetch(`/api/cafe24/products?${params}`);
       if (!res.ok) throw new Error("API 오류");
       const data = await res.json();
@@ -275,17 +296,26 @@ function GongguTab({
       } else {
         setProducts(list);
         setOffset(0);
+        // 최신 결과 localStorage 캐시 저장
+        if (typeof window !== "undefined") {
+          try {
+            localStorage.setItem(cacheKey, JSON.stringify({ at: Date.now(), list }));
+          } catch { /* quota 초과 등 무시 */ }
+        }
       }
       setHasMore(list.length >= PAGE_SIZE);
       setLoaded(true);
     } catch {
-      setError("상품을 불러올 수 없습니다. 카페24 연동을 확인해주세요.");
-      if (!isAppend) setProducts([]);
+      // 캐시 있으면 에러 표시 안 함 (stale 유지)
+      if (products.length === 0) {
+        setError("상품을 불러올 수 없습니다. 카페24 연동을 확인해주세요.");
+        if (!isAppend) setProducts([]);
+      }
     } finally {
       setLoading(false);
       setLoadingMore(false);
     }
-  }, [offset, selectedCategory]);
+  }, [offset, selectedCategory, loaded, products.length]);
 
   useEffect(() => {
     if (!loaded) {

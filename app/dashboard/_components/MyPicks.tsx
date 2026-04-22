@@ -1274,11 +1274,15 @@ function NaverTab({
     try {
       const parsed = new URL(u);
       const host = parsed.hostname.toLowerCase();
+      // 네이버 공식 단축 URL (naver.me) + 본체 도메인 + 각종 서브도메인 전부 허용
       const isNaver =
-        host.includes("naver.com") ||
+        host === "naver.me" ||
+        host.endsWith(".naver.me") ||
+        host.endsWith("naver.com") ||
         host.includes("smartstore.naver") ||
         host.includes("shopping.naver") ||
-        host.includes("brandconnect.naver");
+        host.includes("brandconnect.naver") ||
+        host.includes("link.naver");
       return { ok: true, isNaver };
     } catch {
       return { ok: false, isNaver: false, error: "유효하지 않은 URL" };

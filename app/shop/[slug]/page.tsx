@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { themeToCssVars, normalizeTheme } from "@/lib/shop-theme";
 
 // ─── 타입 ───
 type ProductSource = "tubeping_campaign" | "coupang" | "naver" | "own" | "other";
@@ -1185,8 +1186,17 @@ export default function ShopPage({ params }: { params: Promise<{ slug: string }>
     ? shop.blocks
     : defaultBlocks(shop, safeCampaigns.length > 0, hasActiveCampaign, hasUpcomingCampaign);
 
+  // 테마 — 크리에이터가 몰 꾸미기에서 저장한 값, 없으면 기본값
+  const theme = normalizeTheme((shop as { theme?: unknown })?.theme as never);
+  const themeStyle = {
+    ...themeToCssVars(theme),
+    background: theme.bg,
+    color: theme.fg,
+    fontFamily: "var(--font-sans)",
+  } as React.CSSProperties;
+
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen" style={themeStyle}>
       {blocks.map((block, idx) => (
         <BlockRenderer
           key={idx}
@@ -1200,12 +1210,12 @@ export default function ShopPage({ params }: { params: Promise<{ slug: string }>
         />
       ))}
 
-      <footer className="border-t border-gray-100 bg-white py-6 text-center">
-        <p className="text-xs text-gray-400">
+      <footer className="border-t border-black/10 py-6 text-center">
+        <p className="text-xs opacity-50">
           Powered by{" "}
           <span className="font-semibold">
-            <span className="text-[#C41E1E]">Tube</span>
-            <span className="text-[#111111]">Ping</span>
+            <span style={{ color: theme.accent }}>Tube</span>
+            <span>Ping</span>
           </span>
         </p>
       </footer>

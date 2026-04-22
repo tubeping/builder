@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import {
   DndContext,
   closestCenter,
@@ -18,6 +18,10 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import {
+  type ShopTheme, type ThemePreset, type BlockShape, type BlockShadow, type BlockAlign, type FontKey,
+  DEFAULT_THEME, PRESETS, BG_COLORS, FONTS, normalizeTheme, themeToCssVars,
+} from "@/lib/shop-theme";
 
 // ─── 타입 ───
 interface ShopBlock {
@@ -224,12 +228,194 @@ function BlockPreview({ block, isSelected }: { block: ShopBlock; isSelected: boo
   }
 }
 
+// ─── 스타일 패널 (테마/배경/폰트/블록) ───
+function StylePanel({ theme, setTheme, applyPreset }: {
+  theme: ShopTheme;
+  setTheme: React.Dispatch<React.SetStateAction<ShopTheme>>;
+  applyPreset: (key: ThemePreset) => void;
+}) {
+  const updateBlock = (patch: Partial<ShopTheme["block"]>) =>
+    setTheme(prev => ({ ...prev, block: { ...prev.block, ...patch } }));
+
+  return (
+    <div className="hidden md:block space-y-5">
+      {/* 테마 프리셋 */}
+      <section>
+        <h4 className="mb-2 text-[11px] font-bold uppercase tracking-wide text-gray-400">테마</h4>
+        <div className="grid grid-cols-2 gap-1.5">
+          {PRESETS.map(p => {
+            const active = theme.preset === p.key;
+            return (
+              <button key={p.key} onClick={() => applyPreset(p.key)}
+                className={`relative cursor-pointer rounded-lg border p-2 text-left transition-all ${
+                  active ? "border-[#C41E1E] ring-2 ring-[#C41E1E]/20" : "border-gray-200 hover:border-gray-300"
+                }`}>
+                <div className="mb-1.5 h-10 rounded" style={{ background: p.bg, border: "1px solid rgba(0,0,0,0.05)" }}>
+                  <div className="h-full flex items-center justify-center text-[10px] font-bold" style={{ color: p.fg }}>Aa</div>
+                </div>
+                <div className="flex items-center gap-1">
+                  <span className="h-2 w-2 rounded-full" style={{ background: p.accent }} />
+                  <span className="text-[10px] font-medium text-gray-700">{p.label}</span>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </section>
+
+      {/* 배경색 직접 선택 */}
+      <section>
+        <h4 className="mb-2 text-[11px] font-bold uppercase tracking-wide text-gray-400">배경</h4>
+        <div className="grid grid-cols-6 gap-1.5">
+          {BG_COLORS.map(c => {
+            const active = theme.bg.toUpperCase() === c.value.toUpperCase();
+            return (
+              <button key={c.value} onClick={() => setTheme(prev => ({ ...prev, bg: c.value, preset: "custom" }))}
+                title={c.label}
+                className={`h-7 w-7 cursor-pointer rounded-full border-2 transition-transform ${
+                  active ? "border-[#C41E1E] scale-110" : "border-gray-200 hover:scale-105"
+                }`}
+                style={{ background: c.value }} />
+            );
+          })}
+        </div>
+      </section>
+
+      {/* 강조색 custom */}
+      <section>
+        <h4 className="mb-2 text-[11px] font-bold uppercase tracking-wide text-gray-400">강조색</h4>
+        <div className="flex items-center gap-2">
+          <input type="color" value={theme.accent}
+            onChange={(e) => setTheme(prev => ({ ...prev, accent: e.target.value, preset: "custom" }))}
+            className="h-9 w-9 cursor-pointer rounded-lg border border-gray-200" />
+          <input type="text" value={theme.accent}
+            onChange={(e) => setTheme(prev => ({ ...prev, accent: e.target.value, preset: "custom" }))}
+            className="flex-1 rounded-lg border border-gray-200 px-2 py-1.5 text-xs outline-none focus:border-[#C41E1E]" />
+        </div>
+      </section>
+
+      {/* 폰트 */}
+      <section>
+        <h4 className="mb-2 text-[11px] font-bold uppercase tracking-wide text-gray-400">폰트</h4>
+        <div className="grid grid-cols-2 gap-1.5">
+          {FONTS.map(f => {
+            const active = theme.font === f.key;
+            return (
+              <button key={f.key} onClick={() => setTheme(prev => ({ ...prev, font: f.key }))}
+                className={`cursor-pointer rounded-lg border py-2 px-2 text-xs font-bold transition-all ${
+                  active ? "border-[#C41E1E] bg-[#FFF5F5] text-gray-900" : "border-gray-200 text-gray-600 hover:border-gray-300"
+                }`}
+                style={{ fontFamily: f.cssFamily }}>
+                {f.label}
+              </button>
+            );
+          })}
+        </div>
+      </section>
+
+      {/* 블록 모양 */}
+      <section>
+        <h4 className="mb-2 text-[11px] font-bold uppercase tracking-wide text-gray-400">블록 모양</h4>
+        <div className="grid grid-cols-3 gap-1.5">
+          {(["square", "rounded", "pill"] as BlockShape[]).map(s => {
+            const active = theme.block.shape === s;
+            const radius = s === "square" ? "4px" : s === "rounded" ? "12px" : "999px";
+            return (
+              <button key={s} onClick={() => updateBlock({ shape: s })}
+                className={`cursor-pointer border h-11 p-1 transition-all flex items-center justify-center ${
+                  active ? "border-[#C41E1E] bg-[#FFF5F5]" : "border-gray-200 hover:border-gray-300"
+                }`}
+                style={{ borderRadius: s === "square" ? "8px" : s === "rounded" ? "12px" : "22px" }}>
+                <span className="inline-block h-5 w-full bg-gray-200" style={{ borderRadius: radius }} />
+              </button>
+            );
+          })}
+        </div>
+      </section>
+
+      {/* 그림자 */}
+      <section>
+        <h4 className="mb-2 text-[11px] font-bold uppercase tracking-wide text-gray-400">그림자</h4>
+        <div className="grid grid-cols-4 gap-1.5">
+          {(["none", "soft", "hard", "strong"] as BlockShadow[]).map(s => {
+            const active = theme.block.shadow === s;
+            const shadows = { none: "none", soft: "0 1px 3px rgba(0,0,0,.08)", hard: "0 4px 12px rgba(0,0,0,.12)", strong: "0 10px 25px rgba(0,0,0,.18)" };
+            return (
+              <button key={s} onClick={() => updateBlock({ shadow: s })}
+                className={`cursor-pointer rounded-lg border py-2 text-[10px] font-medium transition-all ${
+                  active ? "border-[#C41E1E] bg-[#FFF5F5] text-gray-900" : "border-gray-200 text-gray-500 hover:border-gray-300"
+                }`}
+                style={{ boxShadow: shadows[s] }}>
+                {s === "none" ? "없음" : s === "soft" ? "연" : s === "hard" ? "진" : "강"}
+              </button>
+            );
+          })}
+        </div>
+      </section>
+
+      {/* 정렬 */}
+      <section>
+        <h4 className="mb-2 text-[11px] font-bold uppercase tracking-wide text-gray-400">정렬</h4>
+        <div className="grid grid-cols-2 gap-1.5">
+          {(["left", "center"] as BlockAlign[]).map(a => {
+            const active = theme.block.align === a;
+            return (
+              <button key={a} onClick={() => updateBlock({ align: a })}
+                className={`cursor-pointer rounded-lg border py-2 text-[11px] font-medium transition-all ${
+                  active ? "border-[#C41E1E] bg-[#FFF5F5] text-gray-900" : "border-gray-200 text-gray-500 hover:border-gray-300"
+                }`}>
+                {a === "left" ? "⬅️ 왼쪽" : "⬌ 중앙"}
+              </button>
+            );
+          })}
+        </div>
+      </section>
+    </div>
+  );
+}
+
+// 모바일에서 StylePanel을 보여주기 위한 래퍼는 생략 (스타일 패널은 PC 전용)
 // ─── 메인 ───
 export default function ShopCustomize() {
   const [blocks, setBlocks] = useState<ShopBlock[]>(DEFAULT_BLOCKS);
   const [selectedId, setSelectedId] = useState<string | null>("b1");
   const [showPalette, setShowPalette] = useState(false);
   const selectedBlock = blocks.find(b => b.id === selectedId) || null;
+
+  // 스타일(테마) 관련
+  const [sideTab, setSideTab] = useState<"blocks" | "style">("blocks");
+  const [theme, setTheme] = useState<ShopTheme>(DEFAULT_THEME);
+  const [saving, setSaving] = useState(false);
+  const [saveMsg, setSaveMsg] = useState("");
+
+  // 초기 로드 — /api/me에서 저장된 theme 가져오기
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const res = await fetch("/api/me");
+        if (!res.ok) return;
+        const data = await res.json();
+        const saved = data?.creator_shops?.[0]?.theme ?? data?.shop?.theme;
+        if (alive && saved) setTheme(normalizeTheme(saved));
+      } catch { /* 그대로 기본값 */ }
+    })();
+    return () => { alive = false; };
+  }, []);
+
+  const handleSave = useCallback(async () => {
+    setSaving(true); setSaveMsg("");
+    try {
+      const res = await fetch("/api/me", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ theme }),
+      });
+      if (res.ok) { setSaveMsg("✅ 저장됨"); setTimeout(() => setSaveMsg(""), 2500); }
+      else setSaveMsg("⚠️ 저장 실패");
+    } catch { setSaveMsg("⚠️ 네트워크 오류"); }
+    finally { setSaving(false); }
+  }, [theme]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -253,28 +439,55 @@ export default function ShopCustomize() {
     setBlocks(prev => [...prev, nb]); setSelectedId(nb.id); setShowPalette(false);
   }, []);
 
+  // 프리셋 선택 시 accent/bg/fg 일괄 교체
+  const applyPreset = useCallback((key: ThemePreset) => {
+    const p = PRESETS.find(x => x.key === key);
+    if (!p) return;
+    setTheme(prev => ({ ...prev, preset: key, accent: p.accent, bg: p.bg, fg: p.fg }));
+  }, []);
+
   return (
     <div className="flex h-full bg-[#FAFAFA] relative">
-      {/* ─────────── Col 1: 블록 리스트 (PC 전체 / Mobile 아이콘) ─────────── */}
+      {/* ─────────── Col 1: 블록 / 스타일 (PC 전체 / Mobile 아이콘) ─────────── */}
       <div className="w-[64px] md:w-[220px] shrink-0 bg-white border-r border-gray-100 flex flex-col">
-        {/* 헤더 + 추가 버튼 */}
-        <div className="p-2 md:p-4 border-b border-gray-100 flex md:block flex-col items-center gap-2">
-          <div className="hidden md:block mb-3">
-            <h3 className="text-sm font-bold text-gray-900">블록 구성</h3>
-            <p className="text-[10px] text-gray-400 mt-0.5">드래그로 순서 변경</p>
+        {/* 탭 토글: 블록 | 스타일 */}
+        <div className="p-2 md:p-4 border-b border-gray-100">
+          <div className="hidden md:flex mb-3 rounded-lg bg-gray-100 p-0.5">
+            <button onClick={() => setSideTab("blocks")}
+              className={`flex-1 cursor-pointer rounded-md py-1.5 text-xs font-bold transition-all ${
+                sideTab === "blocks" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"
+              }`}>블록</button>
+            <button onClick={() => setSideTab("style")}
+              className={`flex-1 cursor-pointer rounded-md py-1.5 text-xs font-bold transition-all ${
+                sideTab === "style" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"
+              }`}>스타일</button>
           </div>
-          <button onClick={() => setShowPalette(!showPalette)}
-            title="블록 추가"
-            className={`cursor-pointer flex items-center justify-center rounded-lg md:w-full h-10 md:h-auto w-10 md:px-3 md:py-2 text-xs font-bold transition-all ${
-              showPalette ? "bg-gray-900 text-white" : "bg-[#C41E1E] text-white hover:bg-[#A01818] shadow-sm"
-            }`}>
-            <span className="md:hidden text-lg">{showPalette ? "✕" : "+"}</span>
-            <span className="hidden md:inline">{showPalette ? "✕ 닫기" : "+ 블록 추가"}</span>
-          </button>
+          {/* 모바일: 아이콘 2개 수직 */}
+          <div className="md:hidden flex flex-col items-center gap-1.5 mb-2">
+            <button onClick={() => setSideTab("blocks")} title="블록"
+              className={`h-9 w-9 cursor-pointer rounded-lg flex items-center justify-center text-base ${
+                sideTab === "blocks" ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-500"
+              }`}>🧱</button>
+            <button onClick={() => setSideTab("style")} title="스타일"
+              className={`h-9 w-9 cursor-pointer rounded-lg flex items-center justify-center text-base ${
+                sideTab === "style" ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-500"
+              }`}>🎨</button>
+          </div>
+
+          {sideTab === "blocks" && (
+            <button onClick={() => setShowPalette(!showPalette)}
+              title="블록 추가"
+              className={`cursor-pointer flex items-center justify-center rounded-lg md:w-full h-10 md:h-auto w-10 md:px-3 md:py-2 text-xs font-bold transition-all ${
+                showPalette ? "bg-gray-900 text-white" : "bg-[#C41E1E] text-white hover:bg-[#A01818] shadow-sm"
+              }`}>
+              <span className="md:hidden text-lg">{showPalette ? "✕" : "+"}</span>
+              <span className="hidden md:inline">{showPalette ? "✕ 닫기" : "+ 블록 추가"}</span>
+            </button>
+          )}
         </div>
 
         {/* 팔레트 (모바일: 오버레이, PC: 인라인) */}
-        {showPalette && (
+        {sideTab === "blocks" && showPalette && (
           <>
             {/* 모바일: 아래에서 올라오는 시트 */}
             <div className="md:hidden fixed inset-0 z-50 bg-black/40" onClick={() => setShowPalette(false)}>
@@ -308,35 +521,40 @@ export default function ShopCustomize() {
           </>
         )}
 
-        {/* 블록 리스트 */}
+        {/* 블록 리스트 OR 스타일 패널 */}
         <div className="flex-1 overflow-y-auto p-2 md:p-4">
-          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-            <SortableContext items={blocks.map(b => b.id)} strategy={verticalListSortingStrategy}>
-              {/* 모바일: 아이콘 버전 */}
-              <div className="md:hidden flex flex-col items-center gap-2">
-                {blocks.map(block => (
-                  <SortableBlock key={block.id} block={block} isSelected={selectedId === block.id} compact
-                    onSelect={() => setSelectedId(block.id)} onDelete={() => { setBlocks(prev => prev.filter(b => b.id !== block.id)); if (selectedId === block.id) setSelectedId(null); }} />
-                ))}
-              </div>
-              {/* PC: 전체 버전 */}
-              <div className="hidden md:block space-y-1.5">
-                {blocks.map(block => (
-                  <SortableBlock key={block.id} block={block} isSelected={selectedId === block.id}
-                    onSelect={() => setSelectedId(block.id)} onDelete={() => { setBlocks(prev => prev.filter(b => b.id !== block.id)); if (selectedId === block.id) setSelectedId(null); }} />
-                ))}
-              </div>
-            </SortableContext>
-          </DndContext>
+          {sideTab === "blocks" ? (
+            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+              <SortableContext items={blocks.map(b => b.id)} strategy={verticalListSortingStrategy}>
+                {/* 모바일: 아이콘 버전 */}
+                <div className="md:hidden flex flex-col items-center gap-2">
+                  {blocks.map(block => (
+                    <SortableBlock key={block.id} block={block} isSelected={selectedId === block.id} compact
+                      onSelect={() => setSelectedId(block.id)} onDelete={() => { setBlocks(prev => prev.filter(b => b.id !== block.id)); if (selectedId === block.id) setSelectedId(null); }} />
+                  ))}
+                </div>
+                {/* PC: 전체 버전 */}
+                <div className="hidden md:block space-y-1.5">
+                  {blocks.map(block => (
+                    <SortableBlock key={block.id} block={block} isSelected={selectedId === block.id}
+                      onSelect={() => setSelectedId(block.id)} onDelete={() => { setBlocks(prev => prev.filter(b => b.id !== block.id)); if (selectedId === block.id) setSelectedId(null); }} />
+                  ))}
+                </div>
+              </SortableContext>
+            </DndContext>
+          ) : (
+            <StylePanel theme={theme} setTheme={setTheme} applyPreset={applyPreset} />
+          )}
         </div>
 
         {/* 하단 저장 버튼 */}
         <div className="border-t border-gray-100 p-2 md:p-4 bg-white space-y-2">
-          <button title="저장"
-            className="cursor-pointer w-full flex items-center justify-center rounded-xl bg-[#C41E1E] h-10 md:py-3 text-sm font-bold text-white hover:bg-[#A01818] shadow-sm">
-            <span className="md:hidden">💾</span>
-            <span className="hidden md:inline">저장</span>
+          <button onClick={handleSave} disabled={saving} title="저장"
+            className="cursor-pointer w-full flex items-center justify-center rounded-xl bg-[#C41E1E] h-10 md:py-3 text-sm font-bold text-white hover:bg-[#A01818] shadow-sm disabled:opacity-60 disabled:cursor-default">
+            <span className="md:hidden">{saving ? "…" : "💾"}</span>
+            <span className="hidden md:inline">{saving ? "저장 중…" : "저장"}</span>
           </button>
+          {saveMsg && <p className="hidden md:block text-center text-[10px] text-gray-500">{saveMsg}</p>}
           <a href="/shop/gwibinjeong" target="_blank" rel="noopener noreferrer"
             title="내 쇼핑몰 보기"
             className="flex items-center justify-center gap-2 w-full rounded-xl border border-gray-200 h-10 md:py-2.5 text-xs font-medium text-gray-600 hover:bg-gray-50">
@@ -367,14 +585,22 @@ export default function ShopCustomize() {
       <div className="flex-1 flex items-start justify-center p-4 md:p-8 overflow-y-auto pb-24 md:pb-8">
         <div className="w-[280px] md:w-[320px] rounded-[3rem] border-[10px] border-gray-900 bg-gray-900 shadow-2xl overflow-hidden">
           <div className="flex justify-center bg-gray-900 pt-2 pb-1.5"><div className="h-[24px] w-[90px] rounded-full bg-black" /></div>
-          <div className="h-[620px] bg-white overflow-y-auto">
+          <div
+            className="h-[620px] overflow-y-auto"
+            style={{
+              ...themeToCssVars(theme),
+              background: theme.bg,
+              color: theme.fg,
+              fontFamily: "var(--font-sans)",
+            }}
+          >
             {blocks.map(block => (
               <div key={block.id} onClick={() => setSelectedId(block.id)} className="cursor-pointer">
                 <BlockPreview block={block} isSelected={selectedId === block.id} />
               </div>
             ))}
-            {blocks.length === 0 && <div className="flex items-center justify-center h-full text-gray-300 text-xs">블록을 추가하세요</div>}
-            <div className="py-4 text-center"><p className="text-[7px] text-gray-300">Powered by <span className="font-bold"><span className="text-[#C41E1E]">Tube</span><span className="text-gray-600">Ping</span></span></p></div>
+            {blocks.length === 0 && <div className="flex items-center justify-center h-full opacity-40 text-xs">블록을 추가하세요</div>}
+            <div className="py-4 text-center"><p className="text-[7px] opacity-50">Powered by <span className="font-bold"><span style={{ color: theme.accent }}>Tube</span><span>Ping</span></span></p></div>
           </div>
           <div className="flex justify-center bg-gray-900 py-2"><div className="h-[4px] w-[80px] rounded-full bg-gray-600" /></div>
         </div>

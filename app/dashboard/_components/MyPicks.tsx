@@ -6,6 +6,17 @@ import { useState, useEffect, useCallback } from "react";
 type SourceType = "tubeping_campaign" | "coupang" | "naver" | "own" | "other";
 type FilterKey = "all" | SourceType;
 
+// 인플루언서 마진 정책: 총 마진(판매가 - 공급가) 중 60%가 인플루언서 몫
+const INFLUENCER_MARGIN_RATIO = 0.6;
+// 카페24 tubeping 몰 상품 상세 URL
+const CAFE24_PRODUCT_DETAIL_URL = (productNo: number) =>
+  `https://tubeping.cafe24.com/product/detail.html?product_no=${productNo}`;
+
+function influencerEarning(price: number, supplyPrice: number): number {
+  const totalMargin = Math.max(0, price - supplyPrice);
+  return Math.round(totalMargin * INFLUENCER_MARGIN_RATIO);
+}
+
 interface PickItem {
   id: string;
   source_type: SourceType;
@@ -275,19 +286,45 @@ function GongguTab({
             내 공구 PICK <span className="text-[#C41E1E]">{gongguPicks.length}</span>
           </h3>
           <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
-            {gongguPicks.map((pick) => (
+            {gongguPicks.map((pick) => {
+              const supplyPrice = Number(pick.source_meta?.supply_price || 0);
+              const earning = supplyPrice > 0 ? influencerEarning(pick.price, supplyPrice) : 0;
+              const cafe24ProductNo = pick.source_meta?.cafe24_product_no as number | undefined;
+              const detailUrl = cafe24ProductNo ? CAFE24_PRODUCT_DETAIL_URL(cafe24ProductNo) : null;
+              return (
               <div key={pick.id} className={`overflow-hidden rounded-lg border transition-colors ${pick.visible ? "border-[#C41E1E]" : "border-gray-200 opacity-60"}`}>
-                <div className="relative aspect-[4/3] bg-gray-100">
-                  {pick.image ? (
-                    <img src={pick.image} alt="" className="h-full w-full object-cover" />
-                  ) : (
-                    <div className="flex h-full items-center justify-center text-gray-300"><svg className="h-6 w-6" fill="currentColor" viewBox="0 0 24 24"><path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg></div>
-                  )}
-                  <span className="absolute left-1.5 top-1.5 rounded bg-[#C41E1E] px-1.5 py-0.5 text-[9px] font-medium text-white">공구</span>
-                </div>
+                {detailUrl ? (
+                  <a href={detailUrl} target="_blank" rel="noopener noreferrer" className="block cursor-pointer" title="카페24에서 상품 상세 보기">
+                    <div className="relative aspect-[4/3] bg-gray-100 group">
+                      {pick.image ? (
+                        <img src={pick.image} alt="" className="h-full w-full object-cover" />
+                      ) : (
+                        <div className="flex h-full items-center justify-center text-gray-300"><svg className="h-6 w-6" fill="currentColor" viewBox="0 0 24 24"><path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg></div>
+                      )}
+                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
+                        <span className="rounded-full bg-white/90 px-2.5 py-1 text-[10px] font-medium text-gray-900 shadow-md">상세 보기 →</span>
+                      </div>
+                      <span className="absolute left-1.5 top-1.5 rounded bg-[#C41E1E] px-1.5 py-0.5 text-[9px] font-medium text-white">공구</span>
+                    </div>
+                  </a>
+                ) : (
+                  <div className="relative aspect-[4/3] bg-gray-100">
+                    {pick.image ? (
+                      <img src={pick.image} alt="" className="h-full w-full object-cover" />
+                    ) : (
+                      <div className="flex h-full items-center justify-center text-gray-300"><svg className="h-6 w-6" fill="currentColor" viewBox="0 0 24 24"><path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg></div>
+                    )}
+                    <span className="absolute left-1.5 top-1.5 rounded bg-[#C41E1E] px-1.5 py-0.5 text-[9px] font-medium text-white">공구</span>
+                  </div>
+                )}
                 <div className="p-2">
                   <p className="line-clamp-1 text-xs font-medium text-gray-900">{pick.name}</p>
                   <p className="mt-0.5 text-sm font-bold text-[#C41E1E]">{formatPrice(pick.price)}</p>
+                  {earning > 0 && (
+                    <p className="text-[10px] font-medium text-green-600">
+                      수익 {formatPrice(earning)} <span className="text-gray-400 font-normal">(60%)</span>
+                    </p>
+                  )}
                   <div className="mt-1 flex gap-2 text-[10px] text-gray-400">
                     <span>클릭 {pick.clicks}</span><span>전환 {pick.conversions}</span>
                   </div>
@@ -313,7 +350,8 @@ function GongguTab({
                   </div>
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
@@ -417,6 +455,8 @@ function GongguTab({
               {products.map((product) => {
                 const isPicked = pickedProductNos.has(product.product_no);
                 const price = Number(product.price);
+                const supplyPrice = Number(product.supply_price);
+                const earning = influencerEarning(price, supplyPrice);
                 const isSoldOut = product.sold_out === "T";
                 // 선택된 카테고리의 공구 적합도 (개별 상품 단위는 아니지만 카테고리 단위 힌트)
                 const currentCat = categories.find((c) => c.id === selectedCategory);
@@ -424,24 +464,45 @@ function GongguTab({
                 const hot = catStat && catStat.performance_score >= 70;
                 return (
                   <div key={product.product_no} className={`overflow-hidden rounded-lg border transition-colors ${isPicked ? "border-[#C41E1E]" : "border-gray-200 hover:border-gray-300"} ${isSoldOut ? "opacity-50" : ""}`}>
-                    <div className="relative aspect-[4/3] bg-gray-100">
-                      {product.list_image || product.detail_image ? (
-                        <img src={product.list_image || product.detail_image} alt={product.product_name} className="h-full w-full object-cover" />
-                      ) : (
-                        <div className="flex h-full items-center justify-center text-gray-300"><svg className="h-6 w-6" fill="currentColor" viewBox="0 0 24 24"><path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg></div>
-                      )}
-                      {isSoldOut && <span className="absolute left-1.5 top-1.5 rounded bg-gray-700 px-1.5 py-0.5 text-[10px] font-medium text-white">품절</span>}
-                      {isPicked && <span className="absolute right-1.5 top-1.5 rounded bg-[#C41E1E] px-1.5 py-0.5 text-[10px] font-medium text-white">PICK</span>}
-                      {!isPicked && !isSoldOut && hot && (
-                        <span className="absolute left-1.5 bottom-1.5 rounded bg-[#C41E1E]/90 px-1.5 py-0.5 text-[9px] font-bold text-white shadow-sm">🔥 적합</span>
-                      )}
-                    </div>
-                    <div className="p-2">
-                      <p className="line-clamp-1 text-xs font-medium text-gray-900">{product.product_name}</p>
-                      <p className="mt-0.5 text-sm font-bold text-[#C41E1E]">{formatPrice(price)}</p>
-                      <p className="text-[10px] text-gray-400">공급가 {formatPrice(Number(product.supply_price))}</p>
-                      <button onClick={() => !isSoldOut && !isPicked && handleAddToPick(product)} disabled={isSoldOut || isPicked}
-                        className={`mt-1.5 w-full cursor-pointer rounded py-1.5 text-xs font-medium transition-colors ${isSoldOut ? "bg-gray-100 text-gray-400 cursor-default" : isPicked ? "bg-gray-100 text-gray-500 cursor-default" : "bg-[#C41E1E] text-white hover:bg-[#A01818]"}`}>
+                    <a
+                      href={CAFE24_PRODUCT_DETAIL_URL(product.product_no)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block cursor-pointer"
+                      title="카페24에서 상품 상세 보기"
+                    >
+                      <div className="relative aspect-[4/3] bg-gray-100 group">
+                        {product.list_image || product.detail_image ? (
+                          <img src={product.list_image || product.detail_image} alt={product.product_name} className="h-full w-full object-cover" />
+                        ) : (
+                          <div className="flex h-full items-center justify-center text-gray-300"><svg className="h-6 w-6" fill="currentColor" viewBox="0 0 24 24"><path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg></div>
+                        )}
+                        {/* hover 시 상세 보기 오버레이 */}
+                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
+                          <span className="rounded-full bg-white/90 px-2.5 py-1 text-[10px] font-medium text-gray-900 shadow-md">
+                            상세 보기 →
+                          </span>
+                        </div>
+                        {isSoldOut && <span className="absolute left-1.5 top-1.5 rounded bg-gray-700 px-1.5 py-0.5 text-[10px] font-medium text-white">품절</span>}
+                        {isPicked && <span className="absolute right-1.5 top-1.5 rounded bg-[#C41E1E] px-1.5 py-0.5 text-[10px] font-medium text-white">PICK</span>}
+                        {!isPicked && !isSoldOut && hot && (
+                          <span className="absolute left-1.5 bottom-1.5 rounded bg-[#C41E1E]/90 px-1.5 py-0.5 text-[9px] font-bold text-white shadow-sm">🔥 적합</span>
+                        )}
+                      </div>
+                      <div className="p-2">
+                        <p className="line-clamp-1 text-xs font-medium text-gray-900">{product.product_name}</p>
+                        <p className="mt-0.5 text-sm font-bold text-[#C41E1E]">{formatPrice(price)}</p>
+                        <p className="text-[10px] font-medium text-green-600">
+                          수익 {formatPrice(earning)} <span className="text-gray-400 font-normal">(60%)</span>
+                        </p>
+                      </div>
+                    </a>
+                    <div className="px-2 pb-2">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); e.preventDefault(); if (!isSoldOut && !isPicked) handleAddToPick(product); }}
+                        disabled={isSoldOut || isPicked}
+                        className={`w-full cursor-pointer rounded py-1.5 text-xs font-medium transition-colors ${isSoldOut ? "bg-gray-100 text-gray-400 cursor-default" : isPicked ? "bg-gray-100 text-gray-500 cursor-default" : "bg-[#C41E1E] text-white hover:bg-[#A01818]"}`}
+                      >
                         {isSoldOut ? "품절" : isPicked ? "PICK 완료" : "PICK 추가"}
                       </button>
                     </div>

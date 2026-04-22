@@ -41,6 +41,42 @@ class RecommendScorer:
     def __init__(self):
         self.season_cfg = self._load_yaml("season.yaml")
         self.categories_cfg = self._load_yaml("naver_categories.yaml")
+        self.rules_cfg = self._load_yaml("recommend_rules.yaml")
+        self.blacklist_keywords = set(self.rules_cfg.get("blacklist_keywords", []) or [])
+        self.blacklist_categories = set(self.rules_cfg.get("blacklist_categories", []) or [])
+        self.shopping_cfg = self.rules_cfg.get("shopping_only", {}) or {}
+
+    def _is_blacklisted(self, keyword: str) -> bool:
+        """키워드가 블랙리스트에 걸리는지 (부분일치 포함)"""
+        if not keyword:
+            return False
+        kw = str(keyword).lower().strip()
+        for bad in self.blacklist_keywords:
+            bad_lower = bad.lower()
+            if bad_lower in kw or kw in bad_lower:
+                return True
+        return False
+
+    def _is_shopping_ok(self, row) -> bool:
+        """쇼핑성 필터: CTR/클릭/is_shopping 기준"""
+        if not self.shopping_cfg.get("enabled", False):
+            return True
+        import pandas as pd
+        min_ctr = self.shopping_cfg.get("min_ctr", 0)
+        min_clicks = self.shopping_cfg.get("min_clicks", 0)
+        require_shopping = self.shopping_cfg.get("require_shopping", False)
+
+        ctr = pd.to_numeric(row.get("click_rate", 0), errors="coerce") or 0
+        clicks = pd.to_numeric(row.get("monthly_total_clicks", 0), errors="coerce") or 0
+        is_shopping = str(row.get("is_shopping", "")).upper()
+
+        if require_shopping and is_shopping != "O":
+            return False
+        if ctr < min_ctr:
+            return False
+        if clicks < min_clicks:
+            return False
+        return True
 
     # ── 카테고리별 추천 (메인 메서드) ────────────────────────────────────
 
@@ -96,6 +132,10 @@ class RecommendScorer:
         for cat_id in category_ids:
             cat_name = self._get_category_name(cat_id)
 
+            # 블랙리스트 카테고리 스킵
+            if cat_name in self.blacklist_categories:
+                continue
+
             # 1. 데이터랩: 이 카테고리의 연령별 인기검색어
             audience_ranks = self._get_audience_ranks_for_category(
                 dl, cat_id, channel_config
@@ -123,6 +163,12 @@ class RecommendScorer:
             )
 
             if not scored.empty:
+                # 블랙리스트 키워드 제거
+                scored = scored[~scored["keyword"].apply(self._is_blacklisted)].reset_index(drop=True)
+                # 쇼핑성 필터 (CTR/클릭/is_shopping)
+                scored = scored[scored.apply(self._is_shopping_ok, axis=1)].reset_index(drop=True)
+                if scored.empty:
+                    continue
                 scored["category"] = cat_name
                 scored["category_emoji"] = CATEGORY_EMOJI.get(cat_name, "📦")
                 results[cat_name] = scored.head(top_n_per_category)

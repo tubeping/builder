@@ -795,6 +795,7 @@ function CoupangTab({
     finally { setSearching(false); }
   };
 
+  // 기존 모달 기반 플로우 유지 (백업용) — 이제는 잘 안 씀
   const handleGenerateLink = async (product: CoupangSearchProduct) => {
     setSelectedProduct(product); setGeneratingLink(true);
     try {
@@ -819,6 +820,58 @@ function CoupangTab({
     });
     setSelectedProduct(null); setGeneratedLink("");
     setToastMessage("PICK에 추가되었습니다!"); setTimeout(() => setToastMessage(""), 3000);
+  };
+
+  // 원클릭 "내 몰에 담기" — 딥링크는 백그라운드 자동 생성
+  const [addingProductId, setAddingProductId] = useState<number | null>(null);
+  const handleAddToMyMall = async (product: CoupangSearchProduct) => {
+    setAddingProductId(product.productId);
+    let affiliateLink = "";
+
+    // 연동되어 있으면 딥링크 백그라운드 생성
+    if (isConnected && accessKey && secretKey) {
+      try {
+        const res = await fetch("/api/coupang/deeplink", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-coupang-access-key": accessKey, "x-coupang-secret-key": secretKey },
+          body: JSON.stringify({ urls: [product.productUrl] }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          affiliateLink = data.data?.[0]?.shortenUrl || data.data?.[0]?.landingUrl || "";
+        }
+      } catch { /* 실패해도 원본 URL로 담음 */ }
+    }
+
+    onAddPick({
+      source_type: "coupang",
+      name: product.productName,
+      price: product.productPrice,
+      category: product.categoryName || "",
+      image: product.productImage || null,
+      external_url: affiliateLink || product.productUrl,
+      affiliate_code: affiliateLink ? "coupang_partners" : null,
+      source_meta: {
+        name: product.productName,
+        price: product.productPrice,
+        image: product.productImage || null,
+        category: product.categoryName,
+        commission_rate: 3,
+        product_url: product.productUrl,
+        affiliate_link: affiliateLink,
+        is_rocket: product.isRocket,
+      },
+    });
+
+    setAddingProductId(null);
+    setToastMessage(
+      affiliateLink
+        ? "🛍️ 내 몰에 담았습니다! (파트너스 링크 적용)"
+        : isConnected
+          ? "🛍️ 내 몰에 담았습니다!"
+          : "🛍️ 내 몰에 담았습니다! (연동 시 파트너스 수수료 받을 수 있어요)"
+    );
+    setTimeout(() => setToastMessage(""), 3500);
   };
 
   const handleCategoryClick = (catId: number) => {
@@ -862,17 +915,57 @@ function CoupangTab({
 
       {/* 연동 모달 */}
       {showConnectModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
-            <h3 className="mb-1 text-center text-base font-semibold text-gray-900">쿠팡 파트너스 연동</h3>
-            <p className="mb-5 text-center text-sm text-gray-500">API 키를 입력해주세요</p>
-            <div className="space-y-3">
-              <input type="text" placeholder="Access Key" value={accessKey} onChange={(e) => setAccessKey(e.target.value)} className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm outline-none focus:border-[#C41E1E]" />
-              <input type="password" placeholder="Secret Key" value={secretKey} onChange={(e) => setSecretKey(e.target.value)} className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm outline-none focus:border-[#C41E1E]" />
+            <div className="mb-4 flex items-center justify-center">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#fff0f0]">
+                <span className="text-xl">🔑</span>
+              </div>
             </div>
+            <h3 className="mb-2 text-center text-lg font-bold text-gray-900">쿠팡 파트너스 내 계정 연동</h3>
+            <p className="mb-4 text-center text-sm text-gray-500">
+              연동하면 <b className="text-[#C41E1E]">판매 수수료가 내 계좌로</b> 들어갑니다
+            </p>
+
+            {/* 혜택 리스트 */}
+            <div className="mb-5 space-y-2 rounded-xl bg-gray-50 p-4 text-xs">
+              <div className="flex items-start gap-2">
+                <span className="text-green-500 mt-0.5">✓</span>
+                <span className="text-gray-700"><b>본인 API 키</b>로 딥링크 생성 → 수수료 본인 계좌로 자동 입금 (쿠팡에서 직접)</span>
+              </div>
+              <div className="flex items-start gap-2">
+                <span className="text-green-500 mt-0.5">✓</span>
+                <span className="text-gray-700">튜핑은 API 키를 <b>중간에 보관하지 않음</b> (브라우저에만 저장)</span>
+              </div>
+              <div className="flex items-start gap-2">
+                <span className="text-green-500 mt-0.5">✓</span>
+                <span className="text-gray-700">통상 판매가의 <b>3% 수수료</b> 지급 (쿠팡 정책 기준)</span>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className="mb-1 block text-xs font-medium text-gray-600">Access Key</label>
+                <input type="text" placeholder="쿠팡 파트너스에서 발급받은 Access Key" value={accessKey} onChange={(e) => setAccessKey(e.target.value)} className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm outline-none focus:border-[#C41E1E]" />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-gray-600">Secret Key</label>
+                <input type="password" placeholder="쿠팡 파트너스에서 발급받은 Secret Key" value={secretKey} onChange={(e) => setSecretKey(e.target.value)} className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm outline-none focus:border-[#C41E1E]" />
+              </div>
+            </div>
+
+            <a
+              href="https://partners.coupang.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-2 inline-flex items-center gap-1 text-[11px] text-[#C41E1E] hover:underline"
+            >
+              쿠팡 파트너스 가입 및 API 키 발급 방법 →
+            </a>
+
             <div className="mt-5 flex gap-3">
               <button onClick={() => setShowConnectModal(false)} className="flex-1 cursor-pointer rounded-lg border border-gray-300 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50">닫기</button>
-              <button onClick={handleConnect} className="flex-1 cursor-pointer rounded-lg bg-[#C41E1E] py-2.5 text-sm font-medium text-white hover:bg-[#A01818]">연동하기</button>
+              <button onClick={handleConnect} disabled={!accessKey.trim() || !secretKey.trim()} className="flex-1 cursor-pointer rounded-lg bg-[#C41E1E] py-2.5 text-sm font-medium text-white hover:bg-[#A01818] disabled:opacity-40 disabled:cursor-default">연동하기</button>
             </div>
           </div>
         </div>
@@ -919,6 +1012,30 @@ function CoupangTab({
                 <button onClick={() => handleGenerateLink(selectedProduct)} className="w-full cursor-pointer rounded-lg bg-[#C41E1E] py-3 text-sm font-medium text-white hover:bg-[#A01818]">링크 생성</button>
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* 미연동 시 수익 안내 배너 */}
+      {!isConnected && (
+        <div className="rounded-xl border border-[#C41E1E]/30 bg-gradient-to-r from-[#fff0f0] to-white p-4">
+          <div className="flex items-start gap-3">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#C41E1E]/10 text-lg">💰</div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-bold text-gray-900">
+                내 쿠팡 파트너스 연동하면 <span className="text-[#C41E1E]">판매 수수료가 내 계좌로</span> 들어가요
+              </p>
+              <p className="mt-1 text-xs text-gray-600 leading-relaxed">
+                연동 전: 내 몰에 상품은 담을 수 있지만 수수료 <b className="text-gray-400">없음</b>.
+                연동 후: 본인 API 키로 딥링크 자동 생성 → 쿠팡이 직접 내 계좌로 지급 (튜핑은 중간 개입 X)
+              </p>
+            </div>
+            <button
+              onClick={() => setShowConnectModal(true)}
+              className="shrink-0 cursor-pointer rounded-lg bg-[#C41E1E] px-4 py-2 text-xs font-bold text-white hover:bg-[#A01818]"
+            >
+              연동하기
+            </button>
           </div>
         </div>
       )}
@@ -1042,24 +1159,28 @@ function CoupangTab({
                     <button
                       onClick={() => {
                         if (isPicked) return;
-                        if (!isConnected) { setShowConnectModal(true); return; }
-                        handleGenerateLink(product);
+                        handleAddToMyMall(product);
                       }}
-                      disabled={isPicked}
-                      className={`mt-3 flex w-full cursor-pointer items-center justify-center gap-1 rounded-lg py-2 text-sm font-medium transition-colors ${
+                      disabled={isPicked || addingProductId === product.productId}
+                      className={`mt-3 flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-lg py-2 text-sm font-medium transition-colors ${
                         isPicked
                           ? "bg-gray-100 text-gray-400 cursor-default"
-                          : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                          : "bg-[#C41E1E] text-white hover:bg-[#A01818]"
                       }`}
                     >
                       {isPicked ? (
-                        "PICK 완료"
+                        "✓ 담기 완료"
+                      ) : addingProductId === product.productId ? (
+                        <>
+                          <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                          담는 중...
+                        </>
                       ) : (
                         <>
                           <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
                           </svg>
-                          링크 생성
+                          내 몰에 담기
                         </>
                       )}
                     </button>

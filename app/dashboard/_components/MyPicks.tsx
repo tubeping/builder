@@ -1105,6 +1105,375 @@ function CoupangTab({
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// 네이버 쇼핑 탭 (검색 + 카테고리별 추천)
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+interface NaverShopItem {
+  productId: string;
+  title: string;
+  link: string;
+  image: string;
+  price: number;
+  maxPrice: number;
+  mallName: string;
+  brand: string;
+  category: string;
+}
+
+function NaverTab({
+  picks,
+  onAddPick,
+  onRemovePick,
+  onToggleVisible,
+}: {
+  picks: PickItem[];
+  onAddPick: (partial: Partial<PickItem>) => void;
+  onRemovePick: (id: string) => void;
+  onToggleVisible: (id: string) => void;
+}) {
+  const [results, setResults] = useState<NaverShopItem[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [toastMessage, setToastMessage] = useState("");
+  const [sortBy, setSortBy] = useState<"sim" | "asc" | "dsc" | "date">("sim");
+
+  // 네이버 쇼핑 카테고리 (키워드 매핑)
+  const NAVER_CATEGORIES: { id: string; label: string; keyword: string }[] = [
+    { id: "best", label: "베스트", keyword: "인기상품" },
+    { id: "food", label: "식품", keyword: "식품 베스트" },
+    { id: "living", label: "생활용품", keyword: "생활용품 인기" },
+    { id: "kitchen", label: "주방", keyword: "주방용품 인기" },
+    { id: "home", label: "가구/인테리어", keyword: "인테리어 소품" },
+    { id: "digital", label: "디지털/가전", keyword: "디지털 가전" },
+    { id: "beauty", label: "뷰티", keyword: "뷰티 베스트" },
+    { id: "fashion", label: "패션", keyword: "여성 패션" },
+    { id: "health", label: "건강식품", keyword: "건강식품 인기" },
+    { id: "baby", label: "출산/유아동", keyword: "유아동 베스트" },
+    { id: "pet", label: "반려동물", keyword: "반려동물 용품" },
+    { id: "sports", label: "스포츠/레저", keyword: "스포츠 용품" },
+  ];
+  const [selectedCat, setSelectedCat] = useState("best");
+
+  const naverPicks = picks.filter((p) => p.source_type === "naver");
+  const pickedIds = new Set(
+    naverPicks.map((p) => p.source_meta?.product_id as string).filter(Boolean)
+  );
+
+  const runSearch = useCallback(async (query: string) => {
+    if (!query.trim()) return;
+    setLoading(true);
+    try {
+      const res = await fetch(
+        `/api/naver/search?query=${encodeURIComponent(query)}&display=30&sort=${sortBy}`
+      );
+      if (res.ok) {
+        const data = await res.json();
+        setResults(data.items || []);
+      } else {
+        setResults([]);
+      }
+    } catch { setResults([]); }
+    finally { setLoading(false); }
+  }, [sortBy]);
+
+  // 탭 진입 시 기본 카테고리 로드
+  useEffect(() => {
+    const cat = NAVER_CATEGORIES.find((c) => c.id === selectedCat);
+    if (cat) runSearch(cat.keyword);
+  }, [selectedCat, runSearch]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleCategoryClick = (catId: string) => {
+    setSelectedCat(catId);
+    setSearchQuery("");
+  };
+
+  const handleSearchSubmit = () => {
+    if (!searchQuery.trim()) return;
+    runSearch(searchQuery);
+  };
+
+  // UTM 자동 추가 (튜핑/크리에이터 트래킹용)
+  const buildTrackedUrl = (originalUrl: string, productId: string): string => {
+    const sep = originalUrl.includes("?") ? "&" : "?";
+    return `${originalUrl}${sep}utm_source=tubeping&utm_medium=pick&utm_campaign=naver_${productId}`;
+  };
+
+  const handleAddToPick = (product: NaverShopItem) => {
+    if (pickedIds.has(product.productId)) return;
+    const trackedUrl = buildTrackedUrl(product.link, product.productId);
+    onAddPick({
+      source_type: "naver",
+      name: product.title,
+      price: product.price,
+      category: product.category.split(" > ")[0] || "",
+      image: product.image || null,
+      external_url: trackedUrl,
+      affiliate_code: null,
+      source_meta: {
+        name: product.title,
+        price: product.price,
+        image: product.image || null,
+        category: product.category,
+        product_id: product.productId,
+        mall_name: product.mallName,
+        brand: product.brand,
+        product_url: product.link,
+      },
+    });
+    setToastMessage("PICK에 추가되었습니다!");
+    setTimeout(() => setToastMessage(""), 3000);
+  };
+
+  return (
+    <div className="space-y-6">
+      {toastMessage && (
+        <div className="fixed top-6 right-6 z-50 rounded-lg bg-[#03C75A] px-5 py-3 text-sm text-white shadow-lg">
+          {toastMessage}
+        </div>
+      )}
+
+      {/* 상단 안내 박스 (수수료 체계 안내) */}
+      <div className="rounded-xl border border-[#03C75A]/30 bg-gradient-to-br from-[#03C75A]/5 to-white p-4">
+        <div className="flex items-start gap-3">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#03C75A] text-sm font-bold text-white">N</div>
+          <div className="flex-1">
+            <p className="text-sm font-bold text-gray-900">네이버 쇼핑 상품 노출하기</p>
+            <p className="mt-1 text-xs text-gray-600 leading-relaxed">
+              검색해서 고른 상품을 내 쇼핑몰에 바로 노출. 구매는 네이버 스마트스토어에서 진행됩니다.
+              <br />
+              <span className="text-[#03C75A] font-medium">수익화 팁:</span> 판매자와 개별 제휴하거나, 네이버 쇼핑커넥트에도 가입해서 수수료 받으세요.
+            </p>
+            <div className="mt-2 flex gap-2">
+              <a
+                href="https://partner.naver.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 rounded-md bg-[#03C75A] px-2.5 py-1 text-[11px] font-medium text-white hover:bg-[#02b051]"
+              >
+                쇼핑커넥트 가입
+                <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                </svg>
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* 검색 영역 */}
+      <div className="rounded-xl border border-gray-200 p-4">
+        <div className="mb-3 flex items-center gap-2">
+          <h3 className="text-base font-semibold text-gray-900">상품 찾기</h3>
+          <span className="rounded-full bg-[#03C75A]/10 px-2 py-0.5 text-[10px] font-medium text-[#03C75A]">네이버 쇼핑</span>
+        </div>
+
+        <div className="relative">
+          <svg className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+          <input
+            type="text"
+            placeholder="네이버 상품명으로 검색"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") handleSearchSubmit(); }}
+            className="w-full rounded-xl border border-gray-300 py-3 pl-10 pr-20 text-sm outline-none focus:border-[#03C75A]"
+          />
+          <button
+            onClick={handleSearchSubmit}
+            className="absolute right-2 top-1/2 -translate-y-1/2 cursor-pointer rounded-lg bg-[#03C75A] px-3 py-1.5 text-xs font-medium text-white hover:bg-[#02b051]"
+          >
+            검색
+          </button>
+        </div>
+
+        {/* 정렬 */}
+        <div className="mt-3 flex items-center gap-2">
+          {[
+            { key: "sim" as const, label: "정확도" },
+            { key: "asc" as const, label: "낮은가격" },
+            { key: "dsc" as const, label: "높은가격" },
+            { key: "date" as const, label: "신상품" },
+          ].map((s) => (
+            <button
+              key={s.key}
+              onClick={() => { setSortBy(s.key); const cat = NAVER_CATEGORIES.find((c) => c.id === selectedCat); if (cat) runSearch(searchQuery || cat.keyword); }}
+              className={`cursor-pointer rounded-full px-3 py-1 text-[11px] font-medium transition-colors ${
+                sortBy === s.key ? "bg-[#111111] text-white" : "border border-gray-300 bg-white text-gray-600 hover:bg-gray-50"
+              }`}
+            >
+              {s.label}
+            </button>
+          ))}
+        </div>
+
+        {/* 카테고리 필터 (가로 스크롤) */}
+        <div className="mt-3 flex gap-1.5 overflow-x-auto pb-1">
+          {NAVER_CATEGORIES.map((cat) => (
+            <button
+              key={cat.id}
+              onClick={() => handleCategoryClick(cat.id)}
+              className={`shrink-0 cursor-pointer rounded-full px-3 py-1.5 text-xs transition-colors ${
+                selectedCat === cat.id && !searchQuery
+                  ? "border border-[#03C75A] bg-[#03C75A]/10 text-[#03C75A]"
+                  : "border border-gray-300 bg-white text-gray-600 hover:bg-gray-50"
+              }`}
+            >
+              {cat.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* 로딩 */}
+      {loading && (
+        <div className="flex items-center justify-center py-16">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-gray-200 border-t-[#03C75A]" />
+          <span className="ml-3 text-sm text-gray-500">상품 불러오는 중...</span>
+        </div>
+      )}
+
+      {/* 상품 그리드 */}
+      {!loading && results.length > 0 && (
+        <div>
+          <h4 className="mb-3 text-sm font-medium text-gray-900">
+            {searchQuery ? `"${searchQuery}" 검색 결과` : NAVER_CATEGORIES.find((c) => c.id === selectedCat)?.label + " 추천"}
+            <span className="text-gray-400"> · {results.length}개</span>
+          </h4>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+            {results.map((product, idx) => {
+              const isPicked = pickedIds.has(product.productId);
+              return (
+                <div
+                  key={product.productId || idx}
+                  className={`overflow-hidden rounded-xl border transition-colors ${
+                    isPicked ? "border-[#03C75A]" : "border-gray-200 hover:border-gray-300"
+                  }`}
+                >
+                  <div className="relative aspect-square bg-gray-100">
+                    {product.image ? (
+                      <img src={product.image} alt={product.title} className="h-full w-full object-cover" />
+                    ) : (
+                      <div className="flex h-full items-center justify-center text-gray-300">{IMAGE_PLACEHOLDER}</div>
+                    )}
+                    {/* 순위 배지 */}
+                    <span className="absolute left-2 top-2 flex h-7 min-w-[28px] items-center justify-center rounded-md bg-[#03C75A] px-1.5 text-sm font-extrabold text-white shadow-sm">
+                      {idx + 1}
+                    </span>
+                    {/* 상품 정보 외부 링크 */}
+                    <a
+                      href={product.link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      className="absolute right-2 top-2 flex items-center gap-0.5 rounded bg-white/95 px-1.5 py-0.5 text-[10px] font-medium text-gray-700 shadow-sm hover:bg-white"
+                      title="네이버 쇼핑 상품 페이지 열기"
+                    >
+                      상품 정보
+                      <svg className="h-2.5 w-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                      </svg>
+                    </a>
+                    {isPicked && (
+                      <span className="absolute right-2 bottom-2 rounded bg-[#03C75A] px-2 py-0.5 text-xs font-medium text-white">PICK</span>
+                    )}
+                  </div>
+                  <div className="p-3">
+                    <p className="line-clamp-2 text-sm font-medium text-gray-900 leading-snug min-h-[2.5rem]">
+                      {product.title}
+                    </p>
+                    <p className="mt-1.5 text-base font-bold text-gray-900">{formatPrice(product.price)}</p>
+                    <p className="mt-0.5 text-xs text-gray-500 truncate">
+                      {product.mallName}
+                      {product.category && <span className="text-gray-400"> · {product.category.split(" > ")[0]}</span>}
+                    </p>
+                    <button
+                      onClick={() => handleAddToPick(product)}
+                      disabled={isPicked}
+                      className={`mt-3 flex w-full cursor-pointer items-center justify-center gap-1 rounded-lg py-2 text-sm font-medium transition-colors ${
+                        isPicked
+                          ? "bg-gray-100 text-gray-400 cursor-default"
+                          : "bg-[#03C75A] text-white hover:bg-[#02b051]"
+                      }`}
+                    >
+                      {isPicked ? "PICK 완료" : (
+                        <>
+                          <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                          </svg>
+                          PICK 추가
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {!loading && results.length === 0 && (
+        <div className="flex flex-col items-center py-12 text-center">
+          <p className="text-sm text-gray-500">상품이 없습니다. 다른 키워드/카테고리로 시도해보세요.</p>
+        </div>
+      )}
+
+      {/* 이미 PICK된 네이버 상품 */}
+      {naverPicks.length > 0 && (
+        <div className="border-t border-gray-200 pt-5">
+          <h4 className="mb-3 text-sm font-semibold text-gray-900">
+            내 네이버 PICK <span className="text-[#03C75A]">{naverPicks.length}</span>
+          </h4>
+          <div className="space-y-2">
+            {naverPicks.map((pick) => (
+              <div key={pick.id} className="flex items-center gap-3 rounded-lg border border-gray-200 p-3">
+                <div className="h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-gray-100">
+                  {pick.image ? (
+                    <img src={pick.image} alt="" className="h-full w-full object-cover" />
+                  ) : (
+                    <div className="flex h-full items-center justify-center text-gray-300">
+                      <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                    </div>
+                  )}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium text-gray-900">{pick.name}</p>
+                  <div className="flex items-center gap-2 text-xs text-gray-400">
+                    <span>{formatPrice(pick.price)}</span>
+                    <span>·</span>
+                    <span className="truncate">{(pick.source_meta?.mall_name as string) || "네이버"}</span>
+                    <span>·</span>
+                    <span>클릭 {pick.clicks}</span>
+                  </div>
+                </div>
+                <button
+                  onClick={() => onToggleVisible(pick.id)}
+                  className={`cursor-pointer rounded px-2 py-1 text-[10px] font-medium ${
+                    pick.visible ? "bg-green-100 text-green-700" : "bg-gray-200 text-gray-500"
+                  }`}
+                >
+                  {pick.visible ? "노출" : "숨김"}
+                </button>
+                <button
+                  onClick={() => onRemovePick(pick.id)}
+                  className="cursor-pointer text-gray-400 hover:text-red-500"
+                >
+                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // 직접 상품 탭
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 function OwnProductTab({
@@ -1400,7 +1769,7 @@ export default function MyPicks() {
       {filter === "all" && <AllPicksList picks={picks} onToggleVisible={toggleVisible} onRemovePick={removePick} onEditComment={editComment} onMoveUp={moveUp} onMoveDown={moveDown} />}
       {filter === "tubeping_campaign" && <GongguTab picks={picks} onAddPick={addPick} onRemovePick={removePick} onToggleVisible={toggleVisible} onEditComment={editComment} />}
       {filter === "coupang" && <CoupangTab picks={picks} onAddPick={addPick} onRemovePick={removePick} onToggleVisible={toggleVisible} />}
-      {filter === "naver" && <AllPicksList picks={picks.filter((p) => p.source_type === "naver")} onToggleVisible={toggleVisible} onRemovePick={removePick} onEditComment={editComment} onMoveUp={moveUp} onMoveDown={moveDown} />}
+      {filter === "naver" && <NaverTab picks={picks} onAddPick={addPick} onRemovePick={removePick} onToggleVisible={toggleVisible} />}
       {filter === "own" && <OwnProductTab picks={picks} onAddPick={addPick} onRemovePick={removePick} onToggleVisible={toggleVisible} onEditComment={editComment} />}
     </div>
   );

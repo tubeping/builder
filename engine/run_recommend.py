@@ -40,6 +40,116 @@ _load_env()
 
 from analyzer.scorer import ProductScorer
 from analyzer.recommend_scorer import RecommendScorer
+from fetchers.youtube import YouTubeFetcher
+
+# 댓글/설명에서 구매 시그널 추출할 때 쓰는 마커 (포괄적 패턴)
+PURCHASE_SIGNAL_MARKERS = [
+    "추천", "구매", "어디서", "링크", "가격", "얼마", "사고 싶", "사려고",
+    "사야겠", "부탁", "주문", "정보", "어떻게 사", "파나요", "팔아",
+    "공구", "공동구매", "싸게", "할인", "세일",
+]
+
+
+def _extract_purchase_signals(comments: list[dict], top_n: int = 30) -> list[str]:
+    """
+    댓글에서 구매 시그널 추출.
+    - 마커 키워드 포함 & likes 많은 상위 댓글 선별
+    - 너무 긴 댓글은 마커 주변 50자만 추출
+    """
+    if not comments:
+        return []
+
+    signals = []
+    for c in comments:
+        text = (c.get("text") or "").strip()
+        if not text or len(text) < 5:
+            continue
+        lower = text.lower()
+        # 마커 히트 카운트 (많을수록 강한 시그널)
+        hits = sum(1 for m in PURCHASE_SIGNAL_MARKERS if m in lower)
+        if hits == 0:
+            continue
+        likes = int(c.get("like_count", 0) or 0)
+        signals.append({
+            "text": text[:100] if len(text) > 100 else text,
+            "score": hits * 10 + likes,
+        })
+
+    # 상위 정렬 후 텍스트만 추출 (중복 제거)
+    signals.sort(key=lambda x: -x["score"])
+    seen = set()
+    result = []
+    for s in signals:
+        key = s["text"][:30]  # 짧은 prefix로 dedup
+        if key in seen:
+            continue
+        seen.add(key)
+        result.append(s["text"])
+        if len(result) >= top_n:
+            break
+    return result
+
+
+def _collect_youtube_data(channel_name: str, video_count: int = 20) -> dict:
+    """
+    채널명으로 YouTube API 조회 → video_titles + purchase_signals 추출.
+    API 키 없거나 실패 시 빈 dict 반환.
+    """
+    api_key = os.getenv("YOUTUBE_API_KEY", "")
+    if not api_key:
+        print(f"  [youtube] YOUTUBE_API_KEY 없음 — 하드코딩 힌트 사용")
+        return {}
+
+    try:
+        yt = YouTubeFetcher(api_key=api_key)
+        print(f"  [youtube] '{channel_name}' 실시간 수집 중...")
+        result = yt.analyze_channel(
+            channel_name,
+            video_count=video_count,
+            comments_per_video=30,
+        )
+        if not result:
+            print(f"  [youtube] 채널 조회 실패 — 폴백")
+            return {}
+
+        videos = result.get("videos", [])
+        comments = result.get("comments", [])
+        channel = result.get("channel", {})
+        stats = result.get("stats", {})
+
+        # 영상 제목 추출 (최신 N개)
+        video_titles = [v["title"] for v in videos if v.get("title")][:video_count]
+
+        # 구매 시그널 추출
+        purchase_signals = _extract_purchase_signals(comments, top_n=30)
+
+        # 트렌드 키워드: 영상 태그에서 상위 빈도
+        tag_counter: dict[str, int] = {}
+        for v in videos:
+            for tag in v.get("tags", []) or []:
+                tag_counter[tag] = tag_counter.get(tag, 0) + 1
+        trend_keywords = [t for t, _ in sorted(tag_counter.items(), key=lambda x: -x[1])[:15]]
+
+        print(
+            f"  [youtube] 영상 {len(video_titles)}개, 댓글 {len(comments)}개, "
+            f"구매시그널 {len(purchase_signals)}개, 태그 {len(trend_keywords)}개 수집"
+        )
+
+        return {
+            "video_titles": video_titles,
+            "purchase_signals": purchase_signals,
+            "trend_keywords": trend_keywords,
+            "channel_info": {
+                "channel_id": channel.get("channel_id", ""),
+                "subscriber": channel.get("subscriber", 0),
+                "avg_views": stats.get("avg_views", 0),
+                "engagement_rate": stats.get("engagement_rate", 0),
+                "top_video_title": (stats.get("top_video") or {}).get("title", ""),
+            },
+        }
+    except Exception as e:
+        print(f"  [youtube] 수집 실패: {type(e).__name__}: {e}")
+        return {}
 
 ROOT = Path(__file__).parent.parent
 OUTPUT_DIR = ROOT / "public" / "recommendations"
@@ -252,6 +362,8 @@ def build_recommendations(channel_config: dict) -> dict:
     except Exception:
         pass
 
+    yt_meta = channel_config.get("_youtube_meta", {}) or {}
+
     return {
         "channel": channel_config.get("name", ""),
         "generatedAt": datetime.now().isoformat(timespec="seconds"),
@@ -267,6 +379,16 @@ def build_recommendations(channel_config: dict) -> dict:
             "device": channel_config.get("device", {}),
             "interests": channel_config.get("interests", []),
             "categories": channel_config.get("categories", []),
+        },
+        "youtubeMeta": {
+            "channelId": yt_meta.get("channel_id", ""),
+            "subscriber": yt_meta.get("subscriber", 0),
+            "avgViews": yt_meta.get("avg_views", 0),
+            "engagementRate": yt_meta.get("engagement_rate", 0),
+            "topVideoTitle": yt_meta.get("top_video_title", ""),
+            "videoTitlesSampled": channel_config.get("video_titles", [])[:5],
+            "signalsCollected": len(channel_config.get("purchase_signals", [])),
+            "trendTagsCollected": len(channel_config.get("trend_keywords", [])),
         },
         "shoppingInsights": shopping_insights,
         "cafe24Performance": cafe24_stats,
@@ -302,22 +424,33 @@ def main():
         name = ch.get("name")
         print(f"\n[{name}] 추천 생성 중...")
 
-        # 채널별 힌트 주입 (TODO: DB 연동 시 영상·댓글 실데이터로 교체)
-        if name == "신사임당":
-            ch["video_titles"] = [
-                "50대 은퇴 후 월 500 버는 법", "부동산 폭락 시작됐다",
-                "주식 투자 30년 한 투자자 인터뷰", "연금 100% 활용법",
-                "노후 대비 건강관리의 중요성",
-            ]
-            ch["purchase_signals"] = [
-                "추천 부탁드립니다", "어디서 사나요", "구매 링크",
-                "가격이 얼마인가요", "좋아 보이네요",
-            ]
-            ch["trend_keywords"] = ["재테크", "건강", "은퇴", "노후", "선물"]
-        elif name == "뉴스엔진":
-            ch["video_titles"] = ["오늘의 뉴스", "정치 이슈 분석"]
-            ch["purchase_signals"] = ["추천해 주세요", "어디서 구매"]
-            ch["trend_keywords"] = ["시사", "건강", "트로트"]
+        # ① 유튜브 실시간 수집 (영상제목/댓글/태그) — 성공 시 하드코딩 덮어씀
+        yt_data = _collect_youtube_data(name, video_count=20)
+        if yt_data:
+            ch["video_titles"] = yt_data.get("video_titles", [])
+            ch["purchase_signals"] = yt_data.get("purchase_signals", [])
+            # trend_keywords는 YouTube 태그 + 채널별 힌트 병합
+            yt_trends = yt_data.get("trend_keywords", [])
+            ch["trend_keywords"] = yt_trends
+            ch["_youtube_meta"] = yt_data.get("channel_info", {})
+
+        # ② 폴백: YouTube 실패하거나 결과 없으면 하드코딩된 힌트 사용
+        if not ch.get("video_titles"):
+            if name == "신사임당":
+                ch["video_titles"] = [
+                    "50대 은퇴 후 월 500 버는 법", "부동산 폭락 시작됐다",
+                    "주식 투자 30년 한 투자자 인터뷰", "연금 100% 활용법",
+                    "노후 대비 건강관리의 중요성",
+                ]
+                ch["purchase_signals"] = [
+                    "추천 부탁드립니다", "어디서 사나요", "구매 링크",
+                    "가격이 얼마인가요", "좋아 보이네요",
+                ]
+                ch["trend_keywords"] = ["재테크", "건강", "은퇴", "노후", "선물"]
+            elif name == "뉴스엔진":
+                ch["video_titles"] = ["오늘의 뉴스", "정치 이슈 분석"]
+                ch["purchase_signals"] = ["추천해 주세요", "어디서 구매"]
+                ch["trend_keywords"] = ["시사", "건강", "트로트"]
 
         try:
             result = build_recommendations(ch)

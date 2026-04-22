@@ -70,12 +70,24 @@ interface ShoppingInsights {
   personaSummary: string;
 }
 
+interface YouTubeMeta {
+  channelId?: string;
+  subscriber?: number;
+  avgViews?: number;
+  engagementRate?: number;
+  topVideoTitle?: string;
+  videoTitlesSampled?: string[];
+  signalsCollected?: number;
+  trendTagsCollected?: number;
+}
+
 interface RecData {
   channel: string;
   generatedAt: string;
   persona: Persona;
   shoppingInsights?: ShoppingInsights;
   cafe24Performance?: Record<string, Cafe24CategoryStats>;
+  youtubeMeta?: YouTubeMeta;
   recommendations: Record<string, CategoryBlock>;
   weights: Record<string, number>;
 }
@@ -380,6 +392,60 @@ export default function ProductRecommend() {
                   })}
               </div>
             </details>
+          )}
+
+          {/* ── 유튜브 채널 실시간 분석 결과 ── */}
+          {data.youtubeMeta && data.youtubeMeta.channelId && (
+            <div className="mb-5 rounded-xl border border-red-200 bg-gradient-to-br from-red-50/50 to-white p-4">
+              <div className="mb-3 flex items-center gap-2">
+                <span className="text-base">▶️</span>
+                <h3 className="text-sm font-bold text-gray-900">YouTube 실시간 분석</h3>
+                <span className="ml-auto text-[10px] text-gray-400">최근 영상 20개 + 댓글</span>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
+                <div className="rounded-lg bg-white p-2.5 border border-gray-100">
+                  <p className="text-[10px] text-gray-500">구독자</p>
+                  <p className="text-sm font-bold text-gray-900">
+                    {formatNumber(data.youtubeMeta.subscriber || 0)}
+                  </p>
+                </div>
+                <div className="rounded-lg bg-white p-2.5 border border-gray-100">
+                  <p className="text-[10px] text-gray-500">평균 조회</p>
+                  <p className="text-sm font-bold text-gray-900">
+                    {formatNumber(data.youtubeMeta.avgViews || 0)}
+                  </p>
+                </div>
+                <div className="rounded-lg bg-white p-2.5 border border-gray-100">
+                  <p className="text-[10px] text-gray-500">참여율</p>
+                  <p className="text-sm font-bold text-gray-900">
+                    {(data.youtubeMeta.engagementRate || 0).toFixed(2)}%
+                  </p>
+                </div>
+                <div className="rounded-lg bg-white p-2.5 border border-gray-100">
+                  <p className="text-[10px] text-gray-500">구매 시그널</p>
+                  <p className="text-sm font-bold text-gray-900">
+                    {data.youtubeMeta.signalsCollected || 0}개
+                  </p>
+                </div>
+              </div>
+              {data.youtubeMeta.topVideoTitle && (
+                <p className="text-[11px] text-gray-600 mb-1">
+                  <span className="text-gray-400">🔥 인기 영상:</span> {data.youtubeMeta.topVideoTitle}
+                </p>
+              )}
+              {data.youtubeMeta.videoTitlesSampled && data.youtubeMeta.videoTitlesSampled.length > 0 && (
+                <details className="mt-2">
+                  <summary className="cursor-pointer text-[10px] text-gray-500 hover:text-gray-700">
+                    샘플 영상 제목 펼치기
+                  </summary>
+                  <ul className="mt-1 space-y-0.5 pl-4 list-disc text-[10px] text-gray-500">
+                    {data.youtubeMeta.videoTitlesSampled.map((t, i) => (
+                      <li key={i} className="truncate">{t}</li>
+                    ))}
+                  </ul>
+                </details>
+              )}
+            </div>
           )}
 
           {/* ── Cafe24 과거 공구 실적 (사전 판매 예측) ── */}

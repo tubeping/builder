@@ -395,105 +395,11 @@ function GongguTab({
 
   return (
     <div className="space-y-6">
-      {/* 이미 PICK된 공구 상품 */}
-      {gongguPicks.length > 0 && (
-        <div>
-          <h3 className="mb-3 text-sm font-semibold text-gray-900">
-            내 공구 PICK <span className="text-[#C41E1E]">{gongguPicks.length}</span>
-          </h3>
-          <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
-            {gongguPicks.map((pick) => {
-              const supplyPrice = Number(pick.source_meta?.supply_price || 0);
-              const pickMargin = calcMargin(pick.price, supplyPrice);
-              const earning = pickMargin.influencer;
-              const marginRate = pick.price > 0 ? (pickMargin.netMargin / pick.price) * 100 : 0;
-              const cafe24ProductNo = pick.source_meta?.cafe24_product_no as number | undefined;
-              const detailUrl = cafe24ProductNo ? CAFE24_PRODUCT_DETAIL_URL(cafe24ProductNo) : null;
-              return (
-              <div key={pick.id} className={`overflow-hidden rounded-lg border transition-colors ${pick.visible ? "border-[#C41E1E]" : "border-gray-200 opacity-60"}`}>
-                {detailUrl ? (
-                  <a href={detailUrl} target="_blank" rel="noopener noreferrer" className="block cursor-pointer" title="카페24에서 상품 상세 보기">
-                    <div className="relative aspect-[4/3] bg-gray-100 group">
-                      {pick.image ? (
-                        <img src={pick.image} alt="" className="h-full w-full object-cover" />
-                      ) : (
-                        <div className="flex h-full items-center justify-center text-gray-300"><svg className="h-6 w-6" fill="currentColor" viewBox="0 0 24 24"><path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg></div>
-                      )}
-                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
-                        <span className="rounded-full bg-white/90 px-2.5 py-1 text-[10px] font-medium text-gray-900 shadow-md">상세 보기 →</span>
-                      </div>
-                      <span className="absolute left-1.5 top-1.5 rounded bg-[#C41E1E] px-1.5 py-0.5 text-[9px] font-medium text-white">공구</span>
-                    </div>
-                  </a>
-                ) : (
-                  <div className="relative aspect-[4/3] bg-gray-100">
-                    {pick.image ? (
-                      <img src={pick.image} alt="" className="h-full w-full object-cover" />
-                    ) : (
-                      <div className="flex h-full items-center justify-center text-gray-300"><svg className="h-6 w-6" fill="currentColor" viewBox="0 0 24 24"><path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg></div>
-                    )}
-                    <span className="absolute left-1.5 top-1.5 rounded bg-[#C41E1E] px-1.5 py-0.5 text-[9px] font-medium text-white">공구</span>
-                  </div>
-                )}
-                <div className="p-2">
-                  <p className="line-clamp-1 text-xs font-medium text-gray-900">{pick.name}</p>
-                  <p className="mt-0.5 text-sm font-bold text-[#C41E1E]">{formatPrice(pick.price)}</p>
-                  {earning > 0 && (
-                    <p
-                      className="text-[10px] font-medium text-green-600"
-                      title={`판매가 ${formatPrice(pick.price)}\n- 공급가 ${formatPrice(supplyPrice)}\n- PG수수료 3% ${formatPrice(pickMargin.pgFee)}\n- 세금 10% ${formatPrice(pickMargin.tax)}\n= 순마진 ${formatPrice(pickMargin.netMargin)} (${marginRate.toFixed(1)}%)\n→ 인플루언서 60%: ${formatPrice(earning)}`}
-                    >
-                      수익 {formatPrice(earning)} <span className="text-gray-400 font-normal">({marginRate.toFixed(0)}% 마진)</span>
-                    </p>
-                  )}
-                  {(() => {
-                    const sb = shippingBadge(pick.source_meta?.shipping_fee_type as string | undefined, pick.price);
-                    if (!sb) return null;
-                    return (
-                      <span className={`mt-1 inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[9px] font-medium ${sb.style}`}>
-                        {sb.icon} {sb.label}
-                      </span>
-                    );
-                  })()}
-                  <div className="mt-1 flex gap-2 text-[10px] text-gray-400">
-                    <span>클릭 {pick.clicks}</span><span>전환 {pick.conversions}</span>
-                  </div>
-                  {editingId === pick.id ? (
-                    <div className="mt-1.5 flex gap-1">
-                      <input type="text" value={commentDraft} onChange={(e) => setCommentDraft(e.target.value)} placeholder="코멘트"
-                        className="flex-1 rounded border border-gray-300 px-1.5 py-0.5 text-[10px] outline-none focus:border-[#C41E1E]"
-                        onKeyDown={(e) => { if (e.key === "Enter") { onEditComment(pick.id, commentDraft); setEditingId(null); } }} />
-                      <button onClick={() => { onEditComment(pick.id, commentDraft); setEditingId(null); }}
-                        className="cursor-pointer rounded bg-[#C41E1E] px-1.5 py-0.5 text-[9px] text-white">저장</button>
-                    </div>
-                  ) : pick.curation_comment ? (
-                    <button onClick={() => { setEditingId(pick.id); setCommentDraft(pick.curation_comment); }}
-                      className="mt-1 block w-full text-left text-[10px] italic text-gray-400 hover:text-gray-600 cursor-pointer truncate">
-                      &ldquo;{pick.curation_comment}&rdquo;
-                    </button>
-                  ) : null}
-                  <div className="mt-1.5 flex gap-1">
-                    <button onClick={() => onToggleVisible(pick.id)} className={`flex-1 cursor-pointer rounded py-1 text-[10px] font-medium ${pick.visible ? "bg-green-50 text-green-600" : "bg-gray-100 text-gray-400"}`}>
-                      {pick.visible ? "노출" : "숨김"}
-                    </button>
-                    <button onClick={() => onRemovePick(pick.id)} className="flex-1 cursor-pointer rounded bg-gray-50 py-1 text-[10px] text-gray-400 hover:text-red-500">삭제</button>
-                  </div>
-                </div>
-              </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
+      {/* 2컬럼 레이아웃: 좌측 인벤토리 브라우저 / 우측 내 몰 미리보기 */}
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
 
-      {gongguPicks.length > 0 && (
-        <div className="border-t border-dashed border-gray-200 pt-2">
-          <p className="text-xs text-gray-400">카페24 인벤토리에서 상품을 골라 PICK에 추가하세요</p>
-        </div>
-      )}
-
-      {/* Cafe24 인벤토리 브라우저 */}
-      <div>
+      {/* 좌측: 카페24 인벤토리 브라우저 */}
+      <div className="lg:col-span-3 space-y-4">
         <div className="rounded-xl border border-gray-200 p-4">
           <div className="relative">
             <svg className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -581,7 +487,7 @@ function GongguTab({
         {!loading && !error && products.length > 0 && (
           <div className="mt-4">
             <p className="mb-3 text-sm text-gray-500">{search ? `"${search}" 검색 결과` : "전체 공구 상품"} · {products.length}개</p>
-            <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4">
               {products.map((product) => {
                 const isPicked = pickedProductNos.has(product.product_no);
                 const price = Number(product.price);
@@ -672,6 +578,129 @@ function GongguTab({
           </div>
         )}
       </div>
+
+      {/* 우측: 내 몰 미리보기 (공구 PICK 리스트) */}
+      <div className="lg:col-span-2 space-y-3 lg:sticky lg:top-4 lg:self-start">
+        <div className="rounded-xl border border-gray-200 bg-white overflow-hidden">
+          <div className="flex items-center justify-between border-b border-gray-100 bg-gray-50 px-4 py-3">
+            <div className="flex items-center gap-2">
+              <span className="h-2 w-2 rounded-full bg-[#C41E1E] animate-pulse" />
+              <h3 className="text-sm font-bold text-gray-900">내 공구 PICK</h3>
+              <span className="rounded-full bg-[#C41E1E] px-2 py-0.5 text-[10px] font-bold text-white">{gongguPicks.length}</span>
+            </div>
+            <a
+              href="/shop/gwibinjeong"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 rounded-md border border-gray-300 bg-white px-2.5 py-1 text-[10px] font-medium text-gray-600 hover:bg-gray-50"
+            >
+              내 몰 열기
+              <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+              </svg>
+            </a>
+          </div>
+
+          {gongguPicks.length === 0 ? (
+            <div className="flex flex-col items-center py-10 text-center">
+              <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-gray-100">
+                <svg className="h-6 w-6 text-gray-300" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+                </svg>
+              </div>
+              <p className="text-xs text-gray-500">아직 담긴 상품이 없어요</p>
+              <p className="mt-0.5 text-[10px] text-gray-400">왼쪽에서 공구 상품을 PICK 하세요</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-gray-100 max-h-[600px] overflow-y-auto">
+              {gongguPicks.map((pick) => {
+                const supplyPrice = Number(pick.source_meta?.supply_price || 0);
+                const pickMargin = calcMargin(pick.price, supplyPrice);
+                const earning = pickMargin.influencer;
+                const marginRate = pick.price > 0 ? (pickMargin.netMargin / pick.price) * 100 : 0;
+                const sb = shippingBadge(pick.source_meta?.shipping_fee_type as string | undefined, pick.price);
+                return (
+                  <div key={pick.id} className={`flex gap-3 p-3 transition-colors ${pick.visible ? "" : "opacity-50"}`}>
+                    <div className="h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-gray-100">
+                      {pick.image ? (
+                        <img src={pick.image} alt="" className="h-full w-full object-cover" />
+                      ) : (
+                        <div className="flex h-full items-center justify-center text-gray-300">
+                          <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                          </svg>
+                        </div>
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1 flex-wrap">
+                        <span className="rounded bg-[#C41E1E]/10 px-1.5 py-0.5 text-[9px] font-medium text-[#C41E1E]">공구</span>
+                        {sb && (
+                          <span className={`inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[9px] font-medium ${sb.style}`}>
+                            {sb.icon} {sb.label}
+                          </span>
+                        )}
+                      </div>
+                      <p className="mt-1 line-clamp-2 text-xs font-medium text-gray-900 leading-snug">{pick.name}</p>
+                      <p className="mt-0.5 text-sm font-bold text-[#C41E1E]">{formatPrice(pick.price)}</p>
+                      {earning > 0 && (
+                        <p
+                          className="text-[10px] font-medium text-green-600"
+                          title={`판매가 ${formatPrice(pick.price)}\n- 공급가 ${formatPrice(supplyPrice)}\n- PG수수료 3% ${formatPrice(pickMargin.pgFee)}\n- 세금 10% ${formatPrice(pickMargin.tax)}\n= 순마진 ${formatPrice(pickMargin.netMargin)} (${marginRate.toFixed(1)}%)\n→ 인플루언서 60%: ${formatPrice(earning)}`}
+                        >
+                          수익 {formatPrice(earning)} <span className="text-gray-400 font-normal">({marginRate.toFixed(0)}%)</span>
+                        </p>
+                      )}
+                      {editingId === pick.id ? (
+                        <div className="mt-1 flex gap-1">
+                          <input type="text" value={commentDraft} onChange={(e) => setCommentDraft(e.target.value)} placeholder="코멘트"
+                            className="flex-1 rounded border border-gray-300 px-1.5 py-0.5 text-[10px] outline-none focus:border-[#C41E1E]"
+                            onKeyDown={(e) => { if (e.key === "Enter") { onEditComment(pick.id, commentDraft); setEditingId(null); } }} />
+                          <button onClick={() => { onEditComment(pick.id, commentDraft); setEditingId(null); }}
+                            className="cursor-pointer rounded bg-[#C41E1E] px-1.5 py-0.5 text-[9px] text-white">저장</button>
+                        </div>
+                      ) : pick.curation_comment ? (
+                        <button onClick={() => { setEditingId(pick.id); setCommentDraft(pick.curation_comment); }}
+                          className="mt-1 block w-full text-left text-[10px] italic text-gray-400 hover:text-gray-600 cursor-pointer truncate">
+                          &ldquo;{pick.curation_comment}&rdquo;
+                        </button>
+                      ) : (
+                        <button onClick={() => { setEditingId(pick.id); setCommentDraft(""); }}
+                          className="mt-1 text-[10px] text-gray-300 hover:text-gray-500 cursor-pointer">
+                          + 코멘트 추가
+                        </button>
+                      )}
+                      <div className="mt-1.5 flex items-center gap-2 text-[10px] text-gray-400">
+                        <span>클릭 {pick.clicks}</span>
+                        <span>전환 {pick.conversions}</span>
+                      </div>
+                      <div className="mt-1.5 flex gap-1">
+                        <button onClick={() => onToggleVisible(pick.id)}
+                          className={`cursor-pointer rounded px-2 py-0.5 text-[9px] font-medium ${pick.visible ? "bg-green-100 text-green-700" : "bg-gray-200 text-gray-500"}`}>
+                          {pick.visible ? "노출중" : "숨김"}
+                        </button>
+                        <button onClick={() => onRemovePick(pick.id)}
+                          className="cursor-pointer rounded px-2 py-0.5 text-[9px] font-medium text-gray-400 hover:bg-red-50 hover:text-red-500">
+                          삭제
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        <div className="rounded-xl border border-dashed border-gray-200 p-3">
+          <p className="text-[10px] text-gray-500 leading-relaxed">
+            💡 담긴 상품은 <b>내 공개 쇼핑몰</b>의 PICK 블록에 자동 노출됩니다.
+            순서나 레이아웃은 <b>몰 꾸미기</b> 탭에서 조정할 수 있어요.
+          </p>
+        </div>
+      </div>
+
+      </div> {/* 2컬럼 grid end */}
     </div>
   );
 }
@@ -1040,6 +1069,11 @@ function CoupangTab({
         </div>
       )}
 
+      {/* 2컬럼 레이아웃: 좌측 상품 탐색 / 우측 내 몰 미리보기 */}
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+
+      {/* 좌측: 상품 탐색 */}
+      <div className="lg:col-span-3 space-y-4">
       {/* 검색 영역 */}
       <div className="rounded-xl border border-gray-200 p-4">
         <div className="mb-3 flex items-center justify-between">
@@ -1116,7 +1150,7 @@ function CoupangTab({
           <h4 className="mb-3 text-sm font-medium text-gray-900">
             상품 추천 <span className="text-gray-400">· {results.length}개</span>
           </h4>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {sortedResults.map((product, idx) => {
               const isPicked = coupangPicks.some((p) => (p.source_meta?.product_url as string)?.includes(String(product.productId)));
               return (
@@ -1197,30 +1231,101 @@ function CoupangTab({
           <p className="text-sm text-gray-500">상품이 없습니다. 다른 카테고리/검색어로 시도해보세요.</p>
         </div>
       )}
+      </div> {/* 좌측 col-span-3 end */}
 
-      {/* 이미 PICK된 쿠팡 상품 */}
-      {coupangPicks.length > 0 && (
-        <div className="border-t border-gray-200 pt-5">
-          <h4 className="mb-3 text-sm font-semibold text-gray-900">내 쿠팡 PICK <span className="text-[#C41E1E]">{coupangPicks.length}</span></h4>
-          <div className="space-y-2">
-            {coupangPicks.map((pick) => (
-              <div key={pick.id} className="flex items-center gap-3 rounded-lg border border-gray-200 p-3">
-                <div className="h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-gray-100">
-                  {pick.image ? <img src={pick.image} alt="" className="h-full w-full object-cover" /> : <div className="flex h-full items-center justify-center text-gray-300"><svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24"><path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg></div>}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium text-gray-900">{pick.name}</p>
-                  <div className="flex items-center gap-2 text-xs text-gray-400"><span>{formatPrice(pick.price)}</span><span>·</span><span>수수료 3%</span><span>·</span><span>클릭 {pick.clicks}</span></div>
-                </div>
-                <button onClick={() => onToggleVisible(pick.id)} className={`cursor-pointer rounded px-2 py-1 text-[10px] font-medium ${pick.visible ? "bg-green-100 text-green-700" : "bg-gray-200 text-gray-500"}`}>{pick.visible ? "노출" : "숨김"}</button>
-                <button onClick={() => onRemovePick(pick.id)} className="cursor-pointer text-gray-400 hover:text-red-500">
-                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                </button>
-              </div>
-            ))}
+      {/* 우측: 내 몰 미리보기 (쿠팡 PICK 리스트) */}
+      <div className="lg:col-span-2 space-y-3 lg:sticky lg:top-4 lg:self-start">
+        <div className="rounded-xl border border-gray-200 bg-white overflow-hidden">
+          <div className="flex items-center justify-between border-b border-gray-100 bg-gray-50 px-4 py-3">
+            <div className="flex items-center gap-2">
+              <span className="h-2 w-2 rounded-full bg-[#C41E1E] animate-pulse" />
+              <h3 className="text-sm font-bold text-gray-900">내 쿠팡 PICK</h3>
+              <span className="rounded-full bg-[#C41E1E] px-2 py-0.5 text-[10px] font-bold text-white">{coupangPicks.length}</span>
+            </div>
+            <a
+              href="/shop/gwibinjeong"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 rounded-md border border-gray-300 bg-white px-2.5 py-1 text-[10px] font-medium text-gray-600 hover:bg-gray-50"
+            >
+              내 몰 열기
+              <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+              </svg>
+            </a>
           </div>
+
+          {coupangPicks.length === 0 ? (
+            <div className="flex flex-col items-center py-10 text-center">
+              <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-gray-100">
+                <svg className="h-6 w-6 text-gray-300" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+                </svg>
+              </div>
+              <p className="text-xs text-gray-500">아직 담긴 상품이 없어요</p>
+              <p className="mt-0.5 text-[10px] text-gray-400">왼쪽에서 상품을 담아보세요</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-gray-100 max-h-[600px] overflow-y-auto">
+              {coupangPicks.map((pick) => {
+                const isRocket = Boolean(pick.source_meta?.is_rocket);
+                return (
+                  <div key={pick.id} className={`flex gap-3 p-3 transition-colors ${pick.visible ? "" : "opacity-50"}`}>
+                    <div className="h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-gray-100">
+                      {pick.image ? (
+                        <img src={pick.image} alt="" className="h-full w-full object-cover" />
+                      ) : (
+                        <div className="flex h-full items-center justify-center text-gray-300">
+                          <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                          </svg>
+                        </div>
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1 flex-wrap">
+                        <span className="rounded bg-[#C41E1E]/10 px-1.5 py-0.5 text-[9px] font-medium text-[#C41E1E]">쿠팡</span>
+                        {isRocket && <span className="rounded bg-blue-600 px-1.5 py-0.5 text-[9px] font-medium text-white">로켓</span>}
+                        {pick.affiliate_code && <span className="rounded bg-green-100 px-1.5 py-0.5 text-[9px] font-medium text-green-700">파트너스</span>}
+                      </div>
+                      <p className="mt-1 line-clamp-2 text-xs font-medium text-gray-900 leading-snug">{pick.name}</p>
+                      <p className="mt-0.5 text-sm font-bold text-[#C41E1E]">{formatPrice(pick.price)}</p>
+                      <div className="mt-1.5 flex items-center gap-2 text-[10px] text-gray-400">
+                        <span>수수료 3%</span>
+                        <span>·</span>
+                        <span>클릭 {pick.clicks}</span>
+                        {pick.external_url && (
+                          <a href={pick.external_url} target="_blank" rel="noopener noreferrer"
+                            className="ml-auto text-[#C41E1E] hover:underline">링크 ↗</a>
+                        )}
+                      </div>
+                      <div className="mt-1.5 flex gap-1">
+                        <button onClick={() => onToggleVisible(pick.id)}
+                          className={`cursor-pointer rounded px-2 py-0.5 text-[9px] font-medium ${pick.visible ? "bg-green-100 text-green-700" : "bg-gray-200 text-gray-500"}`}>
+                          {pick.visible ? "노출중" : "숨김"}
+                        </button>
+                        <button onClick={() => onRemovePick(pick.id)}
+                          className="cursor-pointer rounded px-2 py-0.5 text-[9px] font-medium text-gray-400 hover:bg-red-50 hover:text-red-500">
+                          삭제
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
-      )}
+
+        <div className="rounded-xl border border-dashed border-gray-200 p-3">
+          <p className="text-[10px] text-gray-500 leading-relaxed">
+            💡 담긴 상품은 <b>내 공개 쇼핑몰</b>의 PICK 블록에 자동 노출됩니다.
+            {isConnected ? " 파트너스 딥링크가 적용되어 수수료는 본인 계좌로 입금돼요." : " 연동하면 파트너스 수수료를 받을 수 있어요."}
+          </p>
+        </div>
+      </div>
+
+      </div> {/* 2컬럼 grid end */}
     </div>
   );
 }

@@ -165,6 +165,169 @@ function BlockEditor({ block, onChange }: { block: ShopBlock; onChange: (data: R
           <div><label className={lc}>열 수</label><div className="flex gap-2">{[2, 3, 4].map(n => (<button key={n} onClick={() => onChange({ ...d, columns: n })} className={`cursor-pointer rounded-lg px-4 py-2 text-xs font-bold transition-all ${(d.columns || 2) === n ? "bg-[#C41E1E] text-white shadow-sm" : "bg-gray-100 text-gray-500 hover:bg-gray-200"}`}>{n}열</button>))}</div></div>
         </>)}
         {block.type === "divider" && (<p className="text-xs text-gray-400 bg-gray-50 rounded-lg p-3 text-center">설정 없음</p>)}
+        {block.type === "calendar" && (() => {
+          interface ManualEvent {
+            id: string;
+            title: string;
+            image: string | null;
+            start_date: string; // YYYY-MM-DD
+            end_date: string;
+            price?: number;
+            link_url?: string;
+            platform?: string;
+            status: "upcoming" | "active" | "ended";
+          }
+          const raw = (d.manual_events as ManualEvent[]) || [];
+          const defaultDays = (d.default_duration_days as number) || 7;
+
+          // status는 날짜 기반 자동 계산 (저장 시 fix)
+          const computeStatus = (start: string, end: string): ManualEvent["status"] => {
+            const now = Date.now();
+            const s = new Date(start).getTime();
+            const e = new Date(end).setHours(23, 59, 59, 999);
+            if (now >= s && now <= e) return "active";
+            if (now > e) return "ended";
+            return "upcoming";
+          };
+
+          const update = (i: number, patch: Partial<ManualEvent>) => {
+            const next = [...raw];
+            next[i] = { ...next[i], ...patch };
+            // 날짜가 바뀌면 status 재계산
+            if ("start_date" in patch || "end_date" in patch) {
+              next[i].status = computeStatus(next[i].start_date, next[i].end_date);
+            }
+            onChange({ ...d, manual_events: next });
+          };
+
+          const addEvent = () => {
+            const today = new Date();
+            const weekLater = new Date(today.getTime() + defaultDays * 86400000);
+            const iso = (x: Date) => x.toISOString().slice(0, 10);
+            const ne: ManualEvent = {
+              id: "e" + Date.now(),
+              title: "",
+              image: null,
+              start_date: iso(today),
+              end_date: iso(weekLater),
+              status: "upcoming",
+            };
+            onChange({ ...d, manual_events: [...raw, ne] });
+          };
+
+          const remove = (id: string) => onChange({ ...d, manual_events: raw.filter(x => x.id !== id) });
+
+          return (
+            <>
+              <div className="rounded-lg bg-blue-50 border border-blue-100 p-3 text-[11px] leading-relaxed text-blue-900">
+                💡 여기에 등록한 <b>공구 일정</b>은 내 쇼핑몰의 월별 캘린더에 자동 표시됩니다.
+                <br />
+                튜핑 내부 공구(카페24 연동)는 <b>자동으로</b> 추가돼요. 외부 공구(쿠팡/네이버/자사몰)만 직접 등록하면 됩니다.
+              </div>
+
+              <div>
+                <label className={lc}>기본 공구 기간 <span className="text-gray-400 text-[10px]">(종료일 미지정 시 오픈일 + N일)</span></label>
+                <div className="flex items-center gap-2">
+                  <input type="number" min={1} max={60}
+                    value={defaultDays}
+                    onChange={e => onChange({ ...d, default_duration_days: parseInt(e.target.value) || 7 })}
+                    className="w-20 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm outline-none focus:border-[#C41E1E]" />
+                  <span className="text-xs text-gray-500">일</span>
+                </div>
+              </div>
+
+              <div className="pt-2 border-t border-gray-100">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-bold text-gray-700">공구 일정 <span className="text-[#C41E1E]">{raw.length}</span></span>
+                  {raw.length > 0 && <span className="text-[10px] text-gray-400">드래그 순서는 날짜 기준 자동</span>}
+                </div>
+
+                {raw.length === 0 ? (
+                  <div className="rounded-xl border-2 border-dashed border-gray-200 py-8 text-center">
+                    <p className="text-xs text-gray-400 mb-0.5">등록된 공구가 없어요</p>
+                    <p className="text-[10px] text-gray-300">아래 버튼을 눌러 일정을 추가하세요</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {raw.map((ev, i) => {
+                      const status = computeStatus(ev.start_date, ev.end_date);
+                      const statusColor = status === "active" ? "bg-green-100 text-green-700" :
+                                          status === "ended" ? "bg-gray-100 text-gray-400" :
+                                          "bg-blue-50 text-blue-600";
+                      const statusLabel = status === "active" ? "진행중" : status === "ended" ? "종료" : "예정";
+                      return (
+                        <div key={ev.id} className="rounded-xl border border-gray-100 bg-gray-50/50 p-3 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[10px] font-bold text-gray-400 uppercase">공구 {i + 1}</span>
+                              <span className={`rounded-full px-1.5 py-0.5 text-[9px] font-bold ${statusColor}`}>{statusLabel}</span>
+                            </div>
+                            <button onClick={() => remove(ev.id)} className="cursor-pointer text-[10px] text-red-400 hover:text-red-600">삭제</button>
+                          </div>
+                          <input type="text" value={ev.title}
+                            onChange={e => update(i, { title: e.target.value })}
+                            placeholder="공구명 (예: 오설록 가을 공구)"
+                            className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-[#C41E1E]" />
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <label className="text-[9px] font-bold text-gray-400 uppercase">오픈일</label>
+                              <input type="date" value={ev.start_date}
+                                onChange={e => update(i, { start_date: e.target.value })}
+                                className="w-full mt-0.5 rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-xs outline-none focus:border-[#C41E1E]" />
+                            </div>
+                            <div>
+                              <label className="text-[9px] font-bold text-gray-400 uppercase">종료일</label>
+                              <input type="date" value={ev.end_date}
+                                onChange={e => update(i, { end_date: e.target.value })}
+                                className="w-full mt-0.5 rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-xs outline-none focus:border-[#C41E1E]" />
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <label className="text-[9px] font-bold text-gray-400 uppercase">가격 (원)</label>
+                              <input type="number" value={ev.price ?? ""}
+                                onChange={e => update(i, { price: parseInt(e.target.value) || undefined })}
+                                placeholder="35000"
+                                className="w-full mt-0.5 rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-xs outline-none focus:border-[#C41E1E]" />
+                            </div>
+                            <div>
+                              <label className="text-[9px] font-bold text-gray-400 uppercase">플랫폼</label>
+                              <select value={ev.platform || ""}
+                                onChange={e => update(i, { platform: e.target.value })}
+                                className="w-full mt-0.5 rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-xs outline-none focus:border-[#C41E1E]">
+                                <option value="">선택</option>
+                                <option value="쿠팡">쿠팡</option>
+                                <option value="네이버">네이버</option>
+                                <option value="자사몰">자사몰</option>
+                                <option value="인스타">인스타</option>
+                                <option value="기타">기타</option>
+                              </select>
+                            </div>
+                          </div>
+                          <input type="url" value={ev.link_url || ""}
+                            onChange={e => update(i, { link_url: e.target.value })}
+                            placeholder="공구 링크 (https://...)"
+                            className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs outline-none focus:border-[#C41E1E]" />
+                          <input type="url" value={ev.image || ""}
+                            onChange={e => update(i, { image: e.target.value || null })}
+                            placeholder="대표 이미지 URL (선택)"
+                            className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs outline-none focus:border-[#C41E1E]" />
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                <button onClick={addEvent}
+                  className="mt-2 cursor-pointer w-full rounded-xl border-2 border-dashed border-gray-200 py-3 text-xs font-medium text-gray-400 hover:border-[#C41E1E] hover:text-[#C41E1E] transition-colors">
+                  + 공구 일정 추가
+                </button>
+              </div>
+            </>
+          );
+        })()}
+        {block.type === "campaign_live" && (<p className="text-xs text-gray-400 bg-gray-50 rounded-lg p-3 text-center">진행 중인 공구가 자동 표시됩니다</p>)}
+        {block.type === "campaign_teaser" && (<p className="text-xs text-gray-400 bg-gray-50 rounded-lg p-3 text-center">오픈 예정 공구가 자동 표시됩니다</p>)}
       </div>
     </div>
   );
@@ -219,6 +382,44 @@ function BlockPreview({ block, isSelected }: { block: ShopBlock; isSelected: boo
       <div className={`px-3 py-2 ${ring}`}>{m ? <div className="aspect-video rounded-lg overflow-hidden shadow-sm"><iframe src={`https://www.youtube.com/embed/${m[1]}`} className="h-full w-full" /></div> : <div className="aspect-video rounded-lg bg-gray-900 flex items-center justify-center"><span className="text-white/30 text-lg">▶</span></div>}</div>
     ); }
     case "divider": return <div className={`px-6 py-3 ${ring}`}><hr className="border-gray-100" /></div>;
+    case "calendar": {
+      const evs = (d.manual_events as { id: string; title: string; start_date: string; status: string }[]) || [];
+      const active = evs.filter(e => e.status === "active").length;
+      const upcoming = evs.filter(e => e.status === "upcoming").length;
+      return (
+        <div className={`px-3 py-2 ${ring}`}>
+          <div className="rounded-lg border border-gray-100 bg-white p-2.5 shadow-sm">
+            <div className="flex items-center gap-1.5 mb-1.5">
+              <span className="text-[10px]">📅</span>
+              <span className="text-[9px] font-bold text-gray-900">공구 캘린더</span>
+              {evs.length > 0 && <span className="ml-auto text-[7px] text-gray-400">{evs.length}건</span>}
+            </div>
+            {evs.length === 0 ? (
+              <div className="text-center py-3 text-[8px] text-gray-300">공구 일정이 비어있어요</div>
+            ) : (
+              <div className="grid grid-cols-7 gap-0.5 text-[6px] text-center">
+                {Array.from({ length: 28 }).map((_, i) => {
+                  const hasEv = i < evs.length * 3;
+                  return (
+                    <div key={i} className={`aspect-square rounded flex items-center justify-center ${hasEv ? "bg-[#C41E1E]/20 text-[#C41E1E] font-bold" : "bg-gray-50 text-gray-300"}`}>
+                      {i + 1}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            {(active > 0 || upcoming > 0) && (
+              <div className="flex gap-1 mt-1.5 text-[7px]">
+                {active > 0 && <span className="rounded-full bg-green-100 text-green-700 px-1.5 py-0.5">진행 {active}</span>}
+                {upcoming > 0 && <span className="rounded-full bg-blue-100 text-blue-700 px-1.5 py-0.5">예정 {upcoming}</span>}
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    }
+    case "campaign_live": return <div className={`px-3 py-2 ${ring}`}><div className="rounded-lg bg-gradient-to-r from-green-500/10 to-emerald-500/10 border border-green-200 p-2"><p className="text-[8px] font-bold text-green-700">🔴 LIVE 공구</p></div></div>;
+    case "campaign_teaser": return <div className={`px-3 py-2 ${ring}`}><div className="rounded-lg bg-gradient-to-r from-orange-500/10 to-amber-500/10 border border-orange-200 p-2"><p className="text-[8px] font-bold text-orange-700">🔔 오픈 예정</p></div></div>;
     case "gallery": { const imgs = (d.images as string[]) || []; const c = (d.columns as number) || 2; return (
       <div className={`px-3 py-2 ${ring}`}><div className={`grid gap-1 ${c === 2 ? "grid-cols-2" : c === 3 ? "grid-cols-3" : "grid-cols-4"}`}>
         {imgs.length > 0 ? imgs.slice(0, 6).map((img, i) => <img key={i} src={img} alt="" className="w-full aspect-square rounded-lg object-cover" />) : [1, 2, 3, 4].map(i => <div key={i} className="rounded-lg bg-gray-100 aspect-square flex items-center justify-center text-[7px] text-gray-300">🎨</div>)}
@@ -388,7 +589,7 @@ export default function ShopCustomize() {
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState("");
 
-  // 초기 로드 — /api/me에서 저장된 theme 가져오기
+  // 초기 로드 — /api/me에서 저장된 theme + blocks 가져오기
   useEffect(() => {
     let alive = true;
     (async () => {
@@ -396,8 +597,12 @@ export default function ShopCustomize() {
         const res = await fetch("/api/me");
         if (!res.ok) return;
         const data = await res.json();
-        const saved = data?.creator_shops?.[0]?.theme ?? data?.shop?.theme;
-        if (alive && saved) setTheme(normalizeTheme(saved));
+        const shop = data?.creator_shops?.[0];
+        if (!alive || !shop) return;
+        if (shop.theme) setTheme(normalizeTheme(shop.theme));
+        if (Array.isArray(shop.link_blocks) && shop.link_blocks.length > 0) {
+          setBlocks(shop.link_blocks);
+        }
       } catch { /* 그대로 기본값 */ }
     })();
     return () => { alive = false; };
@@ -406,16 +611,17 @@ export default function ShopCustomize() {
   const handleSave = useCallback(async () => {
     setSaving(true); setSaveMsg("");
     try {
+      // link_blocks 컬럼에 전체 블록 트리 저장 (creator_shops.link_blocks JSONB)
       const res = await fetch("/api/me", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ theme }),
+        body: JSON.stringify({ theme, link_blocks: blocks }),
       });
       if (res.ok) { setSaveMsg("✅ 저장됨"); setTimeout(() => setSaveMsg(""), 2500); }
       else setSaveMsg("⚠️ 저장 실패");
     } catch { setSaveMsg("⚠️ 네트워크 오류"); }
     finally { setSaving(false); }
-  }, [theme]);
+  }, [theme, blocks]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),

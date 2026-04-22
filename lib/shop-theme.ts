@@ -104,6 +104,32 @@ export function fontCss(font: FontKey): string {
   return FONTS.find((f) => f.key === font)?.cssFamily || FONTS[0].cssFamily;
 }
 
+/** hex(#RRGGBB)가 "어두운 배경"인지 판단 — 카드 배경/글자 색 결정용 */
+export function isDarkBg(bg: string): boolean {
+  const m = bg.replace("#", "").trim();
+  const hex = m.length === 3
+    ? m.split("").map((c) => c + c).join("")
+    : m.padEnd(6, "0").slice(0, 6);
+  const r = parseInt(hex.slice(0, 2), 16);
+  const g = parseInt(hex.slice(2, 4), 16);
+  const b = parseInt(hex.slice(4, 6), 16);
+  // YIQ 밝기 (0~255). 128 미만이면 어두움.
+  const yiq = (r * 299 + g * 587 + b * 114) / 1000;
+  return yiq < 128;
+}
+
+/** 테마에 따른 카드/muted/border 색 자동 파생 */
+export function derivedPalette(theme: ShopTheme) {
+  const dark = isDarkBg(theme.bg);
+  return {
+    cardBg: dark ? "rgba(255,255,255,0.06)" : "#FFFFFF",
+    cardBorder: dark ? "rgba(255,255,255,0.10)" : "rgba(0,0,0,0.08)",
+    muted: dark ? "rgba(255,255,255,0.55)" : "rgba(0,0,0,0.55)",
+    mutedSoft: dark ? "rgba(255,255,255,0.35)" : "rgba(0,0,0,0.35)",
+    surface: dark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.03)",
+  };
+}
+
 /**
  * theme → CSS 변수 객체. 공개 몰·미리보기 루트 div에 inline style로 주입.
  * 각 블록은 var(--accent) / var(--shop-bg) / var(--shop-fg) / var(--font-sans)
@@ -111,11 +137,16 @@ export function fontCss(font: FontKey): string {
  */
 export function themeToCssVars(theme: Partial<ShopTheme> | null | undefined): React.CSSProperties {
   const t = normalizeTheme(theme);
+  const p = derivedPalette(t);
   return {
-    // CSS 변수는 타입상 CSSProperties 바깥 키라 Record<string,string>로 캐스트 필요
     ["--accent" as string]: t.accent,
     ["--shop-bg" as string]: t.bg,
     ["--shop-fg" as string]: t.fg,
+    ["--card-bg" as string]: p.cardBg,
+    ["--card-border" as string]: p.cardBorder,
+    ["--muted" as string]: p.muted,
+    ["--muted-soft" as string]: p.mutedSoft,
+    ["--surface" as string]: p.surface,
     ["--font-sans" as string]: fontCss(t.font),
     ["--block-radius" as string]: SHAPE_RADIUS[t.block.shape],
     ["--block-shadow" as string]: SHADOW_VALUE[t.block.shadow],

@@ -154,7 +154,10 @@ function HeroBlock({ data, creator, shop }: { data: Record<string, unknown>; cre
         {coverUrl ? (
           <img src={coverUrl} alt="" className="h-36 sm:h-48 w-full object-cover" />
         ) : (
-          <div className="flex h-36 sm:h-48 w-full items-center justify-center bg-gradient-to-r from-[#C41E1E] to-[#111111]">
+          <div
+            className="flex h-36 sm:h-48 w-full items-center justify-center"
+            style={{ background: "linear-gradient(to right, var(--accent), color-mix(in srgb, var(--accent) 35%, #111))" }}
+          >
             <span className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white/90">{name}</span>
           </div>
         )}
@@ -243,7 +246,14 @@ function BannerBlock({ data, slug }: { data: Record<string, unknown>; slug: stri
 
   return (
     <section className="mx-auto max-w-2xl px-3 sm:px-4 py-3">
-      <a href={addUtm(linkUrl, slug)} target="_blank" rel="noopener noreferrer" className="block overflow-hidden rounded-2xl border border-gray-200 bg-gradient-to-r from-[#C41E1E] to-[#8B1515] hover:shadow-lg transition-shadow">
+      <a href={addUtm(linkUrl, slug)} target="_blank" rel="noopener noreferrer"
+        className="block overflow-hidden hover:shadow-lg transition-shadow"
+        style={{
+          borderRadius: "var(--block-radius)",
+          border: "1px solid var(--card-border)",
+          background: "linear-gradient(to right, var(--accent), color-mix(in srgb, var(--accent) 65%, #000))",
+        }}
+      >
         <div className="flex items-center p-5">
           <div className="flex-1">
             {dday !== undefined && (
@@ -253,7 +263,7 @@ function BannerBlock({ data, slug }: { data: Record<string, unknown>; slug: stri
             )}
             <h3 className="text-lg font-bold text-white">{title}</h3>
             {subtitle && <p className="mt-1 text-sm text-white/80">{subtitle}</p>}
-            <span className="mt-3 inline-block rounded-full bg-white px-4 py-1.5 text-xs font-bold text-[#C41E1E]">
+            <span className="mt-3 inline-block rounded-full bg-white px-4 py-1.5 text-xs font-bold" style={{ color: "var(--accent)" }}>
               자세히 보기
             </span>
           </div>
@@ -273,14 +283,22 @@ function LinksBlock({ data, slug }: { data: Record<string, unknown>; slug: strin
     <section className="mx-auto max-w-2xl px-3 sm:px-4 py-3">
       <div className="flex items-center gap-2 mb-3">
         <span className="text-xl">🔗</span>
-        <h2 className="text-base font-bold text-gray-900">링크</h2>
+        <h2 className="text-base font-bold">링크</h2>
       </div>
       <div className="space-y-2">
         {items.map((link) => (
-          <a key={link.id} href={addUtm(link.url, slug)} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 rounded-xl border border-gray-200 bg-white p-3 hover:border-gray-300 hover:shadow-sm transition-all">
+          <a key={link.id} href={addUtm(link.url, slug)} target="_blank" rel="noopener noreferrer"
+            className="flex items-center gap-3 p-3 hover:opacity-90 transition-all"
+            style={{
+              borderRadius: "var(--block-radius)",
+              border: "1px solid var(--card-border)",
+              background: "var(--card-bg)",
+              boxShadow: "var(--block-shadow)",
+            }}
+          >
             <span className="text-xl">{link.icon}</span>
-            <span className="flex-1 text-sm font-medium text-gray-900">{link.label}</span>
-            <svg className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <span className="flex-1 text-sm font-medium">{link.label}</span>
+            <svg className="h-4 w-4" style={{ color: "var(--muted-soft)" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
             </svg>
           </a>
@@ -1181,9 +1199,15 @@ export default function ShopPage({ params }: { params: Promise<{ slug: string }>
     return new Date(c.started_at).getTime() > nowTs;
   });
 
-  // 블록 결정: DB에 blocks가 있으면 사용, 없으면 기본 레이아웃
-  const blocks: ShopBlock[] = (shop?.blocks && Array.isArray(shop.blocks) && shop.blocks.length > 0)
-    ? shop.blocks
+  // 블록 결정: DB의 link_blocks(JSONB, 전체 블록 트리) 또는 blocks 필드, 없으면 기본 레이아웃
+  const shopRaw = shop as unknown as { link_blocks?: unknown; blocks?: unknown } | null;
+  const savedBlocks = (Array.isArray(shopRaw?.link_blocks) ? shopRaw.link_blocks : null)
+    || (Array.isArray(shopRaw?.blocks) ? shopRaw.blocks : null)
+    || [];
+  // 저장된 블록이 전체 블록 트리 형태인지 (type 필드 존재) 체크 — 레거시 링크 배열과 구분
+  const isFullBlockTree = savedBlocks.length > 0 && typeof (savedBlocks[0] as { type?: unknown })?.type === "string";
+  const blocks: ShopBlock[] = isFullBlockTree
+    ? (savedBlocks as ShopBlock[])
     : defaultBlocks(shop, safeCampaigns.length > 0, hasActiveCampaign, hasUpcomingCampaign);
 
   // 테마 — 크리에이터가 몰 꾸미기에서 저장한 값, 없으면 기본값

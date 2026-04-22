@@ -698,23 +698,81 @@ function CoupangTab({
   const [results, setResults] = useState<CoupangSearchProduct[]>([]);
   const [searching, setSearching] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
-  const [sortBy, setSortBy] = useState<"rank" | "price_low" | "price_high">("rank");
+  const [rankMode, setRankMode] = useState<"sales" | "click">("sales");
   const [selectedProduct, setSelectedProduct] = useState<CoupangSearchProduct | null>(null);
   const [generatedLink, setGeneratedLink] = useState("");
   const [generatingLink, setGeneratingLink] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [onboardingStep, setOnboardingStep] = useState(0);
   const [toastMessage, setToastMessage] = useState("");
+  const [loadingBest, setLoadingBest] = useState(false);
 
-  const CATEGORIES = ["전체", "식품", "로켓프레시", "생활용품", "주방용품", "가구/홈인테리어", "가전/디지털", "패션/의류", "뷰티", "스포츠"];
-  const [selectedCat, setSelectedCat] = useState("전체");
+  // 쿠팡 파트너스 카테고리 (categoryId 매핑)
+  const COUPANG_CATEGORIES: { id: number; label: string }[] = [
+    { id: 0, label: "전체" },
+    { id: 1012, label: "식품" },
+    { id: 1014, label: "생활용품" },
+    { id: 1013, label: "주방용품" },
+    { id: 1015, label: "가구/홈인테리어" },
+    { id: 1016, label: "가전디지털" },
+    { id: 1010, label: "뷰티" },
+    { id: 1001, label: "패션의류" },
+    { id: 1024, label: "헬스/건강" },
+    { id: 1029, label: "반려동물" },
+    { id: 1011, label: "출산/유아동" },
+    { id: 1017, label: "스포츠/레저" },
+  ];
+  const [selectedCatId, setSelectedCatId] = useState(0);
 
+  // 저장된 API 키 로드
   useEffect(() => {
     if (typeof window === "undefined") return;
     const ak = localStorage.getItem("coupang_access_key") || "";
     const sk = localStorage.getItem("coupang_secret_key") || "";
     if (ak && sk) { setIsConnected(true); setAccessKey(ak); setSecretKey(sk); }
   }, []);
+
+  // 카테고리 베스트셀러 로드 (연동 없어도 동작 — 플랫폼 키 사용)
+  const loadBestsellers = useCallback(async (catId: number) => {
+    setLoadingBest(true);
+    try {
+      const headers: Record<string, string> = {};
+      if (accessKey && secretKey) {
+        headers["x-coupang-access-key"] = accessKey;
+        headers["x-coupang-secret-key"] = secretKey;
+      }
+      const res = await fetch(`/api/coupang/bestsellers?categoryId=${catId}&limit=30`, { headers });
+      if (res.ok) {
+        const data = await res.json();
+        const items = (data.items || []).map((it: Record<string, unknown>) => ({
+          id: String(it.productId),
+          productId: Number(it.productId),
+          productName: String(it.productName || ""),
+          productPrice: Number(it.productPrice || 0),
+          productImage: String(it.productImage || ""),
+          productUrl: String(it.productUrl || ""),
+          categoryName: String(it.categoryName || ""),
+          rank: Number(it.rank || 0),
+          isRocket: Boolean(it.isRocket),
+          // 기존 CoupangSearchProduct 필드 호환
+          name: String(it.productName || ""),
+          price: Number(it.productPrice || 0),
+          image: String(it.productImage || ""),
+          rating: 0,
+          reviewCount: 0,
+          commission: 3,
+        }));
+        setResults(items);
+        setHasSearched(true);
+      }
+    } catch { /* ignore */ }
+    finally { setLoadingBest(false); }
+  }, [accessKey, secretKey]);
+
+  // 탭 진입 시 전체 베스트 자동 로드
+  useEffect(() => {
+    loadBestsellers(0);
+  }, [loadBestsellers]);
 
   const handleConnect = () => {
     if (!accessKey.trim() || !secretKey.trim()) return;
@@ -763,14 +821,13 @@ function CoupangTab({
     setToastMessage("PICK에 추가되었습니다!"); setTimeout(() => setToastMessage(""), 3000);
   };
 
-  const sortedResults = [...results].sort((a, b) => {
-    switch (sortBy) {
-      case "rank": return a.rank - b.rank;
-      case "price_low": return a.productPrice - b.productPrice;
-      case "price_high": return b.productPrice - a.productPrice;
-      default: return 0;
-    }
-  });
+  const handleCategoryClick = (catId: number) => {
+    setSelectedCatId(catId);
+    setSearchQuery("");
+    loadBestsellers(catId);
+  };
+
+  const sortedResults = [...results].sort((a, b) => a.rank - b.rank);
 
   const coupangPicks = picks.filter((p) => p.source_type === "coupang");
 
@@ -889,52 +946,59 @@ function CoupangTab({
           <button onClick={() => { isConnected ? handleSearch() : setShowConnectModal(true); }}
             className="absolute right-2 top-1/2 -translate-y-1/2 cursor-pointer rounded-lg bg-[#C41E1E] px-3 py-1.5 text-xs font-medium text-white hover:bg-[#A01818]">검색</button>
         </div>
-        <div className="mt-3 flex flex-wrap gap-1.5">
-          {CATEGORIES.map((cat) => (
-            <button key={cat} onClick={() => setSelectedCat(cat)}
-              className={`cursor-pointer rounded-full px-3 py-1.5 text-xs transition-colors ${selectedCat === cat ? "border border-[#C41E1E] bg-[#fff0f0] text-[#C41E1E]" : "border border-gray-300 bg-white text-gray-600 hover:bg-gray-50"}`}>{cat}</button>
+        {/* 랭킹 토글 (인포크링크 스타일) */}
+        <div className="mt-3 flex items-center gap-2">
+          <button
+            onClick={() => setRankMode("sales")}
+            className={`flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
+              rankMode === "sales" ? "bg-[#111111] text-white" : "border border-gray-300 bg-white text-gray-600 hover:bg-gray-50"
+            }`}
+          >
+            👑 판매 랭킹
+          </button>
+          <button
+            onClick={() => setRankMode("click")}
+            className={`flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
+              rankMode === "click" ? "bg-[#111111] text-white" : "border border-gray-300 bg-white text-gray-600 hover:bg-gray-50"
+            }`}
+          >
+            📈 클릭 랭킹
+          </button>
+          <span className="ml-auto text-[10px] text-gray-400">카테고리별 TOP</span>
+        </div>
+
+        {/* 카테고리 필터 (가로 스크롤) */}
+        <div className="mt-2 flex gap-1.5 overflow-x-auto pb-1 scrollbar-thin">
+          {COUPANG_CATEGORIES.map((cat) => (
+            <button
+              key={cat.id}
+              onClick={() => handleCategoryClick(cat.id)}
+              className={`shrink-0 cursor-pointer rounded-full px-3 py-1.5 text-xs transition-colors ${
+                selectedCatId === cat.id
+                  ? "border border-[#C41E1E] bg-[#fff0f0] text-[#C41E1E]"
+                  : "border border-gray-300 bg-white text-gray-600 hover:bg-gray-50"
+              }`}
+            >
+              {cat.label}
+            </button>
           ))}
         </div>
       </div>
 
-      {/* 미연동 안내 */}
-      {!isConnected && !hasSearched && (
-        <div className="flex flex-col items-center py-12 text-center">
-          <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gray-100">
-            <svg className="h-8 w-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" /></svg>
-          </div>
-          <h4 className="mb-1 text-base font-semibold text-gray-900">쿠팡 파트너스를 연동하세요</h4>
-          <p className="mb-5 text-sm text-gray-500">연동하면 쿠팡 상품을 검색하고<br />파트너스 링크를 생성할 수 있어요</p>
-          <button onClick={() => setShowConnectModal(true)} className="cursor-pointer rounded-lg bg-[#C41E1E] px-6 py-2.5 text-sm font-medium text-white hover:bg-[#A01818]">연동하기</button>
+      {/* 로딩 */}
+      {(searching || loadingBest) && (
+        <div className="flex items-center justify-center py-16">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-gray-200 border-t-[#C41E1E]" />
+          <span className="ml-3 text-sm text-gray-500">상품 불러오는 중...</span>
         </div>
       )}
 
-      {/* 연동됨 + 검색 전 */}
-      {isConnected && !hasSearched && (
-        <div className="flex flex-col items-center py-12 text-center">
-          <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gray-100">
-            <svg className="h-8 w-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
-          </div>
-          <p className="text-sm text-gray-500">상품을 검색해서 파트너스 링크를 만들어 보세요</p>
-        </div>
-      )}
-
-      {searching && (
-        <div className="flex items-center justify-center py-16"><div className="h-8 w-8 animate-spin rounded-full border-2 border-gray-200 border-t-[#C41E1E]" /><span className="ml-3 text-sm text-gray-500">검색 중...</span></div>
-      )}
-
-      {/* 검색 결과 그리드 */}
-      {!searching && hasSearched && results.length > 0 && (
+      {/* 상품 그리드 */}
+      {!searching && !loadingBest && hasSearched && results.length > 0 && (
         <div>
-          <div className="mb-3 flex items-center justify-between">
-            <h4 className="text-sm font-medium text-gray-900">상품 추천 <span className="text-gray-400">· {results.length}개</span></h4>
-            <div className="flex gap-1.5">
-              {([{ key: "rank" as const, label: "판매 랭킹" }, { key: "price_low" as const, label: "낮은가격" }, { key: "price_high" as const, label: "높은가격" }]).map((sort) => (
-                <button key={sort.key} onClick={() => setSortBy(sort.key)}
-                  className={`cursor-pointer rounded-full px-3 py-1.5 text-xs transition-colors ${sortBy === sort.key ? "bg-[#111111] text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200"}`}>{sort.label}</button>
-              ))}
-            </div>
-          </div>
+          <h4 className="mb-3 text-sm font-medium text-gray-900">
+            상품 추천 <span className="text-gray-400">· {results.length}개</span>
+          </h4>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
             {sortedResults.map((product, idx) => {
               const isPicked = coupangPicks.some((p) => (p.source_meta?.product_url as string)?.includes(String(product.productId)));
@@ -942,17 +1006,62 @@ function CoupangTab({
                 <div key={product.productId || idx} className={`overflow-hidden rounded-xl border transition-colors ${isPicked ? "border-[#C41E1E]" : "border-gray-200 hover:border-gray-300"}`}>
                   <div className="relative aspect-square bg-gray-100">
                     {product.productImage ? <img src={product.productImage} alt={product.productName} className="h-full w-full object-cover" /> : <div className="flex h-full items-center justify-center text-gray-300">{IMAGE_PLACEHOLDER}</div>}
-                    {product.rank > 0 && <span className="absolute left-2 top-2 flex h-6 min-w-[24px] items-center justify-center rounded-md bg-[#111111] px-1.5 text-xs font-bold text-white">{product.rank}</span>}
-                    {product.isRocket && <span className="absolute right-2 top-2 rounded bg-blue-600 px-1.5 py-0.5 text-[10px] font-medium text-white">로켓</span>}
-                    {isPicked && <span className="absolute right-2 bottom-2 rounded bg-[#C41E1E] px-2 py-0.5 text-xs font-medium text-white">PICK</span>}
+                    {/* 순위 배지 */}
+                    {product.rank > 0 && (
+                      <span className="absolute left-2 top-2 flex h-7 min-w-[28px] items-center justify-center rounded-md bg-[#F97316] px-1.5 text-sm font-extrabold text-white shadow-sm">
+                        {product.rank}
+                      </span>
+                    )}
+                    {/* 상품 정보 외부 링크 */}
+                    {product.productUrl && (
+                      <a
+                        href={product.productUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="absolute right-2 top-2 flex items-center gap-0.5 rounded bg-white/95 px-1.5 py-0.5 text-[10px] font-medium text-gray-700 shadow-sm hover:bg-white"
+                        title="쿠팡 상품 페이지 열기"
+                      >
+                        상품 정보
+                        <svg className="h-2.5 w-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                        </svg>
+                      </a>
+                    )}
+                    {product.isRocket && (
+                      <span className="absolute right-2 bottom-2 rounded bg-blue-600 px-1.5 py-0.5 text-[10px] font-medium text-white">로켓</span>
+                    )}
+                    {isPicked && (
+                      <span className="absolute left-2 bottom-2 rounded bg-[#C41E1E] px-2 py-0.5 text-xs font-medium text-white">PICK</span>
+                    )}
                   </div>
                   <div className="p-3">
                     <p className="line-clamp-2 text-sm font-medium text-gray-900 leading-snug min-h-[2.5rem]">{product.productName}</p>
                     <p className="mt-1.5 text-base font-bold text-gray-900">{formatPrice(product.productPrice)}</p>
                     {product.categoryName && <p className="mt-0.5 text-xs text-gray-400">{product.categoryName}</p>}
-                    <button onClick={() => !isPicked && handleGenerateLink(product)} disabled={isPicked}
-                      className={`mt-3 w-full cursor-pointer rounded-lg py-2 text-sm font-medium transition-colors ${isPicked ? "bg-gray-100 text-gray-400 cursor-default" : "bg-[#C41E1E] text-white hover:bg-[#A01818]"}`}>
-                      {isPicked ? "PICK 완료" : "링크 생성"}
+                    <button
+                      onClick={() => {
+                        if (isPicked) return;
+                        if (!isConnected) { setShowConnectModal(true); return; }
+                        handleGenerateLink(product);
+                      }}
+                      disabled={isPicked}
+                      className={`mt-3 flex w-full cursor-pointer items-center justify-center gap-1 rounded-lg py-2 text-sm font-medium transition-colors ${
+                        isPicked
+                          ? "bg-gray-100 text-gray-400 cursor-default"
+                          : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                      }`}
+                    >
+                      {isPicked ? (
+                        "PICK 완료"
+                      ) : (
+                        <>
+                          <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101" />
+                          </svg>
+                          링크 생성
+                        </>
+                      )}
                     </button>
                   </div>
                 </div>
@@ -962,8 +1071,10 @@ function CoupangTab({
         </div>
       )}
 
-      {!searching && hasSearched && results.length === 0 && (
-        <div className="flex flex-col items-center py-12 text-center"><p className="text-sm text-gray-500">검색 결과가 없습니다. 다른 키워드로 검색해보세요.</p></div>
+      {!searching && !loadingBest && hasSearched && results.length === 0 && (
+        <div className="flex flex-col items-center py-12 text-center">
+          <p className="text-sm text-gray-500">상품이 없습니다. 다른 카테고리/검색어로 시도해보세요.</p>
+        </div>
       )}
 
       {/* 이미 PICK된 쿠팡 상품 */}

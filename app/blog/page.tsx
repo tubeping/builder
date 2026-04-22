@@ -1,19 +1,15 @@
 import Link from "next/link";
 import { supabaseAdmin } from "@/lib/supabase-server";
 import type { Metadata } from "next";
+import BlogListClient from "./_components/BlogListClient";
 
 export const metadata: Metadata = {
   title: "블로그 — TubePing",
   description:
     "유튜브 쇼핑, 크리에이터 커머스, SNS 풀필먼트 관련 최신 가이드와 트렌드를 확인하세요.",
-};
-
-const CATEGORY_STYLE: Record<string, string> = {
-  "서비스소개": "bg-blue-100 text-blue-700",
-  "회사소개": "bg-purple-100 text-purple-700",
-  "가이드": "bg-green-100 text-green-700",
-  "전략": "bg-amber-100 text-amber-700",
-  "트렌드": "bg-pink-100 text-pink-700",
+  alternates: {
+    canonical: "https://tubeping.site/blog",
+  },
 };
 
 type BlogPost = {
@@ -24,7 +20,6 @@ type BlogPost = {
   category: string;
   keywords: string[];
   published_at: string;
-  thumbnail_url: string | null;
 };
 
 export const revalidate = 60;
@@ -32,7 +27,7 @@ export const revalidate = 60;
 export default async function BlogListPage() {
   const { data: posts } = await supabaseAdmin
     .from("blog_posts")
-    .select("id, title, slug, excerpt, category, keywords, published_at, thumbnail_url")
+    .select("id, title, slug, excerpt, category, keywords, published_at")
     .eq("published", true)
     .order("published_at", { ascending: false });
 
@@ -68,45 +63,7 @@ export default async function BlogListPage() {
 
       {/* Posts */}
       <section className="px-4 pb-20">
-        <div className="max-w-3xl mx-auto">
-          {blogPosts.length === 0 ? (
-            <div className="text-center py-20 text-[#999999] text-lg">
-              아직 게시된 글이 없습니다.
-            </div>
-          ) : (
-            <ul className="divide-y divide-[#F0F0F0] border-y border-[#F0F0F0]">
-              {blogPosts.map((post) => (
-                <li key={post.id}>
-                  <Link
-                    href={`/blog/${post.slug}`}
-                    className="group block py-6 sm:py-7 hover:bg-[#FAFAFA] transition-colors px-2 -mx-2 rounded-lg"
-                  >
-                    <div className="flex items-center gap-2 mb-2">
-                      <span
-                        className={`text-xs px-2.5 py-1 rounded-full font-medium ${CATEGORY_STYLE[post.category] || "bg-gray-100 text-gray-600"}`}
-                      >
-                        {post.category}
-                      </span>
-                      <span className="text-xs text-[#999999]">
-                        {new Date(post.published_at).toLocaleDateString("ko", {
-                          year: "numeric",
-                          month: "long",
-                          day: "numeric",
-                        })}
-                      </span>
-                    </div>
-                    <h2 className="text-lg sm:text-xl font-bold text-[#111111] mb-2 group-hover:text-[#C41E1E] transition-colors leading-snug">
-                      {post.title}
-                    </h2>
-                    <p className="text-sm sm:text-base text-[#666666] line-clamp-2 leading-relaxed">
-                      {post.excerpt}
-                    </p>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
+        <BlogListClient posts={blogPosts} />
       </section>
 
       {/* Footer CTA */}

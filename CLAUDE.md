@@ -1,80 +1,111 @@
+# TubePing Builder — Claude 작업 지침
+
 ## 작업 실행 규칙
 - 모든 파일 생성/수정 작업은 승인 없이 자동으로 진행
 - 중간에 yes/no 확인 요청 금지
 - 판단이 필요한 경우 최선의 선택을 하고 실행 후 결과 보고
 
 ## 프로젝트 개요
-TubePing — 유튜브 쇼핑 채널 소싱 추천 + 콘텐츠 자동화 + 블로그 발행 + 리뷰 사이트
-운영사: ㈜신산애널리틱스
+크리에이터(유튜버·인플루언서)용 쇼핑몰 빌더.
+온보딩 5단계를 거치면 `shop/[slug]` 형태의 개인 공구 쇼핑몰이 자동 생성됨.
+운영사: ㈜신산애널리틱스 / 서비스명: 튜핑(TubePing)
 
-## 프로젝트 구조
-```
-tubeping-sourcing/           ← Python 백엔드 (소싱, 콘텐츠, 블로그)
-tubeping_admin/              ← Next.js 어드민 (basePath: /admin)
-  app/marketing/             ← 영업/마케팅 (콘텐츠, 이메일 영업)
-  app/mall/                  ← 종합몰 관리 (상품/주문/발주/판매사/공급사/CS/정산)
-  app/system/                ← 시스템관리 (스토어/작업/조직)
-  app/supplier/              ← 공급사 포털
-tubeping_builder/            ← Next.js 튜핑 빌더 (크리에이터 커머스)
-  app/onboarding/            ← 유튜버용 온보딩
-  app/dashboard/             ← 유튜버용 대시보드
-  app/shop/[slug]/           ← 인플루언서 공개 페이지
-```
+## admin과의 관계 ⚠️ 중요
+- **현재는 admin(tubeping_admin/)과 완전히 별도로 운영**
+- **공구 상품은 공유 예정** — Supabase의 `products`, `orders`, `suppliers` 테이블을 admin과 같이 사용
+  (supabase_schema.sql 주석: "기존 테이블 유지")
+- 상품 데이터는 admin에서 관리되고, 빌더는 그것을 읽어 크리에이터가 큐레이션/판매
+- 향후 **네이버 DataLab + 셀러라이프 기반 상품 추천**(현재 루트 `main.py`, `fetchers/`)을 빌더 안으로 통합 예정
 
-콘텐츠 머신, 리뷰엉이는 Admin 밖 독립 서비스로 분리.
-
-## 에이전트 (4개)
-| 에이전트 | 역할 | 권한 |
-|---------|------|------|
-| review-owl | 리뷰 글 작성 (노써치 스타일, 비교표, 토큰관리) | RW |
-| tubeping-blogger | SEO 블로그 작성 + 3플랫폼 변환 | RW |
-| seo-scorer | 블로그 SEO 100점 채점 (80+ 통과) | RO |
-| bizplan-writer | 사업계획서 작성 (정부지원/투자유치) | RO |
-
-에이전트는 역할 프리셋임. 자동 실행 아님. 채팅에서 불러야 작동.
-그 외 작업(기획, 소싱분석, 디버깅 등)은 에이전트 없이 직접 요청.
-
-## 슬래시 커맨드
-- `/source` — 소싱 파이프라인 (수집→분석→Excel)
-- `/content` — 콘텐츠 파이프라인 (주제→스크립트→영상)
-- `/seo-check` — SEO 채점 → 자동 개선 루프
-- `/publish` — 블로그 3플랫폼 변환 발행
-- `/weekly-report` — 주간 전체 현황 리포트
-
-## 점수 체계
-- 소싱: 트렌드 35% + 마진 25% + 시즌 20% + 채널적합 20% → S/A/B/C/D
-- SEO: 구조 30 + 콘텐츠 35 + 메타 20 + 링크 15 → 80+ 통과
-
-## 반응형 규칙 (모바일 필수)
-- 모든 페이지 신규 작업/수정 시 반드시 모바일 반응형 함께 구현
-- 그리드: 모바일 1열 → 태블릿 2열 → 데스크톱 3~4열
-- 사이드바: 모바일에서 햄버거 메뉴 or 오버레이
-- 테이블: 모바일에서 카드형 or 가로 스크롤
-- Tailwind breakpoint (sm/md/lg/xl) 활용
-
-## 코딩 규칙 (중복/기술부채 방지)
-- 기존 파일 수정 시 반드시 Read로 먼저 읽고 파악한 뒤 수정
-- 새 파일 생성보다 기존 파일 수정 우선
-- 같은 기능을 다른 파일에 중복 구현 금지 — 기존에 있는지 Grep으로 먼저 확인
-- Python은 함수/클래스 재사용. 같은 로직 2곳 이상이면 공통 모듈로 추출
-- Next.js는 공용 컴포넌트 components/, 페이지별 컴포넌트 _components/
-- 하드코딩 금지 — 설정값은 config/ 또는 .env, 더미데이터는 파일 상단 상수
-
-## 보안 규칙
-- .env, client_secret.json 직접 수정 금지 (훅이 차단)
-- 인증 정보(API 키, 비밀번호, 토큰)를 코드에 하드코딩 절대 금지
-- 인증 정보는 반드시 .env에서 환경변수로 로드
-- .env 파일은 .gitignore에 포함 — 커밋 금지
-- 외부 URL은 사용자가 제공한 것만 사용
-
-## 금지 사항
-- 기존 작동하는 API 연동 코드 임의 변경 금지
-- Write(전체 덮어쓰기) 대신 Edit(부분 수정) 사용
-- 불필요한 패키지 설치 금지
-- 테스트 안 된 코드 커밋 금지
+## ⚠️ 다음주(2026-04-21 주간) Vultr 서버 이전 예정
+- 현재 **Supabase + Vercel** 구성은 임시. 다음주 **Vultr VPS**로 전체 이전.
+- 이전 전까지는 아래 기술 스택·배포 방식이 유효. 이전 후 재작성 필요.
 
 ## 기술 스택
-- Python 3 + requests, pandas, openpyxl, pyyaml, beautifulsoup4, python-dotenv
-- Next.js 15 + TypeScript + Tailwind CSS (tubeping_builder)
-- 외부 API: Naver DataLab, SellerLife, YouTube Data API, Pexels, WordPress REST, Cafe24
-- 배포: Vercel (tubepingadmin.vercel.app)
+- Next.js 16.2.1 App Router + TypeScript + React 19
+- Tailwind CSS
+- **Supabase** (`@supabase/ssr`, `@supabase/supabase-js`) — DB·인증 공용
+- 로컬 실행: `npm run dev` → localhost:3000
+- 배포: Vercel (프로젝트 `tubeping_builder` — 현재 `tubeping/admin` main 브랜치 참조, 곧 자체 repo로 분리 예정)
+
+## 외부 연동 (lib/ · api/)
+- **Supabase** (`lib/supabase.ts`, `supabase-browser.ts`, `supabase-server.ts`) — SSR/클라이언트 분리
+- **카페24** (`app/api/cafe24/`) — 상품·카테고리·콜백
+- **쿠팡파트너스** (`app/api/coupang/`, `lib/coupang-sign.ts`) — 딥링크·검색 API
+- **YouTube Data API** (`app/api/youtube/`) — 크리에이터 채널 분석
+- **Insight 파싱** (`app/api/parse-insight/`) — 인사이트 자동 추출
+
+## 핵심 기능·라우트
+```
+app/
+├── page.tsx                ← 랜딩
+├── onboarding/             ← 5단계 온보딩 (채널 분석 → 상품 → 스토어 → 로그인 → 완료)
+├── dashboard/              ← 크리에이터 전용 대시보드 (상품 관리, 수익)
+├── shop/[slug]/            ← 크리에이터별 공개 공구 쇼핑몰 (최종 산출물)
+├── blog/                   ← 빌더 자체 블로그
+│   └── [slug]/
+├── privacy/, terms/        ← 법적 고지
+│
+└── api/
+    ├── apply/              ← 가입 신청
+    ├── me/                 ← 현재 크리에이터 정보
+    ├── picks/              ← 크리에이터가 고른 상품
+    ├── campaigns/          ← 캠페인(공구) 관리
+    ├── campaign-notify/    ← 캠페인 알림
+    ├── earnings/           ← 수익 정산
+    ├── shop/               ← 공개 숍 데이터
+    ├── blog/, blog/[slug]/ ← 블로그 CRUD
+    ├── cafe24/             ← 카페24 상품 동기화
+    ├── coupang/            ← 쿠팡 딥링크·검색
+    ├── youtube/            ← 채널 분석
+    └── parse-insight/      ← 인사이트 파싱
+```
+
+## DB 주요 테이블 (supabase_schema.sql 참고)
+- **creators** — 크리에이터 계정 (shop_slug, portal_token, platform)
+- **products, orders, suppliers** — admin과 **공유** 테이블
+- (빌더 전용 테이블은 schema 파일 확인)
+
+## ⚠️ 과도기 주의사항 (2026-04-14 기준)
+
+### 이 폴더 안의 `app/admin/` 디렉토리는 옛날 잔재
+- `app/admin/mall/`, `app/admin/marketing/`, `app/admin/system/` 등은 과거 admin+builder 통합 시절의 코드
+- 실제 admin은 별도 폴더 `tubeping_admin/`에 있음
+- **신규 개발 금지**. 곧 정리(삭제) 예정.
+
+### 이 폴더에서 `git push` 금지 🚫
+- 이 폴더의 git 원격이 `tubeping/admin` repo로 **잘못 연결**되어 있음
+- push하면 admin repo에 빌더 코드가 섞여 들어감 (오염)
+- 자체 repo `tubeping/builder` 생성 및 재연결 대기 중
+
+### 루트 `C:/tubeping-sourcing/app/`도 잔재
+- 루트의 `app/`과 `package.json`(name: `tubeping_builder`)도 구버전 코드
+- 현재 살아있는 빌더는 이 폴더(`tubeping_builder/`)가 유일
+- 혼동 시 **package.json의 name**이 아니라 **폴더 위치**와 **최근 수정일** 기준으로 판단
+
+## 코딩 컨벤션
+- TypeScript (`.tsx`, `.ts`)
+- 클라이언트 컴포넌트는 `"use client"` 명시
+- Supabase 클라이언트: 서버 컴포넌트에서는 `supabase-server.ts`, 클라이언트에서는 `supabase-browser.ts` 사용
+- 공용 컴포넌트 `components/`, 페이지별 컴포넌트 `_components/`
+- 하드코딩 금지 — 설정값은 `.env`, 더미데이터는 파일 상단 상수
+
+## 브랜드 규칙 (admin과 공통)
+- 빨간색: `#C41E1E` (Tube)
+- 검정: `#111111` (Ping)
+- 로고: **Tube**Ping (Tube=빨간색, Ping=검정)
+
+## 반응형 규칙 (모바일 필수)
+- 크리에이터 대시보드·공개 숍 모두 **모바일이 메인 사용처**
+- 그리드: 모바일 1열 → 태블릿 2열 → 데스크톱 3~4열
+- Tailwind breakpoint (sm/md/lg/xl) 활용
+
+## 보안 규칙
+- `.env` 인증 정보 하드코딩 금지
+- Supabase RLS(Row Level Security) 적용 필수 (크리에이터 A가 크리에이터 B 데이터 접근 불가)
+- `portal_token` 등 민감값 클라이언트 노출 금지
+
+## 금지 사항
+- 기존 작동하는 Supabase/카페24/쿠팡 연동 코드 임의 변경 금지
+- `tubeping.site`(홈페이지) 관련 코드 건드리지 말 것
+- Write(전체 덮어쓰기) 대신 Edit(부분 수정) 사용

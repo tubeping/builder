@@ -1,0 +1,93 @@
+{
+  "captured_at": "2026-04-21T20:33:09.038045",
+  "current_url": "https://sellochomes.co.kr/sellerlife/sourcing/category/",
+  "title": "카테고리 소싱 - 셀러라이프",
+  "download_button_candidates": [],
+  "category_selector_candidates": [],
+  "nav_links": [
+    {
+      "text": "셀러라이프",
+      "href": "/sellerlife/"
+    },
+    {
+      "text": "소싱라이프",
+      "href": "/sourcinglife/"
+    },
+    {
+      "text": "정책자금",
+      "href": "/bizlife/serviceproduct/?service=5"
+    },
+    {
+      "text": "블로그라이프",
+      "href": "/bloglife/"
+    },
+    {
+      "text": "부업라이프",
+      "href": "/boouplife/"
+    },
+    {
+      "text": "매뉴얼",
+      "href": "https://sellochomes.notion.site/129b4adbdef6807a9f72caf9e571d03e?v=129b4adbdef68180905a000c3cda8a3f&pvs=4"
+    },
+    {
+      "text": "익스텐션",
+      "href": "https://cafe.naver.com/sellerlif2/145"
+    },
+    {
+      "text": "입점/제휴문의",
+      "href": "http://pf.kakao.com/_qzXJb/chat"
+    },
+    {
+      "text": "구독중",
+      "href": "/sellochomes/payment/"
+    },
+    {
+      "text": "로그인",
+      "href": "/auth/login/?redir=/sellerlife"
+    },
+    {
+      "text": "마이페이지",
+      "href": "/sellochomes/mypage/myinfo"
+    },
+    {
+      "text": "로그아웃",
+      "href": "/auth/logout"
+    },
+    {
+      "text": "오늘의 추천",
+      "href": "javascript:;"
+    },
+    {
+      "text": "매매추",
+      "href": "/sellerlife/sourcing/recommend/daily-main"
+    },
+    {
+      "text": "매매상",
+      "href": "/sellerlife/recommend-product/intro"
+    },
+    {
+      "text": "키워드",
+      "href": "javascript:;"
+    },
+    {
+      "text": "키워드 분석",
+      "href": "/sellerlife/keyword-analysis"
+    },
+    {
+      "text": "연관 키워드",
+      "href": "/sellerlife/sourcing/related/"
+    },
+    {
+      "text": "포함 키워드",
+      "href": "/sellerlife/sourcing/include"
+    },
+    {
+      "text": "쿠팡 시장 분석",
+      "href": "javascript:;"
+    },
+    {
+      "text": "최근 판매 트렌드",
+      "href": "/sellerlife/sales-trend/intro"
+    }
+  ]
+}

@@ -9,22 +9,45 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
   const { data } = await supabaseAdmin
     .from("blog_posts")
-    .select("title, excerpt, keywords")
+    .select("title, excerpt, keywords, published_at, category")
     .eq("slug", slug)
     .eq("published", true)
     .single();
 
   if (!data) return { title: "글을 찾을 수 없습니다" };
 
+  const url = `https://tubeping.site/blog/${slug}`;
+
   return {
     title: data.title,
     description: data.excerpt,
     keywords: data.keywords,
+    alternates: {
+      canonical: url,
+    },
     openGraph: {
       title: data.title,
       description: data.excerpt,
       type: "article",
-      url: `https://tubeping.site/blog/${slug}`,
+      url,
+      publishedTime: data.published_at,
+      section: data.category,
+      siteName: "TubePing",
+      locale: "ko_KR",
+      images: [
+        {
+          url: "https://tubeping.site/og-image.png",
+          width: 1200,
+          height: 630,
+          alt: data.title,
+        },
+      ],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: data.title,
+      description: data.excerpt,
+      images: ["https://tubeping.site/og-image.png"],
     },
   };
 }
@@ -142,6 +165,35 @@ export default async function BlogPostPage({ params }: Props) {
 
   const html = markdownToHtml(post.content);
 
+  const articleJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    headline: post.title,
+    description: post.excerpt,
+    image: "https://tubeping.site/og-image.png",
+    datePublished: post.published_at,
+    dateModified: post.updated_at || post.published_at,
+    author: {
+      "@type": "Organization",
+      name: "TubePing",
+      url: "https://tubeping.site",
+    },
+    publisher: {
+      "@type": "Organization",
+      name: "TubePing",
+      logo: {
+        "@type": "ImageObject",
+        url: "https://tubeping.site/favicon.png",
+      },
+    },
+    mainEntityOfPage: {
+      "@type": "WebPage",
+      "@id": `https://tubeping.site/blog/${slug}`,
+    },
+    keywords: post.keywords?.join(", "),
+    articleSection: post.category,
+  };
+
   // 관련 글
   const { data: related } = await supabaseAdmin
     .from("blog_posts")
@@ -153,6 +205,10 @@ export default async function BlogPostPage({ params }: Props) {
 
   return (
     <div className="min-h-screen bg-white">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(articleJsonLd) }}
+      />
       {/* Nav */}
       <nav className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-md border-b border-[#F0F0F0]">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">

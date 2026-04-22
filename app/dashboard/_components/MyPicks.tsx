@@ -1549,20 +1549,6 @@ function NaverTab({
           </div>
         </div>
 
-        <div>
-          <label className="mb-1.5 block text-sm font-medium text-gray-700">
-            상품 이미지 URL
-            <span className="ml-2 text-[10px] font-normal text-gray-400">네이버 상품 페이지에서 이미지 우클릭 &gt; 주소 복사</span>
-          </label>
-          <input
-            type="url"
-            value={imageUrl}
-            onChange={(e) => setImageUrl(e.target.value)}
-            placeholder="https://shop-phinf.pstatic.net/..."
-            className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm outline-none focus:border-[#03C75A]"
-          />
-        </div>
-
         {/* 라이브 미리보기 */}
         {(name || imageUrl) && (
           <div className="rounded-xl border-2 border-dashed border-[#03C75A]/30 bg-[#03C75A]/5 p-3">

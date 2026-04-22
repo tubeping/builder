@@ -2010,7 +2010,6 @@ export default function MyPicks() {
     { key: "tubeping_campaign", label: "공구", count: picks.filter((p) => p.source_type === "tubeping_campaign").length },
     { key: "coupang", label: "쿠팡", count: picks.filter((p) => p.source_type === "coupang").length },
     { key: "naver", label: "네이버", count: picks.filter((p) => p.source_type === "naver").length },
-    { key: "own", label: "직접", count: picks.filter((p) => p.source_type === "own").length },
   ];
 
   return (
@@ -2036,7 +2035,6 @@ export default function MyPicks() {
       {filter === "tubeping_campaign" && <GongguTab picks={picks} onAddPick={addPick} onRemovePick={removePick} onToggleVisible={toggleVisible} onEditComment={editComment} />}
       {filter === "coupang" && <CoupangTab picks={picks} onAddPick={addPick} onRemovePick={removePick} onToggleVisible={toggleVisible} />}
       {filter === "naver" && <NaverTab picks={picks} onAddPick={addPick} onRemovePick={removePick} onToggleVisible={toggleVisible} />}
-      {filter === "own" && <OwnProductTab picks={picks} onAddPick={addPick} onRemovePick={removePick} onToggleVisible={toggleVisible} onEditComment={editComment} />}
     </div>
   );
 }

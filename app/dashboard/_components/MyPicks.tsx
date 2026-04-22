@@ -1289,8 +1289,10 @@ function NaverTab({
     }
   };
 
+  const [manualMode, setManualMode] = useState(false);
+
   const handleFetch = async () => {
-    setFetchError(""); setPreview(null);
+    setFetchError(""); setPreview(null); setManualMode(false);
     const u = url.trim();
     if (!u) { setFetchError("URL을 입력하세요"); return; }
 
@@ -1306,12 +1308,31 @@ function NaverTab({
       const res = await fetch(`/api/unfurl?url=${encodeURIComponent(u)}`);
       if (!res.ok) { setFetchError("상품 정보를 가져올 수 없습니다"); return; }
       const data = await res.json();
-      setPreview({
-        title: data.title || "",
-        image: data.image || "",
-        price: data.price || 0,
-        siteName: data.siteName || "네이버",
-      });
+
+      // 브랜드커넥트/쇼핑커넥트 발급 링크는 로그인 필요 → 자동 추출 불가
+      // title이 "네이버 브랜드 커넥트"처럼 generic하거나 image 없으면 수동 모드로
+      const isGenericTitle = !data.title ||
+        /네이버\s*브랜드\s*커넥트|브랜드커넥트|쇼핑커넥트/i.test(data.title);
+      const noImage = !data.image;
+
+      if (isGenericTitle || noImage) {
+        // 수동 입력 모드 진입
+        setManualMode(true);
+        setPreview({
+          title: "",
+          image: "",
+          price: 0,
+          siteName: data.siteName || "네이버",
+        });
+        setFetchError("");
+      } else {
+        setPreview({
+          title: data.title || "",
+          image: data.image || "",
+          price: data.price || 0,
+          siteName: data.siteName || "네이버",
+        });
+      }
     } catch {
       setFetchError("네트워크 오류");
     } finally {
@@ -1320,30 +1341,32 @@ function NaverTab({
   };
 
   const handleAddToPick = () => {
-    if (!preview || !preview.title) return;
+    const name = preview?.title?.trim();
+    if (!name) { setToastMessage("⚠️ 상품명을 입력해주세요"); setTimeout(() => setToastMessage(""), 2500); return; }
     if (!category) { setToastMessage("⚠️ 카테고리를 선택해주세요"); setTimeout(() => setToastMessage(""), 2500); return; }
 
     onAddPick({
       source_type: "naver",
-      name: preview.title,
-      price: preview.price,
+      name,
+      price: preview?.price || 0,
       category,
-      image: preview.image || null,
+      image: preview?.image || null,
       external_url: url.trim(),   // 본인 트래킹 ID가 박힌 쇼핑커넥트/공동구매 링크 그대로
       affiliate_code: null,        // 네이버는 쿠팡처럼 우리가 생성 X (크리에이터가 직접 발급한 링크)
       curation_comment: comment.trim(),
       source_meta: {
-        name: preview.title,
-        price: preview.price,
-        image: preview.image || null,
+        name,
+        price: preview?.price || 0,
+        image: preview?.image || null,
         category,
         source_url: url.trim(),
-        site_name: preview.siteName,
+        site_name: preview?.siteName || "네이버",
+        manual_entry: manualMode,
       },
     });
 
     // 리셋
-    setUrl(""); setPreview(null); setCategory(""); setComment("");
+    setUrl(""); setPreview(null); setCategory(""); setComment(""); setManualMode(false);
     setToastMessage("내 몰에 담았습니다!");
     setTimeout(() => setToastMessage(""), 3000);
   };
@@ -1424,12 +1447,18 @@ function NaverTab({
           </p>
         </div>
 
-        {/* 미리보기 */}
-        {preview && (
+        {/* 미리보기 (자동 추출) */}
+        {preview && !manualMode && (
           <div className="rounded-xl border-2 border-dashed border-[#03C75A]/30 bg-[#03C75A]/5 p-3">
             <div className="flex items-center gap-2 mb-2">
-              <span className="text-[10px] font-bold text-[#03C75A]">✨ 미리보기</span>
+              <span className="text-[10px] font-bold text-[#03C75A]">✨ 자동 추출됨</span>
               <span className="rounded-full bg-[#03C75A] px-2 py-0.5 text-[9px] font-medium text-white">{preview.siteName}</span>
+              <button
+                onClick={() => setManualMode(true)}
+                className="ml-auto text-[10px] text-gray-500 hover:text-gray-700 underline cursor-pointer"
+              >
+                수동으로 수정
+              </button>
             </div>
             <div className="flex gap-3">
               <div className="h-20 w-20 shrink-0 overflow-hidden rounded-lg bg-gray-100">
@@ -1450,6 +1479,79 @@ function NaverTab({
                 )}
               </div>
             </div>
+          </div>
+        )}
+
+        {/* 수동 입력 모드 (자동 추출 실패 시) */}
+        {preview && manualMode && (
+          <div className="rounded-xl border-2 border-amber-300 bg-amber-50 p-4 space-y-3">
+            <div className="flex items-start gap-2">
+              <span className="text-base">⚠️</span>
+              <div className="flex-1 text-xs text-amber-800">
+                <p className="font-bold">자동 추출이 어려운 링크예요</p>
+                <p className="mt-0.5">브랜드커넥트 발급 링크는 로그인이 필요해서 상품 정보를 가져올 수 없습니다. 아래에 직접 입력해주세요.</p>
+              </div>
+            </div>
+
+            <div>
+              <label className="mb-1 block text-xs font-medium text-gray-700">상품명 *</label>
+              <input
+                type="text"
+                value={preview.title}
+                onChange={(e) => setPreview({ ...preview, title: e.target.value })}
+                placeholder="예) 오설록 제주 녹차 선물세트"
+                className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-[#03C75A]"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="mb-1 block text-xs font-medium text-gray-700">가격 (원)</label>
+                <input
+                  type="number"
+                  value={preview.price || ""}
+                  onChange={(e) => setPreview({ ...preview, price: Number(e.target.value) || 0 })}
+                  placeholder="35000"
+                  className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-[#03C75A]"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-gray-700">이미지 URL</label>
+                <input
+                  type="url"
+                  value={preview.image}
+                  onChange={(e) => setPreview({ ...preview, image: e.target.value })}
+                  placeholder="https://..."
+                  className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-[#03C75A]"
+                />
+              </div>
+            </div>
+
+            {/* 라이브 미리보기 */}
+            {(preview.title || preview.image) && (
+              <div className="flex gap-3 rounded-lg border border-amber-200 bg-white p-2">
+                <div className="h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-gray-100">
+                  {preview.image ? (
+                    <img src={preview.image} alt="" className="h-full w-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                  ) : (
+                    <div className="flex h-full items-center justify-center text-gray-300">
+                      <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                    </div>
+                  )}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[10px] text-gray-500">미리보기</p>
+                  <p className="line-clamp-1 text-sm font-medium text-gray-900">{preview.title || "상품명 입력 필요"}</p>
+                  {preview.price > 0 && <p className="text-sm font-bold text-[#03C75A]">{formatPrice(preview.price)}</p>}
+                </div>
+              </div>
+            )}
+
+            <p className="text-[10px] text-amber-700">
+              💡 팁: 네이버 쇼핑에서 원본 상품 페이지 열기 → 이미지 우클릭 &gt; 이미지 주소 복사 → 위에 붙여넣기
+            </p>
           </div>
         )}
 

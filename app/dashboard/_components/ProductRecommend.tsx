@@ -18,6 +18,22 @@ interface RecommendItem {
   demandScore: number;
   trendScore: number;
   audienceScore: number;
+  cafe24Score?: number;
+}
+
+interface Cafe24TopProduct {
+  name: string;
+  count: number;
+  gmv: number;
+}
+interface Cafe24CategoryStats {
+  order_count: number;
+  unique_buyers: number;
+  total_gmv: number;
+  avg_order_value: number;
+  repeat_rate: number;
+  product_count: number;
+  top_products: Cafe24TopProduct[];
 }
 
 interface CategoryBlock {
@@ -59,6 +75,7 @@ interface RecData {
   generatedAt: string;
   persona: Persona;
   shoppingInsights?: ShoppingInsights;
+  cafe24Performance?: Record<string, Cafe24CategoryStats>;
   recommendations: Record<string, CategoryBlock>;
   weights: Record<string, number>;
 }
@@ -365,6 +382,41 @@ export default function ProductRecommend() {
             </details>
           )}
 
+          {/* ── Cafe24 과거 공구 실적 (사전 판매 예측) ── */}
+          {data.cafe24Performance && Object.keys(data.cafe24Performance).length > 0 && (
+            <div className="mb-5 rounded-xl border border-[#C41E1E]/20 bg-gradient-to-br from-red-50 to-white p-4">
+              <div className="mb-3 flex items-center gap-2">
+                <span className="text-base">🔥</span>
+                <h3 className="text-sm font-bold text-gray-900">최근 90일 공구 판매 실적</h3>
+                <span className="ml-auto text-[10px] text-gray-400">사전 판매 예측 근거</span>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                {Object.entries(data.cafe24Performance)
+                  .sort((a, b) => b[1].total_gmv - a[1].total_gmv)
+                  .slice(0, 6)
+                  .map(([cat, s]) => {
+                    const emoji = data.recommendations[cat]?.emoji || "📦";
+                    return (
+                      <div key={cat} className="rounded-lg bg-white p-3 border border-gray-100">
+                        <p className="text-[11px] text-gray-500 mb-0.5">{emoji} {cat}</p>
+                        <p className="text-base font-extrabold text-gray-900">
+                          {(s.total_gmv / 10000).toFixed(0)}<span className="text-xs font-medium text-gray-500">만</span>
+                        </p>
+                        <div className="mt-1 flex gap-2 text-[10px] text-gray-500">
+                          <span>{s.order_count}건</span>
+                          <span>·</span>
+                          <span>재구매 {(s.repeat_rate * 100).toFixed(0)}%</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
+              <p className="mt-3 text-[10px] text-gray-400">
+                * 이 데이터가 각 상품의 &quot;공구 실적&quot; 점수 산출에 반영됩니다 (가중치 20%)
+              </p>
+            </div>
+          )}
+
           {/* ── 스코어링 로직 안내 ── */}
           <div className="mb-5 rounded-xl border border-blue-100 bg-blue-50/40 p-3">
             <p className="text-[11px] text-blue-700 leading-relaxed">
@@ -430,6 +482,16 @@ export default function ProductRecommend() {
                                 쇼핑성
                               </span>
                             )}
+                            {typeof it.cafe24Score === "number" && it.cafe24Score >= 70 && (
+                              <span className="rounded bg-[#C41E1E]/10 px-1.5 py-0.5 text-[10px] font-bold text-[#C41E1E]">
+                                🔥 공구 적합
+                              </span>
+                            )}
+                            {typeof it.cafe24Score === "number" && it.cafe24Score >= 50 && it.cafe24Score < 70 && (
+                              <span className="rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">
+                                공구 가능
+                              </span>
+                            )}
                           </div>
                           <div className="mt-1 flex items-center gap-3 flex-wrap text-xs text-gray-500">
                             <span className="text-amber-500 font-medium">{starsText(it.stars)}</span>
@@ -446,13 +508,14 @@ export default function ProductRecommend() {
                     {isExpanded && (
                       <div className="border-t border-gray-100 px-4 pb-4 pt-3 bg-gray-50/50">
                         <p className="text-xs font-semibold text-gray-700 mb-2">점수 내역</p>
-                        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                        <div className="grid grid-cols-2 sm:grid-cols-6 gap-2">
                           {[
                             { label: "콘텐츠매칭", value: it.contentScore, color: "bg-purple-400" },
                             { label: "구매의도", value: it.purchaseScore, color: "bg-pink-400" },
                             { label: "검색수요", value: it.demandScore, color: "bg-blue-400" },
                             { label: "트렌드/시즌", value: it.trendScore, color: "bg-green-400" },
                             { label: "연령대매칭", value: it.audienceScore, color: "bg-amber-400" },
+                            { label: "공구 실적", value: it.cafe24Score ?? 50, color: "bg-[#C41E1E]" },
                           ].map((s) => (
                             <div key={s.label} className="rounded-lg bg-white p-2.5 border border-gray-100">
                               <p className="text-[10px] text-gray-500 mb-1">{s.label}</p>

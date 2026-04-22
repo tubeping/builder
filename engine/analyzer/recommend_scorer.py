@@ -1,14 +1,15 @@
 """
 추천 별점 산출 엔진 — 카테고리별 추천
 
-채널 페르소나 × 상품 데이터를 카테고리별로 분석해 추천 별점(1~5)을 산출합니다.
+채널 페르소나 × 상품 데이터 × 과거 공구 실적을 분석해 추천 별점(1~5)을 산출합니다.
 
 별점 공식:
-  콘텐츠 키워드 매칭 (25%)   — 영상 제목 키워드 × 상품 키워드
-  댓글 구매의향 (20%)        — GPT 추출 구매 시그널
-  검색량 + 쇼핑성 (20%)      — 셀러라이프 데이터
-  아이보스 트렌드 (15%)      — 시즌/마케팅 키워드
+  콘텐츠 키워드 매칭 (20%)   — 영상 제목 키워드 × 상품 키워드
+  댓글 구매의향 (15%)        — GPT 추출 구매 시그널
+  검색량 + 쇼핑성 (15%)      — 셀러라이프 데이터
+  아이보스 트렌드 (10%)      — 시즌/마케팅 키워드
   데이터랩 연령매칭 (20%)    — 시청자 연령별 인기검색어 순위
+  ★ Cafe24 공구 실적 (20%)  — 카테고리별 과거 전환·재구매·GMV (사전 판매 예측)
 """
 
 from pathlib import Path
@@ -31,11 +32,12 @@ class RecommendScorer:
     """카테고리별 추천 별점 산출기"""
 
     WEIGHTS = {
-        "content_match": 0.25,
-        "purchase_intent": 0.20,
-        "search_demand": 0.20,
-        "trend_match": 0.15,
+        "content_match": 0.20,
+        "purchase_intent": 0.15,
+        "search_demand": 0.15,
+        "trend_match": 0.10,
         "audience_match": 0.20,
+        "cafe24_performance": 0.20,
     }
 
     def __init__(self):
@@ -45,6 +47,11 @@ class RecommendScorer:
         self.blacklist_keywords = set(self.rules_cfg.get("blacklist_keywords", []) or [])
         self.blacklist_categories = set(self.rules_cfg.get("blacklist_categories", []) or [])
         self.shopping_cfg = self.rules_cfg.get("shopping_only", {}) or {}
+
+        # Cafe24 공구 실적 점수 캐시 (카테고리명 → 0~100)
+        self._cafe24_scores_cache: dict[str, float] = {}
+        self._cafe24_stats_cache: dict = {}
+        self._cafe24_loaded = False
 
     def _is_blacklisted(self, keyword: str) -> bool:
         """키워드가 블랙리스트에 걸리는지 (부분일치 포함)"""
@@ -228,6 +235,10 @@ class RecommendScorer:
         df["audience_score"] = df.apply(
             lambda r: self._audience_match(r, audience_ranks), axis=1
         )
+        # Cafe24 과거 공구 실적 점수 (카테고리 단위)
+        df["cafe24_score"] = df.apply(
+            lambda r: self._cafe24_performance(r), axis=1
+        )
 
         w = self.WEIGHTS
         df["recommend_score"] = (
@@ -236,6 +247,7 @@ class RecommendScorer:
             + df["demand_score"] * w["search_demand"]
             + df["trend_score"] * w["trend_match"]
             + df["audience_score"] * w["audience_match"]
+            + df["cafe24_score"] * w["cafe24_performance"]
         ).round(2)
 
         df["stars"] = df["recommend_score"].apply(self._score_to_stars)
@@ -461,6 +473,61 @@ class RecommendScorer:
 
         weighted = match.iloc[0]["weighted_score"]
         return min(100, round((weighted / max_score) * 100, 2))
+
+    # ── Cafe24 공구 실적 피드백 (사전 판매 예측) ─────────────────────────
+
+    def _load_cafe24_scores(self, days: int = 90):
+        """Cafe24 카테고리별 공구 실적 점수 로드 (1회만)"""
+        if self._cafe24_loaded:
+            return
+        try:
+            from fetchers.cafe24_performance import Cafe24Performance
+            perf = Cafe24Performance()
+            if not perf.is_available:
+                self._cafe24_loaded = True
+                return
+            self._cafe24_stats_cache = perf.get_category_stats(days=days)
+            for cat in self._cafe24_stats_cache.keys():
+                self._cafe24_scores_cache[cat] = perf.compute_performance_score(cat, days=days)
+        except Exception:
+            # 수집 실패 — 중립값(50) 사용
+            pass
+        finally:
+            self._cafe24_loaded = True
+
+    def _cafe24_performance(self, row) -> float:
+        """
+        카테고리의 과거 공구 실적 점수 (0~100).
+        DataLab 카테고리명 → Cafe24 카테고리명 매핑 후 조회.
+        """
+        self._load_cafe24_scores()
+        if not self._cafe24_scores_cache:
+            return 50.0  # 데이터 없음 — 중립값
+
+        cat = str(row.get("category", "")).strip()
+        if not cat:
+            return 50.0
+
+        # 정확 매칭
+        if cat in self._cafe24_scores_cache:
+            return self._cafe24_scores_cache[cat]
+
+        # 부분 매칭 (DataLab "식품" ↔ Cafe24 "식품" 등 자주 다를 수 있음)
+        for c24_cat, score in self._cafe24_scores_cache.items():
+            if cat in c24_cat or c24_cat in cat:
+                return score
+
+        # 매칭 실패 — 전체 평균의 80%로 보수적 추정
+        if self._cafe24_scores_cache:
+            avg = sum(self._cafe24_scores_cache.values()) / len(self._cafe24_scores_cache)
+            return round(avg * 0.8, 2)
+
+        return 50.0
+
+    def get_cafe24_stats(self) -> dict:
+        """외부용: Cafe24 통계 반환 (JSON 직렬화 위해)"""
+        self._load_cafe24_scores()
+        return self._cafe24_stats_cache
 
     # ── 유틸 ─────────────────────────────────────────────────────────────
 

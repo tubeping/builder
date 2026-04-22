@@ -10,12 +10,26 @@
 온보딩 5단계를 거치면 `shop/[slug]` 형태의 개인 공구 쇼핑몰이 자동 생성됨.
 운영사: ㈜신산애널리틱스 / 서비스명: 튜핑(TubePing)
 
-## admin과의 관계 ⚠️ 중요
-- **현재는 admin(tubeping_admin/)과 완전히 별도로 운영**
-- **공구 상품은 공유 예정** — Supabase의 `products`, `orders`, `suppliers` 테이블을 admin과 같이 사용
-  (supabase_schema.sql 주석: "기존 테이블 유지")
-- 상품 데이터는 admin에서 관리되고, 빌더는 그것을 읽어 크리에이터가 큐레이션/판매
+## admin과의 관계 ⚠️ 중요 (DB 공유)
+- **admin(tubeping_admin/)과 같은 Supabase 프로젝트(`tubeping-admin`)를 공유함**
+- 같은 DB를 공유하므로 **builder 작업이 admin에 영향을 줄 수 있음** → 2026-04-22 tubeping.site 사고 재발 방지 차원에서 엄격 분리
 - 향후 **네이버 DataLab + 셀러라이프 기반 상품 추천**(현재 루트 `main.py`, `fetchers/`)을 빌더 안으로 통합 예정
+
+### 🛡️ Admin DB 보호 원칙 — 절대 위반 금지
+**테이블 소유권 구분 (빨간색 = 금지, 초록색 = 자유)**
+
+| 소유 | 테이블 | builder 권한 |
+|---|---|---|
+| 🔴 admin | `products`, `orders`, `suppliers`, `supplier_products`, `purchase_orders`, `cs_tickets`, `cs_ticket_messages`, `product_cafe24_mappings` | **READ ONLY** (SELECT만 가능, UPDATE/DELETE/ALTER 절대 금지) |
+| 🟡 admin | `stores` (Cafe24 토큰) | **OAuth 필드만 UPDATE** 허용 (access_token, refresh_token, token_expires_at) |
+| 🟢 builder | `creators`, `creator_shops`, `creator_picks`, `campaigns`, `reviews`, `blog_posts`, `campaign_notifications` | 자유 |
+
+### SQL 실행 시 절대 규칙
+1. `supabase_schema.sql`에는 **builder 테이블만** CREATE/ALTER. admin 테이블 참조는 FK만 OK (REFERENCES products(id) 등)
+2. `DROP TABLE`, `TRUNCATE`, bulk `DELETE FROM` 금지 (admin 테이블이든 builder 테이블이든)
+3. 마이그레이션은 반드시 idempotent: `CREATE IF NOT EXISTS`, `ADD COLUMN IF NOT EXISTS`
+4. admin 테이블 건드릴 필요 있으면 반드시 사용자에게 먼저 승인
+5. 의심스러우면 SELECT로 먼저 확인, 절대 "그냥 해보고" 금지
 
 ## ⚠️ 다음주(2026-04-21 주간) Vultr 서버 이전 예정
 - 현재 **Supabase + Vercel** 구성은 임시. 다음주 **Vultr VPS**로 전체 이전.

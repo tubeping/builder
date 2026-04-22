@@ -212,6 +212,7 @@ def build_recommendations(channel_config: dict) -> dict:
                 "demandScore": float(row.get("demand_score", 0) or 0),
                 "trendScore": float(row.get("trend_score", 0) or 0),
                 "audienceScore": float(row.get("audience_score", 0) or 0),
+                "cafe24Score": float(row.get("cafe24_score", 0) or 0),
             })
         recommendations[cat_name] = {
             "emoji": CATEGORY_EMOJI.get(cat_name, "📦"),
@@ -240,6 +241,17 @@ def build_recommendations(channel_config: dict) -> dict:
 
     shopping_insights = _estimate_shopping_insights(channel_config, recommendations)
 
+    # Cafe24 과거 공구 실적 (사전 판매 예측용)
+    cafe24_stats = {}
+    try:
+        cafe24_stats = recommender.get_cafe24_stats() or {}
+        # 집합형(buyers set)을 JSON 직렬화 가능하게 정제
+        for cat, s in cafe24_stats.items():
+            if "buyers" in s:
+                s.pop("buyers", None)
+    except Exception:
+        pass
+
     return {
         "channel": channel_config.get("name", ""),
         "generatedAt": datetime.now().isoformat(timespec="seconds"),
@@ -257,6 +269,7 @@ def build_recommendations(channel_config: dict) -> dict:
             "categories": channel_config.get("categories", []),
         },
         "shoppingInsights": shopping_insights,
+        "cafe24Performance": cafe24_stats,
         "recommendations": recommendations,
         "weights": RecommendScorer.WEIGHTS,
     }

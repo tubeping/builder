@@ -6,15 +6,40 @@ import { useState, useEffect, useCallback } from "react";
 type SourceType = "tubeping_campaign" | "coupang" | "naver" | "own" | "other";
 type FilterKey = "all" | SourceType;
 
-// 인플루언서 마진 정책: 총 마진(판매가 - 공급가) 중 60%가 인플루언서 몫
+// ─── 수익 계산 정책 ───
+// 공식: 순마진 = (판매가 - 공급가 - PG수수료 3%) × (1 - 세금 10%)
+//       인플루언서 수익 = 순마진 × 60%  (튜핑 40%)
+const PG_FEE_RATE = 0.03;       // PG사 수수료 3%
+const TAX_RATE = 0.10;           // 부가세 10% (세전 마진 기준)
 const INFLUENCER_MARGIN_RATIO = 0.6;
+
 // 카페24 tubeping 몰 상품 상세 URL
 const CAFE24_PRODUCT_DETAIL_URL = (productNo: number) =>
   `https://tubeping.cafe24.com/product/detail.html?product_no=${productNo}`;
 
+/**
+ * 순마진 계산 (세후)
+ * @returns { netMargin, influencer, tubeping, pgFee, tax }
+ */
+function calcMargin(price: number, supplyPrice: number) {
+  if (price <= 0 || supplyPrice < 0 || price <= supplyPrice) {
+    return { netMargin: 0, influencer: 0, tubeping: 0, pgFee: 0, tax: 0 };
+  }
+  const pgFee = price * PG_FEE_RATE;
+  const preTax = price - supplyPrice - pgFee;
+  const tax = preTax > 0 ? preTax * TAX_RATE : 0;
+  const netMargin = preTax - tax;
+  return {
+    netMargin: Math.round(netMargin),
+    influencer: Math.round(netMargin * INFLUENCER_MARGIN_RATIO),
+    tubeping: Math.round(netMargin * (1 - INFLUENCER_MARGIN_RATIO)),
+    pgFee: Math.round(pgFee),
+    tax: Math.round(tax),
+  };
+}
+
 function influencerEarning(price: number, supplyPrice: number): number {
-  const totalMargin = Math.max(0, price - supplyPrice);
-  return Math.round(totalMargin * INFLUENCER_MARGIN_RATIO);
+  return calcMargin(price, supplyPrice).influencer;
 }
 
 interface PickItem {
@@ -288,7 +313,9 @@ function GongguTab({
           <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
             {gongguPicks.map((pick) => {
               const supplyPrice = Number(pick.source_meta?.supply_price || 0);
-              const earning = supplyPrice > 0 ? influencerEarning(pick.price, supplyPrice) : 0;
+              const pickMargin = calcMargin(pick.price, supplyPrice);
+              const earning = pickMargin.influencer;
+              const marginRate = pick.price > 0 ? (pickMargin.netMargin / pick.price) * 100 : 0;
               const cafe24ProductNo = pick.source_meta?.cafe24_product_no as number | undefined;
               const detailUrl = cafe24ProductNo ? CAFE24_PRODUCT_DETAIL_URL(cafe24ProductNo) : null;
               return (
@@ -321,8 +348,11 @@ function GongguTab({
                   <p className="line-clamp-1 text-xs font-medium text-gray-900">{pick.name}</p>
                   <p className="mt-0.5 text-sm font-bold text-[#C41E1E]">{formatPrice(pick.price)}</p>
                   {earning > 0 && (
-                    <p className="text-[10px] font-medium text-green-600">
-                      수익 {formatPrice(earning)} <span className="text-gray-400 font-normal">(60%)</span>
+                    <p
+                      className="text-[10px] font-medium text-green-600"
+                      title={`판매가 ${formatPrice(pick.price)}\n- 공급가 ${formatPrice(supplyPrice)}\n- PG수수료 3% ${formatPrice(pickMargin.pgFee)}\n- 세금 10% ${formatPrice(pickMargin.tax)}\n= 순마진 ${formatPrice(pickMargin.netMargin)} (${marginRate.toFixed(1)}%)\n→ 인플루언서 60%: ${formatPrice(earning)}`}
+                    >
+                      수익 {formatPrice(earning)} <span className="text-gray-400 font-normal">({marginRate.toFixed(0)}% 마진)</span>
                     </p>
                   )}
                   <div className="mt-1 flex gap-2 text-[10px] text-gray-400">
@@ -456,7 +486,9 @@ function GongguTab({
                 const isPicked = pickedProductNos.has(product.product_no);
                 const price = Number(product.price);
                 const supplyPrice = Number(product.supply_price);
-                const earning = influencerEarning(price, supplyPrice);
+                const margin = calcMargin(price, supplyPrice);
+                const earning = margin.influencer;
+                const marginRate = price > 0 ? (margin.netMargin / price) * 100 : 0;
                 const isSoldOut = product.sold_out === "T";
                 // 선택된 카테고리의 공구 적합도 (개별 상품 단위는 아니지만 카테고리 단위 힌트)
                 const currentCat = categories.find((c) => c.id === selectedCategory);
@@ -492,8 +524,11 @@ function GongguTab({
                       <div className="p-2">
                         <p className="line-clamp-1 text-xs font-medium text-gray-900">{product.product_name}</p>
                         <p className="mt-0.5 text-sm font-bold text-[#C41E1E]">{formatPrice(price)}</p>
-                        <p className="text-[10px] font-medium text-green-600">
-                          수익 {formatPrice(earning)} <span className="text-gray-400 font-normal">(60%)</span>
+                        <p
+                          className="text-[10px] font-medium text-green-600"
+                          title={`판매가 ${formatPrice(price)}\n- 공급가 ${formatPrice(supplyPrice)}\n- PG수수료 3% ${formatPrice(margin.pgFee)}\n- 세금 10% ${formatPrice(margin.tax)}\n= 순마진 ${formatPrice(margin.netMargin)} (${marginRate.toFixed(1)}%)\n→ 인플루언서 60%: ${formatPrice(earning)}`}
+                        >
+                          수익 {formatPrice(earning)} <span className="text-gray-400 font-normal">({marginRate.toFixed(0)}% 마진)</span>
                         </p>
                       </div>
                     </a>

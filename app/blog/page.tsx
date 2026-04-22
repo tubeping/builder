@@ -58,7 +58,7 @@ export default async function BlogListPage() {
 
       {/* Hero */}
       <section className="pt-28 sm:pt-36 pb-12 sm:pb-16 px-4 bg-gradient-to-b from-[#FFF8F8] to-white">
-        <div className="max-w-5xl mx-auto">
+        <div className="max-w-3xl mx-auto">
           <h1 className="text-3xl sm:text-5xl font-extrabold text-[#111111]">블로그</h1>
           <p className="text-[#666666] text-lg mt-3">
             유튜브 쇼핑, 크리에이터 커머스의 모든 것
@@ -68,49 +68,43 @@ export default async function BlogListPage() {
 
       {/* Posts */}
       <section className="px-4 pb-20">
-        <div className="max-w-5xl mx-auto">
+        <div className="max-w-3xl mx-auto">
           {blogPosts.length === 0 ? (
             <div className="text-center py-20 text-[#999999] text-lg">
               아직 게시된 글이 없습니다.
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            <ul className="divide-y divide-[#F0F0F0] border-y border-[#F0F0F0]">
               {blogPosts.map((post) => (
-                <Link
-                  key={post.id}
-                  href={`/blog/${post.slug}`}
-                  className="group bg-white rounded-2xl border border-[#F0F0F0] overflow-hidden hover:shadow-xl hover:border-[#C41E1E]/20 transition-all"
-                >
-                  {/* Thumbnail */}
-                  <div className="h-40 bg-gradient-to-br from-[#111111] to-[#333333] flex items-center justify-center">
-                    <span className="text-5xl">
-                      {post.category === "서비스소개" ? "🛒" : post.category === "회사소개" ? "🏢" : post.category === "가이드" ? "📖" : post.category === "전략" ? "🎯" : post.category === "트렌드" ? "🔥" : "📝"}
-                    </span>
-                  </div>
-
-                  <div className="p-5 sm:p-6">
-                    <span
-                      className={`text-xs px-2.5 py-1 rounded-full font-medium ${CATEGORY_STYLE[post.category] || "bg-gray-100 text-gray-600"}`}
-                    >
-                      {post.category}
-                    </span>
-                    <h2 className="text-lg font-bold text-[#111111] mt-3 mb-2 group-hover:text-[#C41E1E] transition-colors line-clamp-2">
+                <li key={post.id}>
+                  <Link
+                    href={`/blog/${post.slug}`}
+                    className="group block py-6 sm:py-7 hover:bg-[#FAFAFA] transition-colors px-2 -mx-2 rounded-lg"
+                  >
+                    <div className="flex items-center gap-2 mb-2">
+                      <span
+                        className={`text-xs px-2.5 py-1 rounded-full font-medium ${CATEGORY_STYLE[post.category] || "bg-gray-100 text-gray-600"}`}
+                      >
+                        {post.category}
+                      </span>
+                      <span className="text-xs text-[#999999]">
+                        {new Date(post.published_at).toLocaleDateString("ko", {
+                          year: "numeric",
+                          month: "long",
+                          day: "numeric",
+                        })}
+                      </span>
+                    </div>
+                    <h2 className="text-lg sm:text-xl font-bold text-[#111111] mb-2 group-hover:text-[#C41E1E] transition-colors leading-snug">
                       {post.title}
                     </h2>
-                    <p className="text-sm text-[#666666] line-clamp-3 leading-relaxed">
+                    <p className="text-sm sm:text-base text-[#666666] line-clamp-2 leading-relaxed">
                       {post.excerpt}
                     </p>
-                    <div className="text-xs text-[#999999] mt-4">
-                      {new Date(post.published_at).toLocaleDateString("ko", {
-                        year: "numeric",
-                        month: "long",
-                        day: "numeric",
-                      })}
-                    </div>
-                  </div>
-                </Link>
+                  </Link>
+                </li>
               ))}
-            </div>
+            </ul>
           )}
         </div>
       </section>

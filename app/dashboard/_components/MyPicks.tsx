@@ -42,6 +42,30 @@ function influencerEarning(price: number, supplyPrice: number): number {
   return calcMargin(price, supplyPrice).influencer;
 }
 
+/**
+ * Cafe24 배송비 타입 → 레이블/스타일
+ * T: 무료 / M: 조건부 무료 / R: 고정 유료 / D: 구간별 / W: 수량비례 / N: 배송비 없음
+ */
+function shippingBadge(feeType?: string): { label: string; icon: string; style: string } | null {
+  if (!feeType) return null;
+  switch (feeType) {
+    case "T":
+      return { label: "무료배송", icon: "🚚", style: "bg-emerald-50 text-emerald-700" };
+    case "M":
+      return { label: "조건부 무료", icon: "🚚", style: "bg-sky-50 text-sky-700" };
+    case "R":
+      return { label: "유료배송", icon: "🚚", style: "bg-gray-100 text-gray-600" };
+    case "D":
+      return { label: "구간별", icon: "🚚", style: "bg-gray-100 text-gray-600" };
+    case "W":
+      return { label: "수량별", icon: "🚚", style: "bg-gray-100 text-gray-600" };
+    case "N":
+      return { label: "배송비 별도", icon: "🚚", style: "bg-gray-100 text-gray-500" };
+    default:
+      return null;
+  }
+}
+
 interface PickItem {
   id: string;
   source_type: SourceType;
@@ -73,6 +97,8 @@ interface Cafe24Product {
   selling: string;
   sold_out: string;
   created_date: string;
+  shipping_fee_type?: string;
+  shipping_fee_by_product?: string;
 }
 
 interface CoupangSearchProduct {
@@ -291,6 +317,8 @@ function GongguTab({
         cafe24_product_no: product.product_no,
         cafe24_product_code: product.product_code,
         supply_price: Number(product.supply_price),
+        shipping_fee_type: product.shipping_fee_type,
+        shipping_fee_by_product: product.shipping_fee_by_product,
         name: product.product_name,
         price: Number(product.price),
         image: product.list_image || product.detail_image || null,
@@ -355,6 +383,15 @@ function GongguTab({
                       수익 {formatPrice(earning)} <span className="text-gray-400 font-normal">({marginRate.toFixed(0)}% 마진)</span>
                     </p>
                   )}
+                  {(() => {
+                    const sb = shippingBadge(pick.source_meta?.shipping_fee_type as string | undefined);
+                    if (!sb) return null;
+                    return (
+                      <span className={`mt-1 inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[9px] font-medium ${sb.style}`}>
+                        {sb.icon} {sb.label}
+                      </span>
+                    );
+                  })()}
                   <div className="mt-1 flex gap-2 text-[10px] text-gray-400">
                     <span>클릭 {pick.clicks}</span><span>전환 {pick.conversions}</span>
                   </div>
@@ -530,6 +567,15 @@ function GongguTab({
                         >
                           수익 {formatPrice(earning)} <span className="text-gray-400 font-normal">({marginRate.toFixed(0)}% 마진)</span>
                         </p>
+                        {(() => {
+                          const sb = shippingBadge(product.shipping_fee_type);
+                          if (!sb) return null;
+                          return (
+                            <span className={`mt-1 inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[9px] font-medium ${sb.style}`}>
+                              {sb.icon} {sb.label}
+                            </span>
+                          );
+                        })()}
                       </div>
                     </a>
                     <div className="px-2 pb-2">

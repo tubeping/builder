@@ -42,23 +42,56 @@ function influencerEarning(price: number, supplyPrice: number): number {
   return calcMargin(price, supplyPrice).influencer;
 }
 
+// tubeping 공구 공통 배송비 정책 (차후 관리자 설정 연동 가능)
+const SHIPPING_FEE = 3000;
+const FREE_SHIPPING_THRESHOLD = 30000;
+
 /**
- * Cafe24 배송비 타입 → 레이블/스타일
+ * Cafe24 배송비 타입 + 상품 가격 → 배송 레이블
  * T: 무료 / M: 조건부 무료 / R: 고정 유료 / D: 구간별 / W: 수량비례 / N: 배송비 없음
+ *
+ * @param feeType 카페24 shipping_fee_type 코드
+ * @param price   상품 가격 (조건부 무료 판단용)
  */
-function shippingBadge(feeType?: string): { label: string; icon: string; style: string } | null {
+function shippingBadge(
+  feeType?: string,
+  price: number = 0
+): { label: string; icon: string; style: string } | null {
   if (!feeType) return null;
+  const fmt = (n: number) => n.toLocaleString("ko-KR") + "원";
+
   switch (feeType) {
     case "T":
-      return { label: "무료배송", icon: "🚚", style: "bg-emerald-50 text-emerald-700" };
-    case "M":
-      return { label: "조건부 무료", icon: "🚚", style: "bg-sky-50 text-sky-700" };
+      return {
+        label: "무료배송",
+        icon: "🚚",
+        style: "bg-emerald-50 text-emerald-700",
+      };
+    case "M": {
+      // 조건부 무료: 가격이 기준 이상이면 무료, 아니면 배송비
+      const qualifies = price >= FREE_SHIPPING_THRESHOLD;
+      return qualifies
+        ? {
+            label: "무료배송",
+            icon: "🚚",
+            style: "bg-emerald-50 text-emerald-700",
+          }
+        : {
+            label: `${fmt(SHIPPING_FEE)} (${FREE_SHIPPING_THRESHOLD / 10000}만원↑ 무료)`,
+            icon: "🚚",
+            style: "bg-sky-50 text-sky-700",
+          };
+    }
     case "R":
-      return { label: "유료배송", icon: "🚚", style: "bg-gray-100 text-gray-600" };
+      return {
+        label: `배송비 ${fmt(SHIPPING_FEE)}`,
+        icon: "🚚",
+        style: "bg-gray-100 text-gray-600",
+      };
     case "D":
-      return { label: "구간별", icon: "🚚", style: "bg-gray-100 text-gray-600" };
+      return { label: "구간별 배송비", icon: "🚚", style: "bg-gray-100 text-gray-600" };
     case "W":
-      return { label: "수량별", icon: "🚚", style: "bg-gray-100 text-gray-600" };
+      return { label: "수량별 배송비", icon: "🚚", style: "bg-gray-100 text-gray-600" };
     case "N":
       return { label: "배송비 별도", icon: "🚚", style: "bg-gray-100 text-gray-500" };
     default:
@@ -414,7 +447,7 @@ function GongguTab({
                     </p>
                   )}
                   {(() => {
-                    const sb = shippingBadge(pick.source_meta?.shipping_fee_type as string | undefined);
+                    const sb = shippingBadge(pick.source_meta?.shipping_fee_type as string | undefined, pick.price);
                     if (!sb) return null;
                     return (
                       <span className={`mt-1 inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[9px] font-medium ${sb.style}`}>
@@ -598,7 +631,7 @@ function GongguTab({
                           수익 {formatPrice(earning)} <span className="text-gray-400 font-normal">({marginRate.toFixed(0)}% 마진)</span>
                         </p>
                         {(() => {
-                          const sb = shippingBadge(product.shipping_fee_type);
+                          const sb = shippingBadge(product.shipping_fee_type, price);
                           if (!sb) return null;
                           return (
                             <span className={`mt-1 inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[9px] font-medium ${sb.style}`}>

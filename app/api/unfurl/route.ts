@@ -100,6 +100,43 @@ function extractMeta(html: string, url: string): UnfurlResult {
   };
 }
 
+// 일반 브라우저 UA로 위장
+const BROWSER_HEADERS = {
+  "User-Agent":
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+  "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+  "Accept-Language": "ko-KR,ko;q=0.9,en;q=0.8",
+  "Sec-Fetch-Dest": "document",
+  "Sec-Fetch-Mode": "navigate",
+  "Sec-Fetch-Site": "none",
+};
+
+async function fetchWithTimeout(u: string, signal?: AbortSignal) {
+  return fetch(u, {
+    headers: BROWSER_HEADERS,
+    redirect: "follow",
+    signal: signal || AbortSignal.timeout(8000),
+  });
+}
+
+/**
+ * 네이버 브랜드커넥트 URL에서 channelProductNo 파싱 → 스마트스토어 상품 페이지 URL로 재구성
+ * 예: brandconnect.naver.com/affiliates/944311184274112?channelProductNo=9102118112
+ *  → smartstore.naver.com/main/products/9102118112 (네이버가 실제 스토어로 자동 리다이렉트)
+ */
+function resolveNaverProductUrl(finalUrl: string): string | null {
+  try {
+    const u = new URL(finalUrl);
+    if (u.hostname.includes("brandconnect.naver")) {
+      const productNo = u.searchParams.get("channelProductNo");
+      if (productNo) {
+        return `https://smartstore.naver.com/main/products/${productNo}`;
+      }
+    }
+  } catch { /* ignore */ }
+  return null;
+}
+
 export async function GET(request: NextRequest) {
   const url = request.nextUrl.searchParams.get("url");
   if (!url) {
@@ -117,17 +154,19 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const res = await fetch(url, {
-      headers: {
-        // 일부 사이트는 봇 차단 있어서 일반 브라우저 UA로 위장
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Language": "ko-KR,ko;q=0.9,en;q=0.8",
-      },
-      redirect: "follow",
-      signal: AbortSignal.timeout(8000),
-    });
+    let res = await fetchWithTimeout(url);
+
+    // 네이버 브랜드커넥트로 리다이렉트됐으면 channelProductNo로 스마트스토어 재시도
+    const bcProductUrl = resolveNaverProductUrl(res.url || url);
+    if (bcProductUrl) {
+      try {
+        const retry = await fetchWithTimeout(bcProductUrl);
+        // 429/실패 시 기존 응답 유지
+        if (retry.ok && (retry.headers.get("content-type") || "").includes("text/html")) {
+          res = retry;
+        }
+      } catch { /* 재시도 실패 — 원본 응답 사용 */ }
+    }
 
     if (!res.ok) {
       return NextResponse.json(

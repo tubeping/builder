@@ -11,8 +11,10 @@ import AutoDM from "./_components/AutoDM";
 import Earnings from "./_components/Earnings";
 import FanInsights from "./_components/FanInsights";
 import Settings from "./_components/Settings";
+import Stats from "./_components/Stats";
+import ShareLinks from "./_components/ShareLinks";
 
-type MenuKey = "inbox" | "recommend" | "picks" | "partners" | "shop" | "analytics" | "autodm" | "earnings" | "fans" | "settings";
+type MenuKey = "inbox" | "recommend" | "picks" | "partners" | "shop" | "share" | "stats" | "analytics" | "autodm" | "earnings" | "fans" | "settings";
 
 const MENU_ITEMS: { key: MenuKey; label: string; icon: string }[] = [
   { key: "inbox", label: "공구 제안함", icon: "🔔" },
@@ -20,6 +22,8 @@ const MENU_ITEMS: { key: MenuKey; label: string; icon: string }[] = [
   { key: "picks", label: "내 PICK", icon: "📦" },
   { key: "partners", label: "파트너스", icon: "🔗" },
   { key: "shop", label: "몰 꾸미기", icon: "🎨" },
+  { key: "share", label: "공유 링크", icon: "📤" },
+  { key: "stats", label: "통계", icon: "📊" },
   { key: "analytics", label: "공구 스크립트", icon: "📝" },
   { key: "autodm", label: "자동응답", icon: "💬" },
   { key: "earnings", label: "수익", icon: "💰" },
@@ -37,6 +41,8 @@ export default function DashboardPage() {
     picks: <MyPicks />,
     partners: <Partners />,
     shop: <ShopCustomize />,
+    share: <ShareLinks />,
+    stats: <Stats />,
     analytics: <ContentAnalytics />,
     autodm: <AutoDM />,
     earnings: <Earnings />,

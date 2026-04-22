@@ -128,6 +128,42 @@ CREATE INDEX IF NOT EXISTS idx_campaign_notif_campaign ON campaign_notifications
 CREATE INDEX IF NOT EXISTS idx_campaign_notif_notified ON campaign_notifications(notified_at) WHERE notified_at IS NULL;
 
 -- ============================================
+-- pick_clicks (공개 몰 유입·클릭 로그)
+-- 공개몰에서 상품·링크 클릭 시 /api/track beacon으로 insert.
+-- 통계 대시보드의 1차 원본 데이터.
+-- ============================================
+CREATE TABLE IF NOT EXISTS pick_clicks (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  shop_slug TEXT NOT NULL,
+  creator_id UUID REFERENCES creators(id) ON DELETE CASCADE,
+  pick_id UUID REFERENCES creator_picks(id) ON DELETE SET NULL,
+  source_type TEXT,      -- tubeping_campaign / coupang / naver / own / link / direct
+  target_url TEXT,
+  utm_source TEXT,       -- instagram / youtube / kakao / naver / direct ...
+  utm_medium TEXT,       -- bio / desc / pinned / dm / post ...
+  utm_campaign TEXT,     -- 크리에이터가 지정한 캠페인 or pick_id
+  referrer TEXT,
+  landing_url TEXT,
+  user_agent TEXT,
+  device TEXT,           -- mobile / desktop / tablet
+  ip_hash TEXT,
+  clicked_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_pick_clicks_slug_time ON pick_clicks(shop_slug, clicked_at DESC);
+CREATE INDEX IF NOT EXISTS idx_pick_clicks_creator_time ON pick_clicks(creator_id, clicked_at DESC);
+CREATE INDEX IF NOT EXISTS idx_pick_clicks_pick ON pick_clicks(pick_id);
+CREATE INDEX IF NOT EXISTS idx_pick_clicks_utm ON pick_clicks(shop_slug, utm_source, clicked_at DESC);
+
+ALTER TABLE pick_clicks ENABLE ROW LEVEL SECURITY;
+-- 공개 몰에서 anon key로 insert (beacon) 허용
+CREATE POLICY "Public insert pick_clicks" ON pick_clicks FOR INSERT WITH CHECK (true);
+-- 크리에이터 본인만 자기 클릭 데이터 SELECT (통계 대시보드)
+CREATE POLICY "Creator read own clicks" ON pick_clicks FOR SELECT USING (
+  creator_id IN (SELECT id FROM creators WHERE email = auth.email())
+);
+
+-- ============================================
 -- RLS (Row Level Security) — 기본 설정
 -- ============================================
 ALTER TABLE creators ENABLE ROW LEVEL SECURITY;

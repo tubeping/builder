@@ -132,6 +132,34 @@ function addUtm(url: string, slug: string) {
   return `${url}${sep}utm_source=tubeping&utm_medium=shop&utm_campaign=${slug}`;
 }
 
+/** 클릭 beacon — 모든 외부 링크 클릭 시 /api/track에 비동기 전송 */
+function trackClick(params: {
+  slug: string; pickId?: string; sourceType?: string; targetUrl?: string;
+}) {
+  if (typeof window === "undefined") return;
+  try {
+    const payload = JSON.stringify({
+      slug: params.slug,
+      pickId: params.pickId || null,
+      sourceType: params.sourceType || null,
+      targetUrl: params.targetUrl || null,
+      landingUrl: window.location.href,
+    });
+    // sendBeacon이 지원되면 이탈 시에도 안전. 미지원 시 fetch keepalive.
+    if (navigator.sendBeacon) {
+      const blob = new Blob([payload], { type: "application/json" });
+      navigator.sendBeacon("/api/track", blob);
+    } else {
+      fetch("/api/track", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: payload,
+        keepalive: true,
+      }).catch(() => { /* swallow */ });
+    }
+  } catch { /* 트래킹 실패가 UX 방해 안 하게 */ }
+}
+
 // ─── 블록 렌더러들 ───
 
 function HeroBlock({ data, creator, shop }: { data: Record<string, unknown>; creator: ShopApiResponse["creator"]; shop: ShopApiResponse["shop"] }) {
@@ -247,6 +275,7 @@ function BannerBlock({ data, slug }: { data: Record<string, unknown>; slug: stri
   return (
     <section className="mx-auto max-w-2xl px-3 sm:px-4 py-3">
       <a href={addUtm(linkUrl, slug)} target="_blank" rel="noopener noreferrer"
+        onClick={() => trackClick({ slug, sourceType: "banner", targetUrl: linkUrl })}
         className="block overflow-hidden hover:shadow-lg transition-shadow"
         style={{
           borderRadius: "var(--block-radius)",
@@ -286,6 +315,7 @@ function LinksBlock({ data, slug }: { data: Record<string, unknown>; slug: strin
           <a key={link.id} href={addUtm(link.url, slug)} target="_blank" rel="noopener noreferrer"
             title={link.label}
             aria-label={link.label}
+            onClick={() => trackClick({ slug, sourceType: "link", targetUrl: link.url })}
             className="flex h-11 w-11 items-center justify-center hover:opacity-75 transition-opacity"
             style={{
               borderRadius: "var(--block-radius)",
@@ -728,7 +758,10 @@ function PicksBlock({ picks, slug }: { picks: DisplayPick[]; slug: string }) {
             {detail.curationComment && <p className="mt-2 text-sm text-gray-600 italic">&ldquo;{detail.curationComment}&rdquo;</p>}
             <div className="mt-5 flex gap-2">
               <button onClick={() => setDetail(null)} className="flex-1 cursor-pointer rounded-xl border border-gray-300 py-3 text-sm font-medium text-gray-600 hover:bg-gray-50">닫기</button>
-              <a href={addUtm(detail.buyUrl, slug)} target="_blank" rel="noopener noreferrer" className="flex-[2] flex items-center justify-center rounded-xl bg-[#C41E1E] py-3 text-sm font-medium text-white hover:bg-[#A01818]">구매하러 가기</a>
+              <a href={addUtm(detail.buyUrl, slug)} target="_blank" rel="noopener noreferrer"
+                onClick={() => trackClick({ slug, pickId: detail.id, sourceType: detail.source, targetUrl: detail.buyUrl })}
+                className="flex-[2] flex items-center justify-center rounded-xl py-3 text-sm font-medium text-white hover:opacity-90"
+                style={{ background: "var(--accent)" }}>구매하러 가기</a>
             </div>
           </div>
         </div>
@@ -903,7 +936,9 @@ function CampaignLiveBlock({ data, campaigns, slug }: { data: Record<string, unk
               href={addUtm(buyUrl, slug)}
               target={buyUrl.startsWith("http") ? "_blank" : undefined}
               rel="noopener noreferrer"
-              className="mt-4 block w-full rounded-xl bg-[#C41E1E] py-3 text-center text-sm font-bold text-white hover:bg-[#A01818] transition-colors"
+              onClick={() => trackClick({ slug, sourceType: "campaign_live", targetUrl: buyUrl })}
+              className="mt-4 block w-full rounded-xl py-3 text-center text-sm font-bold text-white hover:opacity-90 transition-opacity"
+              style={{ background: "var(--accent)" }}
             >
               바로 구매하기 →
             </a>

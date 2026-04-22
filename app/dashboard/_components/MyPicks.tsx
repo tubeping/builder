@@ -1251,96 +1251,96 @@ function NaverTab({
   onRemovePick: (id: string) => void;
   onToggleVisible: (id: string) => void;
 }) {
-  const [results, setResults] = useState<NaverShopItem[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
+  // 본인 쇼핑커넥트/공동구매 링크 붙여넣기 전용
+  const [url, setUrl] = useState("");
+  const [fetching, setFetching] = useState(false);
+  const [fetchError, setFetchError] = useState("");
+  const [preview, setPreview] = useState<{
+    title: string;
+    image: string;
+    price: number;
+    siteName: string;
+  } | null>(null);
+  const [category, setCategory] = useState("");
+  const [comment, setComment] = useState("");
   const [toastMessage, setToastMessage] = useState("");
-  const [sortBy, setSortBy] = useState<"sim" | "asc" | "dsc" | "date">("sim");
 
-  // 네이버 쇼핑 카테고리 (키워드 매핑)
-  const NAVER_CATEGORIES: { id: string; label: string; keyword: string }[] = [
-    { id: "best", label: "베스트", keyword: "인기상품" },
-    { id: "food", label: "식품", keyword: "식품 베스트" },
-    { id: "living", label: "생활용품", keyword: "생활용품 인기" },
-    { id: "kitchen", label: "주방", keyword: "주방용품 인기" },
-    { id: "home", label: "가구/인테리어", keyword: "인테리어 소품" },
-    { id: "digital", label: "디지털/가전", keyword: "디지털 가전" },
-    { id: "beauty", label: "뷰티", keyword: "뷰티 베스트" },
-    { id: "fashion", label: "패션", keyword: "여성 패션" },
-    { id: "health", label: "건강식품", keyword: "건강식품 인기" },
-    { id: "baby", label: "출산/유아동", keyword: "유아동 베스트" },
-    { id: "pet", label: "반려동물", keyword: "반려동물 용품" },
-    { id: "sports", label: "스포츠/레저", keyword: "스포츠 용품" },
-  ];
-  const [selectedCat, setSelectedCat] = useState("best");
+  const CATEGORIES = ["식품", "생활/건강", "뷰티/화장품", "패션/의류", "디지털/가전", "주방용품", "가구/인테리어", "유아동", "반려동물", "스포츠/레저", "기타"];
 
   const naverPicks = picks.filter((p) => p.source_type === "naver");
-  const pickedIds = new Set(
-    naverPicks.map((p) => p.source_meta?.product_id as string).filter(Boolean)
-  );
 
-  const runSearch = useCallback(async (query: string) => {
-    if (!query.trim()) return;
-    setLoading(true);
+  // URL 유효성 & 네이버 도메인 판별
+  const validateUrl = (u: string): { ok: boolean; isNaver: boolean; error?: string } => {
     try {
-      const res = await fetch(
-        `/api/naver/search?query=${encodeURIComponent(query)}&display=30&sort=${sortBy}`
-      );
-      if (res.ok) {
-        const data = await res.json();
-        setResults(data.items || []);
-      } else {
-        setResults([]);
-      }
-    } catch { setResults([]); }
-    finally { setLoading(false); }
-  }, [sortBy]);
-
-  // 탭 진입 시 기본 카테고리 로드
-  useEffect(() => {
-    const cat = NAVER_CATEGORIES.find((c) => c.id === selectedCat);
-    if (cat) runSearch(cat.keyword);
-  }, [selectedCat, runSearch]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const handleCategoryClick = (catId: string) => {
-    setSelectedCat(catId);
-    setSearchQuery("");
+      const parsed = new URL(u);
+      const host = parsed.hostname.toLowerCase();
+      const isNaver =
+        host.includes("naver.com") ||
+        host.includes("smartstore.naver") ||
+        host.includes("shopping.naver") ||
+        host.includes("brandconnect.naver");
+      return { ok: true, isNaver };
+    } catch {
+      return { ok: false, isNaver: false, error: "유효하지 않은 URL" };
+    }
   };
 
-  const handleSearchSubmit = () => {
-    if (!searchQuery.trim()) return;
-    runSearch(searchQuery);
+  const handleFetch = async () => {
+    setFetchError(""); setPreview(null);
+    const u = url.trim();
+    if (!u) { setFetchError("URL을 입력하세요"); return; }
+
+    const v = validateUrl(u);
+    if (!v.ok) { setFetchError(v.error || "유효하지 않은 URL"); return; }
+    if (!v.isNaver) {
+      setFetchError("네이버 도메인이 아닙니다. 쿠팡은 '쿠팡 탭', 그 외 플랫폼은 '직접 탭'을 사용하세요");
+      return;
+    }
+
+    setFetching(true);
+    try {
+      const res = await fetch(`/api/unfurl?url=${encodeURIComponent(u)}`);
+      if (!res.ok) { setFetchError("상품 정보를 가져올 수 없습니다"); return; }
+      const data = await res.json();
+      setPreview({
+        title: data.title || "",
+        image: data.image || "",
+        price: data.price || 0,
+        siteName: data.siteName || "네이버",
+      });
+    } catch {
+      setFetchError("네트워크 오류");
+    } finally {
+      setFetching(false);
+    }
   };
 
-  // UTM 자동 추가 (튜핑/크리에이터 트래킹용)
-  const buildTrackedUrl = (originalUrl: string, productId: string): string => {
-    const sep = originalUrl.includes("?") ? "&" : "?";
-    return `${originalUrl}${sep}utm_source=tubeping&utm_medium=pick&utm_campaign=naver_${productId}`;
-  };
+  const handleAddToPick = () => {
+    if (!preview || !preview.title) return;
+    if (!category) { setToastMessage("⚠️ 카테고리를 선택해주세요"); setTimeout(() => setToastMessage(""), 2500); return; }
 
-  const handleAddToPick = (product: NaverShopItem) => {
-    if (pickedIds.has(product.productId)) return;
-    const trackedUrl = buildTrackedUrl(product.link, product.productId);
     onAddPick({
       source_type: "naver",
-      name: product.title,
-      price: product.price,
-      category: product.category.split(" > ")[0] || "",
-      image: product.image || null,
-      external_url: trackedUrl,
-      affiliate_code: null,
+      name: preview.title,
+      price: preview.price,
+      category,
+      image: preview.image || null,
+      external_url: url.trim(),   // 본인 트래킹 ID가 박힌 쇼핑커넥트/공동구매 링크 그대로
+      affiliate_code: null,        // 네이버는 쿠팡처럼 우리가 생성 X (크리에이터가 직접 발급한 링크)
+      curation_comment: comment.trim(),
       source_meta: {
-        name: product.title,
-        price: product.price,
-        image: product.image || null,
-        category: product.category,
-        product_id: product.productId,
-        mall_name: product.mallName,
-        brand: product.brand,
-        product_url: product.link,
+        name: preview.title,
+        price: preview.price,
+        image: preview.image || null,
+        category,
+        source_url: url.trim(),
+        site_name: preview.siteName,
       },
     });
-    setToastMessage("PICK에 추가되었습니다!");
+
+    // 리셋
+    setUrl(""); setPreview(null); setCategory(""); setComment("");
+    setToastMessage("내 몰에 담았습니다!");
     setTimeout(() => setToastMessage(""), 3000);
   };
 
@@ -1352,194 +1352,141 @@ function NaverTab({
         </div>
       )}
 
-      {/* 상단 안내 박스 (수수료 체계 안내) */}
+      {/* 상단 가이드 박스 */}
       <div className="rounded-xl border border-[#03C75A]/30 bg-gradient-to-br from-[#03C75A]/5 to-white p-4">
         <div className="flex items-start gap-3">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#03C75A] text-sm font-bold text-white">N</div>
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#03C75A] text-base font-bold text-white">N</div>
           <div className="flex-1">
-            <p className="text-sm font-bold text-gray-900">네이버 쇼핑 상품 노출하기</p>
-            <p className="mt-1 text-xs text-gray-600 leading-relaxed">
-              검색해서 고른 상품을 내 쇼핑몰에 바로 노출. 구매는 네이버 스마트스토어에서 진행됩니다.
-              <br />
-              <span className="text-[#03C75A] font-medium">수익화 팁:</span> 판매자와 개별 제휴하거나, 네이버 쇼핑커넥트에도 가입해서 수수료 받으세요.
+            <p className="text-sm font-bold text-gray-900">
+              네이버 쇼핑커넥트 / 공동구매 <span className="text-[#03C75A]">본인 발급 링크</span>만 붙여넣기
             </p>
-            <div className="mt-2 flex gap-2">
+            <p className="mt-1 text-xs text-gray-600 leading-relaxed">
+              네이버는 공식 파트너스 API가 없어서 튜핑이 직접 딥링크를 못 만듭니다.
+              <br />
+              <b className="text-gray-900">brand.connect.naver.com</b>에서 본인 계정으로 발급받은 링크만 여기에 붙여넣으세요.
+              구매자가 해당 링크로 주문하면 네이버가 <b className="text-[#03C75A]">직접 본인 계좌로 수수료 지급</b>합니다.
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
               <a
                 href="https://partner.naver.com"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 rounded-md bg-[#03C75A] px-2.5 py-1 text-[11px] font-medium text-white hover:bg-[#02b051]"
+                className="inline-flex items-center gap-1 rounded-md bg-[#03C75A] px-3 py-1.5 text-[11px] font-bold text-white hover:bg-[#02b051]"
               >
-                쇼핑커넥트 가입
-                <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                </svg>
+                쇼핑커넥트 가입하러 가기 →
+              </a>
+              <a
+                href="https://brandconnect.naver.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 rounded-md border border-[#03C75A] bg-white px-3 py-1.5 text-[11px] font-bold text-[#03C75A] hover:bg-[#03C75A]/5"
+              >
+                브랜드커넥트 바로가기 →
               </a>
             </div>
           </div>
         </div>
       </div>
 
-      {/* 검색 영역 */}
-      <div className="rounded-xl border border-gray-200 p-4">
-        <div className="mb-3 flex items-center gap-2">
-          <h3 className="text-base font-semibold text-gray-900">상품 찾기</h3>
-          <span className="rounded-full bg-[#03C75A]/10 px-2 py-0.5 text-[10px] font-medium text-[#03C75A]">네이버 쇼핑</span>
+      {/* URL 입력 폼 */}
+      <div className="rounded-xl border border-gray-200 p-5 space-y-4">
+        <div>
+          <label className="mb-1.5 block text-sm font-medium text-gray-700">네이버 발급 링크 *</label>
+          <div className="flex gap-2">
+            <input
+              type="url"
+              value={url}
+              onChange={(e) => { setUrl(e.target.value); setFetchError(""); }}
+              onKeyDown={(e) => { if (e.key === "Enter") handleFetch(); }}
+              placeholder="https://smartstore.naver.com/... 또는 brandconnect.naver.com/... (본인 발급 링크)"
+              className="flex-1 rounded-lg border border-gray-300 px-4 py-2.5 text-sm outline-none focus:border-[#03C75A]"
+            />
+            <button
+              onClick={handleFetch}
+              disabled={fetching || !url.trim()}
+              className="cursor-pointer rounded-lg bg-[#03C75A] px-5 py-2.5 text-sm font-medium text-white hover:bg-[#02b051] disabled:opacity-40 disabled:cursor-default whitespace-nowrap"
+            >
+              {fetching ? (
+                <span className="flex items-center gap-1.5">
+                  <span className="h-3 w-3 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                  분석 중
+                </span>
+              ) : "정보 가져오기"}
+            </button>
+          </div>
+          {fetchError && <p className="mt-1.5 text-xs text-red-500">{fetchError}</p>}
+          <p className="mt-1.5 text-[11px] text-gray-400">
+            ⚠️ 일반 네이버 쇼핑 검색 링크 말고 <b>본인 트래킹 ID가 박힌 발급 링크</b>를 붙여넣어야 수수료를 받을 수 있습니다.
+          </p>
         </div>
 
-        <div className="relative">
-          <svg className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-          </svg>
+        {/* 미리보기 */}
+        {preview && (
+          <div className="rounded-xl border-2 border-dashed border-[#03C75A]/30 bg-[#03C75A]/5 p-3">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-[10px] font-bold text-[#03C75A]">✨ 미리보기</span>
+              <span className="rounded-full bg-[#03C75A] px-2 py-0.5 text-[9px] font-medium text-white">{preview.siteName}</span>
+            </div>
+            <div className="flex gap-3">
+              <div className="h-20 w-20 shrink-0 overflow-hidden rounded-lg bg-gray-100">
+                {preview.image ? (
+                  <img src={preview.image} alt="" className="h-full w-full object-cover" />
+                ) : (
+                  <div className="flex h-full items-center justify-center text-gray-300">
+                    <svg className="h-6 w-6" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                  </div>
+                )}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="line-clamp-2 text-sm font-medium text-gray-900 leading-snug">{preview.title || "제목 없음"}</p>
+                {preview.price > 0 && (
+                  <p className="mt-1 text-base font-bold text-[#03C75A]">{formatPrice(preview.price)}</p>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div>
+          <label className="mb-1.5 block text-sm font-medium text-gray-700">카테고리 *</label>
+          <select
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+            className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm outline-none focus:border-[#03C75A] bg-white"
+          >
+            <option value="">선택하세요</option>
+            {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+          </select>
+        </div>
+
+        <div>
+          <label className="mb-1.5 block text-sm font-medium text-gray-700">큐레이션 코멘트</label>
           <input
             type="text"
-            placeholder="네이버 상품명으로 검색"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Enter") handleSearchSubmit(); }}
-            className="w-full rounded-xl border border-gray-300 py-3 pl-10 pr-20 text-sm outline-none focus:border-[#03C75A]"
+            value={comment}
+            onChange={(e) => setComment(e.target.value)}
+            placeholder="이 상품을 추천하는 이유를 한 줄로"
+            className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm outline-none focus:border-[#03C75A]"
           />
+        </div>
+
+        <div className="flex items-center justify-between pt-1">
+          <p className="text-[11px] text-gray-400">
+            내 쇼핑몰에 담기면 본인 발급 링크로 연결 → 구매 시 네이버가 본인 계좌로 수수료 지급
+          </p>
           <button
-            onClick={handleSearchSubmit}
-            className="absolute right-2 top-1/2 -translate-y-1/2 cursor-pointer rounded-lg bg-[#03C75A] px-3 py-1.5 text-xs font-medium text-white hover:bg-[#02b051]"
+            onClick={handleAddToPick}
+            disabled={!preview || !preview.title || !category}
+            className="cursor-pointer rounded-lg bg-[#03C75A] px-6 py-2.5 text-sm font-medium text-white hover:bg-[#02b051] disabled:opacity-40 disabled:cursor-default"
           >
-            검색
+            내 몰에 담기
           </button>
-        </div>
-
-        {/* 정렬 */}
-        <div className="mt-3 flex items-center gap-2">
-          {[
-            { key: "sim" as const, label: "정확도" },
-            { key: "asc" as const, label: "낮은가격" },
-            { key: "dsc" as const, label: "높은가격" },
-            { key: "date" as const, label: "신상품" },
-          ].map((s) => (
-            <button
-              key={s.key}
-              onClick={() => { setSortBy(s.key); const cat = NAVER_CATEGORIES.find((c) => c.id === selectedCat); if (cat) runSearch(searchQuery || cat.keyword); }}
-              className={`cursor-pointer rounded-full px-3 py-1 text-[11px] font-medium transition-colors ${
-                sortBy === s.key ? "bg-[#111111] text-white" : "border border-gray-300 bg-white text-gray-600 hover:bg-gray-50"
-              }`}
-            >
-              {s.label}
-            </button>
-          ))}
-        </div>
-
-        {/* 카테고리 필터 (가로 스크롤) */}
-        <div className="mt-3 flex gap-1.5 overflow-x-auto pb-1">
-          {NAVER_CATEGORIES.map((cat) => (
-            <button
-              key={cat.id}
-              onClick={() => handleCategoryClick(cat.id)}
-              className={`shrink-0 cursor-pointer rounded-full px-3 py-1.5 text-xs transition-colors ${
-                selectedCat === cat.id && !searchQuery
-                  ? "border border-[#03C75A] bg-[#03C75A]/10 text-[#03C75A]"
-                  : "border border-gray-300 bg-white text-gray-600 hover:bg-gray-50"
-              }`}
-            >
-              {cat.label}
-            </button>
-          ))}
         </div>
       </div>
 
-      {/* 로딩 */}
-      {loading && (
-        <div className="flex items-center justify-center py-16">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-gray-200 border-t-[#03C75A]" />
-          <span className="ml-3 text-sm text-gray-500">상품 불러오는 중...</span>
-        </div>
-      )}
-
-      {/* 상품 그리드 */}
-      {!loading && results.length > 0 && (
-        <div>
-          <h4 className="mb-3 text-sm font-medium text-gray-900">
-            {searchQuery ? `"${searchQuery}" 검색 결과` : NAVER_CATEGORIES.find((c) => c.id === selectedCat)?.label + " 추천"}
-            <span className="text-gray-400"> · {results.length}개</span>
-          </h4>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-            {results.map((product, idx) => {
-              const isPicked = pickedIds.has(product.productId);
-              return (
-                <div
-                  key={product.productId || idx}
-                  className={`overflow-hidden rounded-xl border transition-colors ${
-                    isPicked ? "border-[#03C75A]" : "border-gray-200 hover:border-gray-300"
-                  }`}
-                >
-                  <div className="relative aspect-square bg-gray-100">
-                    {product.image ? (
-                      <img src={product.image} alt={product.title} className="h-full w-full object-cover" />
-                    ) : (
-                      <div className="flex h-full items-center justify-center text-gray-300">{IMAGE_PLACEHOLDER}</div>
-                    )}
-                    {/* 순위 배지 */}
-                    <span className="absolute left-2 top-2 flex h-7 min-w-[28px] items-center justify-center rounded-md bg-[#03C75A] px-1.5 text-sm font-extrabold text-white shadow-sm">
-                      {idx + 1}
-                    </span>
-                    {/* 상품 정보 외부 링크 */}
-                    <a
-                      href={product.link}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={(e) => e.stopPropagation()}
-                      className="absolute right-2 top-2 flex items-center gap-0.5 rounded bg-white/95 px-1.5 py-0.5 text-[10px] font-medium text-gray-700 shadow-sm hover:bg-white"
-                      title="네이버 쇼핑 상품 페이지 열기"
-                    >
-                      상품 정보
-                      <svg className="h-2.5 w-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                      </svg>
-                    </a>
-                    {isPicked && (
-                      <span className="absolute right-2 bottom-2 rounded bg-[#03C75A] px-2 py-0.5 text-xs font-medium text-white">PICK</span>
-                    )}
-                  </div>
-                  <div className="p-3">
-                    <p className="line-clamp-2 text-sm font-medium text-gray-900 leading-snug min-h-[2.5rem]">
-                      {product.title}
-                    </p>
-                    <p className="mt-1.5 text-base font-bold text-gray-900">{formatPrice(product.price)}</p>
-                    <p className="mt-0.5 text-xs text-gray-500 truncate">
-                      {product.mallName}
-                      {product.category && <span className="text-gray-400"> · {product.category.split(" > ")[0]}</span>}
-                    </p>
-                    <button
-                      onClick={() => handleAddToPick(product)}
-                      disabled={isPicked}
-                      className={`mt-3 flex w-full cursor-pointer items-center justify-center gap-1 rounded-lg py-2 text-sm font-medium transition-colors ${
-                        isPicked
-                          ? "bg-gray-100 text-gray-400 cursor-default"
-                          : "bg-[#03C75A] text-white hover:bg-[#02b051]"
-                      }`}
-                    >
-                      {isPicked ? "PICK 완료" : (
-                        <>
-                          <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                          </svg>
-                          PICK 추가
-                        </>
-                      )}
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {!loading && results.length === 0 && (
-        <div className="flex flex-col items-center py-12 text-center">
-          <p className="text-sm text-gray-500">상품이 없습니다. 다른 키워드/카테고리로 시도해보세요.</p>
-        </div>
-      )}
-
-      {/* 이미 PICK된 네이버 상품 */}
+      {/* 내 네이버 PICK */}
       {naverPicks.length > 0 && (
         <div className="border-t border-gray-200 pt-5">
           <h4 className="mb-3 text-sm font-semibold text-gray-900">
@@ -1562,13 +1509,20 @@ function NaverTab({
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium text-gray-900">{pick.name}</p>
                   <div className="flex items-center gap-2 text-xs text-gray-400">
-                    <span>{formatPrice(pick.price)}</span>
-                    <span>·</span>
-                    <span className="truncate">{(pick.source_meta?.mall_name as string) || "네이버"}</span>
+                    {pick.price > 0 && <><span>{formatPrice(pick.price)}</span><span>·</span></>}
+                    <span className="truncate">{(pick.source_meta?.site_name as string) || "네이버"}</span>
                     <span>·</span>
                     <span>클릭 {pick.clicks}</span>
                   </div>
                 </div>
+                <a
+                  href={pick.external_url || "#"}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[10px] text-[#03C75A] hover:underline"
+                >
+                  링크 →
+                </a>
                 <button
                   onClick={() => onToggleVisible(pick.id)}
                   className={`cursor-pointer rounded px-2 py-1 text-[10px] font-medium ${

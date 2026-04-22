@@ -153,6 +153,16 @@ function GongguTab({
   const [loaded, setLoaded] = useState(false);
   const PAGE_SIZE = 40;
 
+  // 카페24 카테고리별 공구 실적 (사전 판매 예측)
+  interface CategoryStats {
+    category: string;
+    order_count: number;
+    total_gmv: number;
+    repeat_rate: number;
+    performance_score: number;
+  }
+  const [perfStats, setPerfStats] = useState<Map<string, CategoryStats>>(new Map());
+
   const pickedProductNos = new Set(
     picks
       .filter((p) => p.source_type === "tubeping_campaign")
@@ -167,6 +177,19 @@ function GongguTab({
       const data = await res.json();
       if (data.categories?.length > 0) setCategories(data.categories);
     } catch { /* 폴백 카테고리 유지 */ }
+  }, []);
+
+  const fetchPerformance = useCallback(async () => {
+    try {
+      const res = await fetch("/api/cafe24-performance?days=90");
+      if (!res.ok) return;
+      const data = await res.json();
+      const map = new Map<string, CategoryStats>();
+      for (const c of (data.categories as CategoryStats[]) || []) {
+        map.set(c.category, c);
+      }
+      setPerfStats(map);
+    } catch { /* 실적 데이터 없어도 OK */ }
   }, []);
 
   const fetchProducts = useCallback(async (opts?: { keyword?: string; category?: number | null; append?: boolean }) => {
@@ -206,8 +229,9 @@ function GongguTab({
     if (!loaded) {
       fetchProducts();
       fetchCategories();
+      fetchPerformance();
     }
-  }, [loaded, fetchProducts, fetchCategories]);
+  }, [loaded, fetchProducts, fetchCategories, fetchPerformance]);
 
   const handleCategoryChange = (catId: number | null) => {
     setSelectedCategory(catId);
@@ -316,13 +340,59 @@ function GongguTab({
             <div className="mt-3 flex flex-wrap gap-1.5">
               <button onClick={() => handleCategoryChange(null)}
                 className={`cursor-pointer rounded-full px-3 py-1.5 text-xs transition-colors ${selectedCategory === null ? "border border-[#C41E1E] bg-[#fff0f0] text-[#C41E1E]" : "border border-gray-300 bg-white text-gray-600 hover:bg-gray-50"}`}>전체</button>
-              {categories.map((cat) => (
-                <button key={cat.id} onClick={() => handleCategoryChange(cat.id)}
-                  className={`cursor-pointer rounded-full px-3 py-1.5 text-xs transition-colors ${selectedCategory === cat.id ? "border border-[#C41E1E] bg-[#fff0f0] text-[#C41E1E]" : "border border-gray-300 bg-white text-gray-600 hover:bg-gray-50"}`}>{cat.name}</button>
-              ))}
+              {categories.map((cat) => {
+                const stat = perfStats.get(cat.name);
+                const score = stat?.performance_score ?? null;
+                const hot = score !== null && score >= 70;
+                const warm = score !== null && score >= 50 && score < 70;
+                return (
+                  <button key={cat.id} onClick={() => handleCategoryChange(cat.id)}
+                    className={`cursor-pointer rounded-full px-3 py-1.5 text-xs transition-colors flex items-center gap-1 ${
+                      selectedCategory === cat.id
+                        ? "border border-[#C41E1E] bg-[#fff0f0] text-[#C41E1E]"
+                        : "border border-gray-300 bg-white text-gray-600 hover:bg-gray-50"
+                    }`}
+                    title={stat ? `과거 90일: ${stat.order_count}건 · 재구매율 ${(stat.repeat_rate * 100).toFixed(0)}%` : undefined}
+                  >
+                    <span>{cat.name}</span>
+                    {hot && <span className="text-[9px]">🔥</span>}
+                    {warm && <span className="text-[9px] text-amber-600">●</span>}
+                  </button>
+                );
+              })}
             </div>
           )}
         </div>
+
+        {/* ── 선택 카테고리 실적 요약 ── */}
+        {selectedCategory !== null && (() => {
+          const cat = categories.find((c) => c.id === selectedCategory);
+          const stat = cat ? perfStats.get(cat.name) : null;
+          if (!stat) return null;
+          return (
+            <div className="mt-3 rounded-lg border border-[#C41E1E]/20 bg-gradient-to-r from-red-50/50 to-white p-3">
+              <div className="flex items-center gap-2 flex-wrap text-xs">
+                <span className="font-bold text-gray-900">{cat?.name}</span>
+                <span className="text-gray-400">최근 90일</span>
+                <span className="ml-auto flex items-center gap-2">
+                  <span>주문 <b className="text-gray-900">{stat.order_count}</b>건</span>
+                  <span>·</span>
+                  <span>GMV <b className="text-gray-900">{(stat.total_gmv / 10000).toFixed(0)}만</b></span>
+                  <span>·</span>
+                  <span>재구매 <b className="text-gray-900">{(stat.repeat_rate * 100).toFixed(0)}%</b></span>
+                  <span>·</span>
+                  <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                    stat.performance_score >= 70 ? "bg-[#C41E1E] text-white" :
+                    stat.performance_score >= 50 ? "bg-amber-100 text-amber-700" :
+                    "bg-gray-100 text-gray-500"
+                  }`}>
+                    공구 적합도 {stat.performance_score.toFixed(0)}
+                  </span>
+                </span>
+              </div>
+            </div>
+          );
+        })()}
 
         {loading && (
           <div className="flex items-center justify-center py-16">
@@ -348,6 +418,10 @@ function GongguTab({
                 const isPicked = pickedProductNos.has(product.product_no);
                 const price = Number(product.price);
                 const isSoldOut = product.sold_out === "T";
+                // 선택된 카테고리의 공구 적합도 (개별 상품 단위는 아니지만 카테고리 단위 힌트)
+                const currentCat = categories.find((c) => c.id === selectedCategory);
+                const catStat = currentCat ? perfStats.get(currentCat.name) : null;
+                const hot = catStat && catStat.performance_score >= 70;
                 return (
                   <div key={product.product_no} className={`overflow-hidden rounded-lg border transition-colors ${isPicked ? "border-[#C41E1E]" : "border-gray-200 hover:border-gray-300"} ${isSoldOut ? "opacity-50" : ""}`}>
                     <div className="relative aspect-[4/3] bg-gray-100">
@@ -358,6 +432,9 @@ function GongguTab({
                       )}
                       {isSoldOut && <span className="absolute left-1.5 top-1.5 rounded bg-gray-700 px-1.5 py-0.5 text-[10px] font-medium text-white">품절</span>}
                       {isPicked && <span className="absolute right-1.5 top-1.5 rounded bg-[#C41E1E] px-1.5 py-0.5 text-[10px] font-medium text-white">PICK</span>}
+                      {!isPicked && !isSoldOut && hot && (
+                        <span className="absolute left-1.5 bottom-1.5 rounded bg-[#C41E1E]/90 px-1.5 py-0.5 text-[9px] font-bold text-white shadow-sm">🔥 적합</span>
+                      )}
                     </div>
                     <div className="p-2">
                       <p className="line-clamp-1 text-xs font-medium text-gray-900">{product.product_name}</p>

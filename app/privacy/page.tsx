@@ -1,86 +1,143 @@
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "개인정보처리방침",
+  description: "TubePing 개인정보처리방침",
+};
+
+const LAST_UPDATED = "2026-04-30";
+
 export default function PrivacyPage() {
   return (
-    <div className="mx-auto max-w-2xl px-4 py-12">
-      <h1 className="mb-8 text-2xl font-bold text-gray-900">개인정보처리방침</h1>
-
-      <div className="space-y-6 text-sm text-gray-700 leading-relaxed">
-        <section>
-          <h2 className="mb-2 text-base font-semibold text-gray-900">1. 수집하는 개인정보 항목</h2>
-          <ul className="ml-4 list-disc space-y-1">
-            <li><strong>필수항목</strong>: 이메일, 이름(채널명), 비밀번호</li>
-            <li><strong>선택항목</strong>: 전화번호, 채널 URL, 프로필 이미지, 은행 계좌 정보</li>
-            <li><strong>자동 수집</strong>: 접속 IP, 쿠키, 접속 로그, 서비스 이용 기록</li>
-          </ul>
-        </section>
-
-        <section>
-          <h2 className="mb-2 text-base font-semibold text-gray-900">2. 개인정보의 수집 및 이용 목적</h2>
-          <ul className="ml-4 list-disc space-y-1">
-            <li>서비스 제공 및 회원 관리</li>
-            <li>공구 캠페인 매칭 및 정산</li>
-            <li>어필리에이트 수익 추적</li>
-            <li>서비스 개선 및 통계 분석</li>
-          </ul>
-        </section>
-
-        <section>
-          <h2 className="mb-2 text-base font-semibold text-gray-900">3. 개인정보의 보유 및 이용 기간</h2>
-          <p>
-            회원 탈퇴 시 지체 없이 파기합니다. 단, 관련 법령에 따라 보존이 필요한 경우 해당 기간 동안 보관합니다.
+    <div className="min-h-screen bg-white py-10 px-4">
+      <article className="mx-auto max-w-3xl">
+        <header className="mb-8 border-b border-gray-200 pb-6">
+          <h1 className="text-2xl font-extrabold text-gray-900">개인정보처리방침</h1>
+          <p className="mt-2 text-sm text-gray-500">최종 수정일: {LAST_UPDATED}</p>
+          <p className="mt-1 text-sm text-gray-500">
+            ㈜신산애널리틱스(이하 &ldquo;회사&rdquo;)는 TubePing 서비스(이하 &ldquo;서비스&rdquo;) 이용자의
+            개인정보를 중요시하며, 「개인정보 보호법」 등 관련 법령을 준수합니다.
           </p>
-          <ul className="ml-4 list-disc space-y-1">
-            <li>계약·청약철회 기록: 5년 (전자상거래법)</li>
-            <li>대금결제·재화공급 기록: 5년 (전자상거래법)</li>
-            <li>소비자 불만·분쟁 처리 기록: 3년 (전자상거래법)</li>
-            <li>접속 로그: 3개월 (통신비밀보호법)</li>
-          </ul>
-        </section>
+        </header>
 
-        <section>
-          <h2 className="mb-2 text-base font-semibold text-gray-900">4. 제3자 제공</h2>
-          <p>
-            회사는 원칙적으로 이용자의 개인정보를 제3자에게 제공하지 않습니다.
-            다만 다음의 경우 예외로 합니다.
+        <Section title="1. 수집하는 개인정보 항목">
+          <ul className="list-disc pl-5 space-y-1.5 text-sm text-gray-700">
+            <li><b>필수</b>: 이메일 주소, 이름(또는 닉네임), 채널 URL, 쇼핑몰 슬러그(shop_slug)</li>
+            <li><b>선택</b>: 전화번호, 프로필 사진, 자기소개</li>
+            <li><b>자동 수집</b>: 접속 IP(해시 처리), User-Agent, 쿠키, 페이지 방문 기록, 클릭 이벤트</li>
+            <li><b>외부 연동 시 별도 동의 후 수집</b>: YouTube 채널 정보·통계, Instagram 비즈니스 계정 정보·메시지·코멘트, Cafe24 주문·상품 정보, 쿠팡 파트너스 실적</li>
+          </ul>
+        </Section>
+
+        <Section title="2. 개인정보의 수집 및 이용 목적">
+          <ul className="list-disc pl-5 space-y-1.5 text-sm text-gray-700">
+            <li>회원 가입 및 본인 확인, 서비스 제공·운영</li>
+            <li>크리에이터 쇼핑몰 생성·관리, PICK 큐레이션, 통계 제공</li>
+            <li>외부 플랫폼(YouTube, Instagram, Cafe24, 쿠팡 등) 연동 및 데이터 동기화</li>
+            <li>고객 문의 응대 및 공지사항 전달</li>
+            <li>부정 이용 방지, 서비스 품질 개선, 통계 분석</li>
+            <li>법령상 의무 이행</li>
+          </ul>
+        </Section>
+
+        <Section title="3. 개인정보의 보유 및 이용 기간">
+          <p className="text-sm text-gray-700 leading-relaxed">
+            회사는 회원 탈퇴 시 또는 수집·이용 목적이 달성된 후에는 해당 정보를 지체 없이 파기합니다.
+            다만, 관계 법령에 따라 보관이 필요한 경우 아래 기간 동안 보관합니다.
           </p>
-          <ul className="ml-4 list-disc space-y-1">
-            <li>이용자가 사전에 동의한 경우</li>
-            <li>법령에 의해 요구되는 경우</li>
-            <li>정산을 위해 결제대행사(PG)에 최소한의 정보 전달</li>
+          <ul className="mt-3 list-disc pl-5 space-y-1 text-sm text-gray-700">
+            <li>계약 또는 청약 철회 등에 관한 기록: <b>5년</b> (전자상거래법)</li>
+            <li>대금 결제 및 재화 등의 공급에 관한 기록: <b>5년</b> (전자상거래법)</li>
+            <li>소비자 불만 또는 분쟁 처리에 관한 기록: <b>3년</b> (전자상거래법)</li>
+            <li>접속 로그, IP 정보: <b>3개월</b> (통신비밀보호법)</li>
           </ul>
-        </section>
+        </Section>
 
-        <section>
-          <h2 className="mb-2 text-base font-semibold text-gray-900">5. 개인정보의 파기</h2>
-          <p>
-            보유 기간이 경과하거나 처리 목적이 달성된 경우 지체 없이 해당 개인정보를 파기합니다.
-            전자적 파일은 복구 불가능한 방법으로 삭제하고, 종이 문서는 분쇄 또는 소각합니다.
+        <Section title="4. 개인정보의 제3자 제공">
+          <p className="text-sm text-gray-700 leading-relaxed">
+            회사는 이용자의 동의 없이 개인정보를 제3자에게 제공하지 않습니다. 다만, 이용자가
+            외부 플랫폼(Google, Meta(Instagram/Facebook), Cafe24, 쿠팡 파트너스, 네이버 등)을
+            연동하는 경우, 해당 플랫폼이 요구하는 범위 내에서 인증 정보 및 데이터가 연결되며,
+            이는 각 플랫폼의 개인정보 정책을 따릅니다.
           </p>
-        </section>
+        </Section>
 
-        <section>
-          <h2 className="mb-2 text-base font-semibold text-gray-900">6. 이용자의 권리</h2>
-          <ul className="ml-4 list-disc space-y-1">
-            <li>개인정보 열람, 정정, 삭제, 처리 정지를 요청할 수 있습니다.</li>
-            <li>요청은 이메일(support@shinsananalytics.com)로 접수합니다.</li>
-            <li>회사는 요청 접수 후 10일 이내에 처리합니다.</li>
+        <Section title="5. 개인정보 처리의 위탁">
+          <p className="text-sm text-gray-700 leading-relaxed">
+            서비스 운영을 위해 다음 업체에 개인정보 처리 업무를 위탁하고 있습니다.
+          </p>
+          <div className="mt-3 overflow-x-auto">
+            <table className="w-full text-xs text-gray-700">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="text-left p-2 font-bold">수탁자</th>
+                  <th className="text-left p-2 font-bold">위탁 업무</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                <tr><td className="p-2">Supabase, Inc.</td><td className="p-2">데이터베이스 및 인증 시스템 운영</td></tr>
+                <tr><td className="p-2">Vercel, Inc.</td><td className="p-2">웹 서비스 호스팅</td></tr>
+                <tr><td className="p-2">Google LLC</td><td className="p-2">소셜 로그인(OAuth), YouTube 데이터 연동</td></tr>
+                <tr><td className="p-2">Meta Platforms, Inc.</td><td className="p-2">Instagram 비즈니스 데이터 연동</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </Section>
+
+        <Section title="6. 이용자의 권리와 행사 방법">
+          <ul className="list-disc pl-5 space-y-1.5 text-sm text-gray-700">
+            <li>개인정보 열람·정정·삭제·처리정지 요구</li>
+            <li>회원 탈퇴 시 모든 개인정보는 즉시 파기 (법령상 보관 항목 제외)</li>
+            <li>외부 플랫폼 연동 해제 시 해당 데이터 즉시 삭제</li>
+            <li>요청 방법: <a href="mailto:master@shinsananalytics.com" className="text-[#C41E1E] underline">master@shinsananalytics.com</a> 또는 <a href="/data-deletion" className="text-[#C41E1E] underline">데이터 삭제 요청 페이지</a></li>
           </ul>
-        </section>
+        </Section>
 
-        <section>
-          <h2 className="mb-2 text-base font-semibold text-gray-900">7. 개인정보 보호책임자</h2>
-          <ul className="ml-4 list-disc space-y-1">
-            <li>책임자: 최준 (대표이사)</li>
-            <li>이메일: support@shinsananalytics.com</li>
-            <li>소속: ㈜신산애널리틱스</li>
+        <Section title="7. 개인정보의 안전성 확보 조치">
+          <ul className="list-disc pl-5 space-y-1.5 text-sm text-gray-700">
+            <li>비밀번호는 단방향 암호화 저장</li>
+            <li>외부 플랫폼 액세스 토큰은 암호화 보관</li>
+            <li>접속 IP는 해시 처리 후 저장(원본 IP 미보관)</li>
+            <li>접근 권한 최소화 및 접근 기록 관리</li>
           </ul>
-        </section>
+        </Section>
 
-        <p className="mt-8 text-xs text-gray-400">시행일: 2026년 4월 6일</p>
-      </div>
+        <Section title="8. 쿠키 및 유사 기술">
+          <p className="text-sm text-gray-700 leading-relaxed">
+            서비스 이용 통계 분석 및 로그인 유지를 위해 쿠키 및 유사 기술을 사용합니다. 이용자는
+            브라우저 설정을 통해 쿠키 저장을 거부할 수 있으나, 일부 기능 이용에 제한이 있을 수
+            있습니다.
+          </p>
+        </Section>
 
-      <div className="mt-8">
-        <a href="/onboarding" className="text-sm text-[#C41E1E] hover:underline">← 돌아가기</a>
-      </div>
+        <Section title="9. 개인정보 보호책임자">
+          <div className="rounded-lg bg-gray-50 p-4 text-sm text-gray-700 space-y-1">
+            <p><b>회사명</b>: ㈜신산애널리틱스</p>
+            <p><b>책임자</b>: 대표이사 최준</p>
+            <p><b>이메일</b>: <a href="mailto:master@shinsananalytics.com" className="text-[#C41E1E] underline">master@shinsananalytics.com</a></p>
+          </div>
+        </Section>
+
+        <Section title="10. 정책 변경">
+          <p className="text-sm text-gray-700 leading-relaxed">
+            본 방침은 법령·정책 또는 보안 기술의 변경에 따라 수정될 수 있으며, 변경 시 홈페이지를
+            통해 사전 공지합니다.
+          </p>
+        </Section>
+
+        <footer className="mt-12 pt-6 border-t border-gray-200 text-xs text-gray-400 text-center">
+          <p>관련 약관: <a href="/terms" className="text-[#C41E1E] hover:underline">이용약관</a> · <a href="/data-deletion" className="text-[#C41E1E] hover:underline">데이터 삭제 요청</a></p>
+        </footer>
+      </article>
     </div>
+  );
+}
+
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section className="mb-7">
+      <h2 className="text-base font-bold text-gray-900 mb-3">{title}</h2>
+      {children}
+    </section>
   );
 }

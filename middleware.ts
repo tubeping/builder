@@ -48,22 +48,23 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  // ── 인증 체크 (기본 도메인) ──
-  // TODO: Supabase Auth 연동 완료 후 인증 체크 복원
-  const protectedPaths: string[] = []; // 임시: 인증 없이 대시보드 접근 허용
-  const isProtected = protectedPaths.some((p) => pathname.startsWith(p));
+  // ── 인증 가드 ──
+  // 보호 경로: 로그인 필수
+  const protectedPaths = ["/dashboard", "/onboarding", "/settings"];
+  const isProtected = protectedPaths.some((p) => pathname === p || pathname.startsWith(p + "/"));
 
   if (!isProtected) {
     return NextResponse.next();
   }
 
-  // Supabase 세션 확인 — Edge 호환 (REST API 직접 호출, @supabase/ssr 제거)
+  // Supabase 세션 확인 — Edge 호환 (REST API 직접 호출)
   const accessToken = request.cookies.getAll()
     .find(c => c.name.includes("auth-token") || c.name === "sb-access-token")?.value;
 
   if (!accessToken) {
     const url = request.nextUrl.clone();
-    url.pathname = "/onboarding";
+    url.pathname = "/login";
+    url.searchParams.set("next", pathname);
     return NextResponse.redirect(url);
   }
 
@@ -78,7 +79,8 @@ export async function middleware(request: NextRequest) {
 
     if (!res.ok) {
       const url = request.nextUrl.clone();
-      url.pathname = "/onboarding";
+      url.pathname = "/login";
+      url.searchParams.set("next", pathname);
       return NextResponse.redirect(url);
     }
   } catch {

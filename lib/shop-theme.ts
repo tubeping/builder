@@ -50,30 +50,32 @@ export const DEFAULT_THEME: ShopTheme = {
   block: { shape: "rounded", shadow: "soft", align: "center", anim: "none" },
 };
 
-export const PRESETS: { key: ThemePreset; label: string; accent: string; bg: string; fg: string }[] = [
-  { key: "light",    label: "라이트",    accent: "#111111", bg: "#FFFFFF", fg: "#111111" },
-  { key: "tubeping", label: "튜핑 레드", accent: "#C41E1E", bg: "#FFFFFF", fg: "#111111" },
-  { key: "pink",     label: "파스텔 핑크", accent: "#EC4899", bg: "#FDF2F8", fg: "#1F2937" },
-  { key: "blue",     label: "블루",      accent: "#2563EB", bg: "#EFF6FF", fg: "#1F2937" },
-  { key: "dark",     label: "다크",      accent: "#FFFFFF", bg: "#0A0A0A", fg: "#FFFFFF" },
-  { key: "black",    label: "블랙 포인트", accent: "#C41E1E", bg: "#111111", fg: "#FFFFFF" },
-  { key: "purple",   label: "퍼플",      accent: "#7C3AED", bg: "#F5F3FF", fg: "#1F2937" },
+// 프리셋 4개 — 결정 피로 최소화 (Light / Tubeping / Pastel / Dark)
+export const PRESETS: { key: ThemePreset; label: string; tagline: string; accent: string; bg: string; fg: string }[] = [
+  { key: "light",    label: "미니멀",   tagline: "깨끗하고 군더더기 없게",  accent: "#111111", bg: "#FFFFFF", fg: "#111111" },
+  { key: "tubeping", label: "튜핑",     tagline: "브랜드 레드로 강하게",   accent: "#C41E1E", bg: "#FFFFFF", fg: "#111111" },
+  { key: "pink",     label: "파스텔",   tagline: "부드러운 따뜻함",        accent: "#E11D74", bg: "#FFF1F5", fg: "#1A1A1A" },
+  { key: "dark",     label: "다크",     tagline: "고급스러운 검정",        accent: "#FFFFFF", bg: "#0A0A0A", fg: "#FFFFFF" },
 ];
 
-// 배경 팔레트 (12색)
+// 배경 팔레트 (6색 — 무게감 순)
 export const BG_COLORS: { value: string; label: string }[] = [
   { value: "#FFFFFF", label: "화이트" },
-  { value: "#FFF0F3", label: "베이비핑크" },
-  { value: "#FCE7F3", label: "핑크" },
-  { value: "#FEF3C7", label: "크림" },
-  { value: "#FED7AA", label: "피치" },
-  { value: "#DCFCE7", label: "민트" },
-  { value: "#D1FAE5", label: "세이지" },
-  { value: "#DBEAFE", label: "스카이블루" },
-  { value: "#E0E7FF", label: "라벤더" },
-  { value: "#F3F4F6", label: "그레이" },
-  { value: "#1F2937", label: "슬레이트" },
+  { value: "#FFF1F5", label: "파스텔" },
+  { value: "#FAF7F2", label: "베이지" },
+  { value: "#F4F4F5", label: "라이트 그레이" },
+  { value: "#1F1F1F", label: "차콜" },
   { value: "#0A0A0A", label: "블랙" },
+];
+
+// 추천 강조색 (브랜드·뉴트럴·계절감)
+export const ACCENT_SWATCHES: { value: string; label: string }[] = [
+  { value: "#C41E1E", label: "튜핑 레드" },
+  { value: "#111111", label: "잉크 블랙" },
+  { value: "#E11D74", label: "핑크" },
+  { value: "#1F6FEB", label: "블루" },
+  { value: "#0E7C66", label: "딥 그린" },
+  { value: "#A16207", label: "오커" },
 ];
 
 export const FONTS: { key: FontKey; label: string; cssFamily: string }[] = [

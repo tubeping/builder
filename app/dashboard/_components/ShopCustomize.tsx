@@ -32,11 +32,14 @@ import {
   Minus,
   Images,
   X as XIcon,
+  Check,
+  AlignLeft,
+  AlignCenter,
   type LucideIcon,
 } from "lucide-react";
 import {
   type ShopTheme, type ThemePreset, type BlockShape, type BlockShadow, type BlockAlign, type FontKey,
-  DEFAULT_THEME, PRESETS, BG_COLORS, FONTS, normalizeTheme, themeToCssVars,
+  DEFAULT_THEME, PRESETS, BG_COLORS, ACCENT_SWATCHES, FONTS, normalizeTheme, themeToCssVars,
 } from "@/lib/shop-theme";
 
 // ─── 타입 ───
@@ -588,24 +591,64 @@ function StylePanel({ theme, setTheme, applyPreset }: {
     setTheme(prev => ({ ...prev, block: { ...prev.block, ...patch } }));
 
   return (
-    <div className="hidden md:block space-y-5">
-      {/* 테마 프리셋 */}
+    <div className="hidden md:block space-y-7">
+      {/* ───── 테마 프리셋 (mini-shop 미니어처) ───── */}
       <section>
-        <h4 className="mb-2 text-[11px] font-bold uppercase tracking-wide text-gray-400">테마</h4>
-        <div className="grid grid-cols-2 gap-1.5">
+        <SectionLabel>테마</SectionLabel>
+        <div className="grid grid-cols-2 gap-2.5">
           {PRESETS.map(p => {
             const active = theme.preset === p.key;
             return (
-              <button key={p.key} onClick={() => applyPreset(p.key)}
-                className={`relative cursor-pointer rounded-lg border p-2 text-left transition-all ${
-                  active ? "border-[#C41E1E] ring-2 ring-[#C41E1E]/20" : "border-gray-200 hover:border-gray-300"
-                }`}>
-                <div className="mb-1.5 h-10 rounded" style={{ background: p.bg, border: "1px solid rgba(0,0,0,0.05)" }}>
-                  <div className="h-full flex items-center justify-center text-[10px] font-bold" style={{ color: p.fg }}>Aa</div>
+              <button
+                key={p.key}
+                onClick={() => applyPreset(p.key)}
+                className={`group relative cursor-pointer overflow-hidden rounded-2xl bg-white text-left transition-all ${
+                  active
+                    ? "ring-2 ring-[#C41E1E] ring-offset-2 ring-offset-white"
+                    : "ring-1 ring-gray-200 hover:ring-gray-300 hover:-translate-y-0.5"
+                }`}
+              >
+                {/* mini-shop preview */}
+                <div
+                  className="relative h-[112px] px-3 pb-2.5 pt-3 overflow-hidden"
+                  style={{ background: p.bg, color: p.fg }}
+                >
+                  {/* 채널명 */}
+                  <div className="text-[11px] font-black tracking-tight">샵 이름</div>
+                  {/* accent line */}
+                  <div className="mt-1 h-[2px] w-6 rounded-full" style={{ background: p.accent }} />
+                  {/* mini blocks */}
+                  <div className="mt-2 flex gap-1">
+                    <div className="h-3 w-3 rounded-md" style={{ background: p.accent, opacity: 0.9 }} />
+                    <div className="h-3 w-3 rounded-md opacity-30" style={{ background: p.fg }} />
+                    <div className="h-3 w-3 rounded-md opacity-15" style={{ background: p.fg }} />
+                  </div>
+                  <div className="mt-1.5 flex gap-1">
+                    <div className="h-7 flex-1 rounded-md opacity-10" style={{ background: p.fg }} />
+                    <div className="h-7 flex-1 rounded-md opacity-10" style={{ background: p.fg }} />
+                  </div>
+                  {/* CTA pill */}
+                  <div
+                    className="absolute right-2.5 bottom-2.5 rounded-full px-2 py-0.5 text-[8px] font-bold"
+                    style={{ background: p.accent, color: p.bg }}
+                  >
+                    구매
+                  </div>
+                  {/* 활성 체크 */}
+                  {active && (
+                    <div className="absolute left-2.5 top-2.5 flex h-5 w-5 items-center justify-center rounded-full bg-[#C41E1E] shadow-md">
+                      <Check className="h-3 w-3 text-white" strokeWidth={3} />
+                    </div>
+                  )}
                 </div>
-                <div className="flex items-center gap-1">
-                  <span className="h-2 w-2 rounded-full" style={{ background: p.accent }} />
-                  <span className="text-[10px] font-medium text-gray-700">{p.label}</span>
+                {/* 라벨 */}
+                <div className="px-3 py-2.5 border-t border-gray-100">
+                  <div className="flex items-center gap-1.5">
+                    <span className={`text-[12px] font-bold tracking-tight ${active ? "text-[#C41E1E]" : "text-gray-900"}`}>
+                      {p.label}
+                    </span>
+                  </div>
+                  <p className="mt-0.5 text-[10px] text-gray-400 leading-tight truncate">{p.tagline}</p>
                 </div>
               </button>
             );
@@ -613,114 +656,206 @@ function StylePanel({ theme, setTheme, applyPreset }: {
         </div>
       </section>
 
-      {/* 배경색 직접 선택 */}
+      {/* ───── 배경색 ───── */}
       <section>
-        <h4 className="mb-2 text-[11px] font-bold uppercase tracking-wide text-gray-400">배경</h4>
-        <div className="grid grid-cols-6 gap-1.5">
+        <SectionLabel>배경</SectionLabel>
+        <div className="grid grid-cols-3 gap-2">
           {BG_COLORS.map(c => {
             const active = theme.bg.toUpperCase() === c.value.toUpperCase();
             return (
-              <button key={c.value} onClick={() => setTheme(prev => ({ ...prev, bg: c.value, preset: "custom" }))}
-                title={c.label}
-                className={`h-7 w-7 cursor-pointer rounded-full border-2 transition-transform ${
-                  active ? "border-[#C41E1E] scale-110" : "border-gray-200 hover:scale-105"
+              <button
+                key={c.value}
+                onClick={() => setTheme(prev => ({ ...prev, bg: c.value, preset: "custom" }))}
+                className={`group cursor-pointer rounded-xl bg-white p-2 text-left transition-all ${
+                  active ? "ring-2 ring-[#C41E1E]" : "ring-1 ring-gray-200 hover:ring-gray-300"
                 }`}
-                style={{ background: c.value }} />
+              >
+                <div
+                  className="relative h-9 w-full rounded-lg ring-1 ring-black/[0.04]"
+                  style={{ background: c.value }}
+                >
+                  {active && (
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <div className="flex h-5 w-5 items-center justify-center rounded-full bg-[#C41E1E] shadow-md">
+                        <Check className="h-3 w-3 text-white" strokeWidth={3} />
+                      </div>
+                    </div>
+                  )}
+                </div>
+                <p className={`mt-1.5 text-[11px] font-bold ${active ? "text-[#C41E1E]" : "text-gray-700"}`}>
+                  {c.label}
+                </p>
+              </button>
             );
           })}
         </div>
       </section>
 
-      {/* 강조색 custom */}
+      {/* ───── 강조색 ───── */}
       <section>
-        <h4 className="mb-2 text-[11px] font-bold uppercase tracking-wide text-gray-400">강조색</h4>
-        <div className="flex items-center gap-2">
-          <input type="color" value={theme.accent}
-            onChange={(e) => setTheme(prev => ({ ...prev, accent: e.target.value, preset: "custom" }))}
-            className="h-9 w-9 cursor-pointer rounded-lg border border-gray-200" />
-          <input type="text" value={theme.accent}
-            onChange={(e) => setTheme(prev => ({ ...prev, accent: e.target.value, preset: "custom" }))}
-            className="flex-1 rounded-lg border border-gray-200 px-2 py-1.5 text-xs outline-none focus:border-[#C41E1E]" />
+        <SectionLabel>강조색</SectionLabel>
+        <div className="space-y-2.5">
+          {/* 추천 swatches */}
+          <div className="grid grid-cols-6 gap-1.5">
+            {ACCENT_SWATCHES.map(c => {
+              const active = theme.accent.toUpperCase() === c.value.toUpperCase();
+              return (
+                <button
+                  key={c.value}
+                  onClick={() => setTheme(prev => ({ ...prev, accent: c.value, preset: "custom" }))}
+                  title={c.label}
+                  className={`relative h-9 w-full cursor-pointer rounded-lg transition-transform ${
+                    active ? "ring-2 ring-offset-2 ring-[#C41E1E] scale-105" : "ring-1 ring-black/5 hover:scale-105"
+                  }`}
+                  style={{ background: c.value }}
+                >
+                  {active && (
+                    <span className="absolute inset-0 flex items-center justify-center">
+                      <Check className="h-4 w-4 text-white drop-shadow" strokeWidth={3} />
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+          {/* hex 입력 */}
+          <div className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white pl-2 pr-2 py-1">
+            <input
+              type="color"
+              value={theme.accent}
+              onChange={(e) => setTheme(prev => ({ ...prev, accent: e.target.value, preset: "custom" }))}
+              className="h-7 w-7 cursor-pointer rounded-md border border-gray-200"
+              aria-label="강조색 선택"
+            />
+            <input
+              type="text"
+              value={theme.accent}
+              onChange={(e) => setTheme(prev => ({ ...prev, accent: e.target.value, preset: "custom" }))}
+              className="flex-1 bg-transparent px-1 py-1.5 text-xs font-mono tabular-nums tracking-tight text-gray-900 outline-none"
+              spellCheck={false}
+            />
+          </div>
         </div>
       </section>
 
-      {/* 폰트 */}
+      {/* ───── 폰트 ───── */}
       <section>
-        <h4 className="mb-2 text-[11px] font-bold uppercase tracking-wide text-gray-400">폰트</h4>
-        <div className="grid grid-cols-2 gap-1.5">
+        <SectionLabel>폰트</SectionLabel>
+        <div className="grid grid-cols-2 gap-2">
           {FONTS.map(f => {
             const active = theme.font === f.key;
             return (
-              <button key={f.key} onClick={() => setTheme(prev => ({ ...prev, font: f.key }))}
-                className={`cursor-pointer rounded-lg border py-2 px-2 text-xs font-bold transition-all ${
-                  active ? "border-[#C41E1E] bg-[#FFF5F5] text-gray-900" : "border-gray-200 text-gray-600 hover:border-gray-300"
+              <button
+                key={f.key}
+                onClick={() => setTheme(prev => ({ ...prev, font: f.key }))}
+                className={`cursor-pointer rounded-xl bg-white px-3 py-3 text-left transition-all ${
+                  active ? "ring-2 ring-[#C41E1E] bg-[#FFF0F0]" : "ring-1 ring-gray-200 hover:ring-gray-300"
                 }`}
-                style={{ fontFamily: f.cssFamily }}>
-                {f.label}
+              >
+                <p
+                  className={`text-[18px] font-bold leading-none tracking-tight ${active ? "text-[#C41E1E]" : "text-gray-900"}`}
+                  style={{ fontFamily: f.cssFamily }}
+                >
+                  쇼핑몰
+                </p>
+                <p className="mt-1.5 text-[10px] font-medium text-gray-400">{f.label}</p>
               </button>
             );
           })}
         </div>
       </section>
 
-      {/* 블록 모양 */}
+      {/* ───── 블록 모양 ───── */}
       <section>
-        <h4 className="mb-2 text-[11px] font-bold uppercase tracking-wide text-gray-400">블록 모양</h4>
-        <div className="grid grid-cols-3 gap-1.5">
+        <SectionLabel>블록 모양</SectionLabel>
+        <div className="grid grid-cols-3 gap-2">
           {(["square", "rounded", "pill"] as BlockShape[]).map(s => {
             const active = theme.block.shape === s;
-            const radius = s === "square" ? "4px" : s === "rounded" ? "12px" : "999px";
+            const radius = s === "square" ? "4px" : s === "rounded" ? "10px" : "999px";
+            const labels = { square: "각진", rounded: "둥근", pill: "필" };
             return (
-              <button key={s} onClick={() => updateBlock({ shape: s })}
-                className={`cursor-pointer border h-11 p-1 transition-all flex items-center justify-center ${
-                  active ? "border-[#C41E1E] bg-[#FFF5F5]" : "border-gray-200 hover:border-gray-300"
+              <button
+                key={s}
+                onClick={() => updateBlock({ shape: s })}
+                className={`group cursor-pointer rounded-xl bg-white p-2.5 transition-all ${
+                  active ? "ring-2 ring-[#C41E1E]" : "ring-1 ring-gray-200 hover:ring-gray-300"
                 }`}
-                style={{ borderRadius: s === "square" ? "8px" : s === "rounded" ? "12px" : "22px" }}>
-                <span className="inline-block h-5 w-full bg-gray-200" style={{ borderRadius: radius }} />
+              >
+                <div
+                  className={`mx-auto h-6 w-full transition-colors ${active ? "bg-[#C41E1E]" : "bg-gray-200 group-hover:bg-gray-300"}`}
+                  style={{ borderRadius: radius }}
+                />
+                <p className={`mt-2 text-center text-[11px] font-bold ${active ? "text-[#C41E1E]" : "text-gray-600"}`}>
+                  {labels[s]}
+                </p>
               </button>
             );
           })}
         </div>
       </section>
 
-      {/* 그림자 */}
+      {/* ───── 그림자 ───── */}
       <section>
-        <h4 className="mb-2 text-[11px] font-bold uppercase tracking-wide text-gray-400">그림자</h4>
-        <div className="grid grid-cols-4 gap-1.5">
+        <SectionLabel>그림자</SectionLabel>
+        <div className="grid grid-cols-4 gap-2">
           {(["none", "soft", "hard", "strong"] as BlockShadow[]).map(s => {
             const active = theme.block.shadow === s;
             const shadows = { none: "none", soft: "0 1px 3px rgba(0,0,0,.08)", hard: "0 4px 12px rgba(0,0,0,.12)", strong: "0 10px 25px rgba(0,0,0,.18)" };
+            const labels = { none: "없음", soft: "연하게", hard: "보통", strong: "진하게" };
             return (
-              <button key={s} onClick={() => updateBlock({ shadow: s })}
-                className={`cursor-pointer rounded-lg border py-2 text-[10px] font-medium transition-all ${
-                  active ? "border-[#C41E1E] bg-[#FFF5F5] text-gray-900" : "border-gray-200 text-gray-500 hover:border-gray-300"
+              <button
+                key={s}
+                onClick={() => updateBlock({ shadow: s })}
+                className={`cursor-pointer rounded-xl bg-white p-2 transition-all ${
+                  active ? "ring-2 ring-[#C41E1E]" : "ring-1 ring-gray-200 hover:ring-gray-300"
                 }`}
-                style={{ boxShadow: shadows[s] }}>
-                {s === "none" ? "없음" : s === "soft" ? "연" : s === "hard" ? "진" : "강"}
+              >
+                <div
+                  className="mx-auto h-6 w-6 rounded-md bg-white"
+                  style={{ boxShadow: shadows[s], border: "1px solid rgba(0,0,0,0.04)" }}
+                />
+                <p className={`mt-2 text-center text-[10px] font-bold ${active ? "text-[#C41E1E]" : "text-gray-500"}`}>
+                  {labels[s]}
+                </p>
               </button>
             );
           })}
         </div>
       </section>
 
-      {/* 정렬 */}
+      {/* ───── 정렬 ───── */}
       <section>
-        <h4 className="mb-2 text-[11px] font-bold uppercase tracking-wide text-gray-400">정렬</h4>
-        <div className="grid grid-cols-2 gap-1.5">
+        <SectionLabel>정렬</SectionLabel>
+        <div className="grid grid-cols-2 gap-2">
           {(["left", "center"] as BlockAlign[]).map(a => {
             const active = theme.block.align === a;
+            const Icon = a === "left" ? AlignLeft : AlignCenter;
+            const label = a === "left" ? "왼쪽" : "중앙";
             return (
-              <button key={a} onClick={() => updateBlock({ align: a })}
-                className={`cursor-pointer rounded-lg border py-2 text-[11px] font-medium transition-all ${
-                  active ? "border-[#C41E1E] bg-[#FFF5F5] text-gray-900" : "border-gray-200 text-gray-500 hover:border-gray-300"
-                }`}>
-                {a === "left" ? "⬅️ 왼쪽" : "⬌ 중앙"}
+              <button
+                key={a}
+                onClick={() => updateBlock({ align: a })}
+                className={`flex cursor-pointer items-center justify-center gap-1.5 rounded-xl bg-white px-3 py-2.5 transition-all ${
+                  active ? "ring-2 ring-[#C41E1E]" : "ring-1 ring-gray-200 hover:ring-gray-300"
+                }`}
+              >
+                <Icon className={`h-4 w-4 ${active ? "text-[#C41E1E]" : "text-gray-500"}`} strokeWidth={active ? 2.6 : 2} />
+                <span className={`text-[12px] font-bold ${active ? "text-[#C41E1E]" : "text-gray-700"}`}>{label}</span>
               </button>
             );
           })}
         </div>
       </section>
     </div>
+  );
+}
+
+// 섹션 라벨 — uppercase 디폴트 미감 회피, 한국어 친화
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <h4 className="mb-2.5 text-[12px] font-bold tracking-tight text-gray-900">
+      {children}
+    </h4>
   );
 }
 

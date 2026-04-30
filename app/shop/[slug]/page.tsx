@@ -1,7 +1,20 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Share2, Package, Calendar as CalendarIcon, Megaphone } from "lucide-react";
+import {
+  Share2,
+  Package,
+  Calendar as CalendarIcon,
+  Megaphone,
+  Radio,
+  Zap,
+  Flame,
+  Bell,
+  Users,
+  Star,
+  CheckCircle2,
+  ArrowRight,
+} from "lucide-react";
 import { themeToCssVars, normalizeTheme } from "@/lib/shop-theme";
 
 // ─── 타입 ───
@@ -336,23 +349,41 @@ function BannerBlock({ data, slug }: { data: Record<string, unknown>; slug: stri
 function LinksBlock({ data, slug }: { data: Record<string, unknown>; slug: string }) {
   const items = (data.items as LinkBlock[]) || [];
   if (items.length === 0) return null;
+
+  // 라벨 없으면 아이콘만 보여주는 컴팩트 모드 (기존 41x41 박스 호환)
+  const allShort = items.every((l) => !l.label || l.label.trim().length === 0);
+
+  if (allShort) {
+    return (
+      <section className="mx-auto max-w-2xl px-3 sm:px-4 py-3">
+        <div className="flex flex-wrap items-center justify-center gap-2.5">
+          {items.map((link) => (
+            <a key={link.id} href={addUtm(link.url, slug)} target="_blank" rel="noopener noreferrer"
+              title={link.label}
+              aria-label={link.label}
+              onClick={() => trackClick({ slug, sourceType: "link", targetUrl: link.url })}
+              className="flex h-12 w-12 items-center justify-center rounded-full bg-white ring-1 ring-gray-200 transition-all hover:-translate-y-0.5 hover:ring-gray-300"
+            >
+              <span className="text-lg leading-none">{link.icon}</span>
+            </a>
+          ))}
+        </div>
+      </section>
+    );
+  }
+
+  // 풀폭 pill 모드 — 라벨 있을 때
   return (
     <section className="mx-auto max-w-2xl px-3 sm:px-4 py-3">
-      <div className="flex flex-wrap items-center justify-center gap-2.5">
+      <div className="flex flex-col gap-2.5">
         {items.map((link) => (
           <a key={link.id} href={addUtm(link.url, slug)} target="_blank" rel="noopener noreferrer"
-            title={link.label}
-            aria-label={link.label}
             onClick={() => trackClick({ slug, sourceType: "link", targetUrl: link.url })}
-            className="flex h-11 w-11 items-center justify-center hover:opacity-75 transition-opacity"
-            style={{
-              borderRadius: "var(--block-radius)",
-              border: "1px solid var(--card-border)",
-              background: "var(--card-bg)",
-              boxShadow: "var(--block-shadow)",
-            }}
+            className="group flex items-center gap-3 rounded-full bg-white px-5 py-3.5 ring-1 ring-gray-200 transition-all hover:ring-gray-300 hover:-translate-y-0.5"
           >
-            <span className="text-lg">{link.icon}</span>
+            <span className="text-lg leading-none shrink-0">{link.icon}</span>
+            <span className="flex-1 text-[14px] font-bold text-gray-900 tracking-tight">{link.label}</span>
+            <ArrowRight className="h-4 w-4 text-gray-300 group-hover:text-gray-700 transition-colors" strokeWidth={2.4} />
           </a>
         ))}
       </div>
@@ -664,27 +695,40 @@ function CalendarBlock({ data, campaigns, slug }: { data: Record<string, unknown
 
 function ReviewsBlock({ reviews }: { reviews: ShopReview[] }) {
   if (reviews.length === 0) return null;
+  const avgRating = reviews.reduce((a, r) => a + (r.product_rating || 0), 0) / reviews.length;
   return (
     <section className="mx-auto max-w-2xl px-3 sm:px-4 py-3">
-      <div className="flex items-center gap-2 mb-3">
-        <span className="text-xl">💬</span>
-        <h2 className="text-base font-bold text-gray-900">큐레이션 리뷰</h2>
-        <span className="ml-auto text-xs text-gray-400">
-          ★ {(reviews.reduce((a, r) => a + (r.product_rating || 0), 0) / reviews.length).toFixed(1)}
+      <div className="flex items-baseline gap-2 mb-4">
+        <Star className="h-[18px] w-[18px] shrink-0 self-center text-gray-900 fill-gray-900" strokeWidth={2} />
+        <h2 className="text-[17px] font-black tracking-tight text-gray-900">리뷰</h2>
+        <span className="ml-auto inline-flex items-center gap-1 rounded-full bg-gray-100 px-2.5 py-0.5 text-[11px] font-bold tabular-nums text-gray-700">
+          <Star className="h-3 w-3 text-yellow-500 fill-yellow-500" strokeWidth={0} />
+          {avgRating.toFixed(1)}
         </span>
       </div>
-      <div className="space-y-2">
+      <div className="space-y-2.5">
         {reviews.map((review) => (
-          <div key={review.id} className="rounded-xl border border-gray-200 bg-white p-4">
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-medium text-gray-900">{review.customer_hash || "익명"}</span>
-              <span className="text-xs text-yellow-500">{"★".repeat(review.product_rating || 0)}</span>
+          <div key={review.id} className="rounded-2xl bg-white ring-1 ring-gray-100 p-4">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-[13px] font-bold text-gray-900">{review.customer_hash || "익명"}</span>
+              <span className="inline-flex items-center gap-0.5">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <Star
+                    key={i}
+                    className={`h-3 w-3 ${i < (review.product_rating || 0) ? "text-yellow-500 fill-yellow-500" : "text-gray-200 fill-gray-200"}`}
+                    strokeWidth={0}
+                  />
+                ))}
+              </span>
               {review.would_rebuy && (
-                <span className="rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-medium text-green-700">재구매 의사</span>
+                <span className="inline-flex items-center gap-0.5 rounded-full bg-green-50 px-2 py-0.5 text-[10px] font-bold text-green-700">
+                  <CheckCircle2 className="h-2.5 w-2.5" strokeWidth={2.6} />
+                  재구매 의사
+                </span>
               )}
-              <span className="ml-auto text-xs text-gray-400">{review.created_at?.split("T")[0]}</span>
+              <span className="ml-auto text-[11px] tabular-nums text-gray-400">{review.created_at?.split("T")[0]}</span>
             </div>
-            {review.product_comment && <p className="mt-2 text-sm text-gray-700 leading-relaxed">{review.product_comment}</p>}
+            {review.product_comment && <p className="mt-2 text-[13.5px] leading-relaxed text-gray-700">{review.product_comment}</p>}
           </div>
         ))}
       </div>
@@ -868,41 +912,50 @@ function CampaignLiveBlock({ data, campaigns, slug }: { data: Record<string, unk
 
   return (
     <section className="mx-auto max-w-2xl px-3 sm:px-4 py-3">
-      <div className={`overflow-hidden rounded-2xl border ${isUrgent ? "border-[#C41E1E] shadow-lg shadow-red-100" : "border-gray-200"} bg-white`}>
+      <div className={`overflow-hidden rounded-2xl bg-white ring-1 transition-shadow ${isUrgent ? "ring-[#C41E1E] shadow-[0_8px_24px_-8px_rgba(196,30,30,0.25)]" : "ring-gray-200"}`}>
         {/* 상단 라이브 배지 */}
-        <div className={`flex items-center gap-2 px-4 py-2 text-white text-xs font-bold ${isUrgent ? "bg-[#C41E1E] animate-pulse" : "bg-[#C41E1E]"}`}>
+        <div className="flex items-center gap-2 bg-[#C41E1E] px-4 py-2.5 text-white text-[11px] font-bold tracking-wider uppercase">
           <span className="relative flex h-2 w-2">
-            <span className="absolute inset-0 animate-ping rounded-full bg-white opacity-75" />
+            <span className="absolute inset-0 animate-ping rounded-full bg-white opacity-60" />
             <span className="relative h-2 w-2 rounded-full bg-white" />
           </span>
-          {isUrgent ? "⚡ 마감 임박!" : "🔴 LIVE 공구중"}
+          {isUrgent ? (
+            <>
+              <Zap className="h-3.5 w-3.5" strokeWidth={2.6} />
+              마감 임박
+            </>
+          ) : (
+            <>
+              <Radio className="h-3.5 w-3.5" strokeWidth={2.6} />
+              Live 공구
+            </>
+          )}
           {isUrgent && timeLeft && (
-            <span className="ml-auto tabular-nums">
+            <span className="ml-auto font-mono tabular-nums tracking-tight normal-case">
               {String(timeLeft.h).padStart(2, "0")}:{String(timeLeft.m).padStart(2, "0")}:{String(timeLeft.s).padStart(2, "0")}
             </span>
           )}
         </div>
 
-        <div className="p-4">
+        <div className="p-5">
           {/* 상품 정보 */}
-          <div className="flex gap-3">
-            <div className="h-24 w-24 shrink-0 overflow-hidden rounded-xl bg-gray-100">
+          <div className="flex gap-4">
+            <div className="h-24 w-24 shrink-0 overflow-hidden rounded-xl bg-gray-100 ring-1 ring-gray-100">
               {product.image_url ? (
                 <img src={product.image_url} alt="" className="h-full w-full object-cover" />
               ) : (
-                <div className="flex h-full items-center justify-center text-gray-300">
-                  <svg className="h-8 w-8" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                  </svg>
+                <div className="flex h-full items-center justify-center">
+                  <Package className="h-8 w-8 text-gray-300" strokeWidth={1.5} />
                 </div>
               )}
             </div>
             <div className="min-w-0 flex-1">
-              <p className="line-clamp-2 text-sm font-bold text-gray-900 leading-snug">{product.product_name}</p>
-              <p className="mt-1 text-xl font-extrabold text-[#C41E1E]">{formatPrice(product.price)}</p>
+              <p className="line-clamp-2 text-[14px] font-bold text-gray-900 leading-snug">{product.product_name}</p>
+              <p className="mt-1.5 text-[22px] font-black tabular-nums tracking-tight text-[#C41E1E]">{formatPrice(product.price)}</p>
               {soldCount > 0 && (
-                <p className="mt-0.5 text-[11px] text-gray-500">
-                  🔥 지금까지 <b className="text-gray-900">{soldCount}명</b>이 구매했어요
+                <p className="mt-1 inline-flex items-center gap-1 text-[11px] text-gray-600">
+                  <Flame className="h-3 w-3 text-[#C41E1E]" strokeWidth={2.4} />
+                  지금까지 <b className="text-gray-900 tabular-nums">{soldCount}명</b>이 구매
                 </p>
               )}
             </div>
@@ -910,59 +963,64 @@ function CampaignLiveBlock({ data, campaigns, slug }: { data: Record<string, unk
 
           {/* 카운트다운 (큰 화면) */}
           {!isUrgent && timeLeft && !isEnded && (
-            <div className="mt-4 flex items-center justify-center gap-2">
-              <div className="flex-1 rounded-lg bg-gray-50 py-2 text-center">
-                <div className="text-xl font-extrabold tabular-nums text-gray-900">{timeLeft.d}</div>
-                <div className="text-[10px] text-gray-500">DAYS</div>
-              </div>
-              <div className="flex-1 rounded-lg bg-gray-50 py-2 text-center">
-                <div className="text-xl font-extrabold tabular-nums text-gray-900">{String(timeLeft.h).padStart(2, "0")}</div>
-                <div className="text-[10px] text-gray-500">HOURS</div>
-              </div>
-              <div className="flex-1 rounded-lg bg-gray-50 py-2 text-center">
-                <div className="text-xl font-extrabold tabular-nums text-gray-900">{String(timeLeft.m).padStart(2, "0")}</div>
-                <div className="text-[10px] text-gray-500">MIN</div>
-              </div>
-              <div className="flex-1 rounded-lg bg-gray-50 py-2 text-center">
-                <div className="text-xl font-extrabold tabular-nums text-gray-900">{String(timeLeft.s).padStart(2, "0")}</div>
-                <div className="text-[10px] text-gray-500">SEC</div>
-              </div>
+            <div className="mt-5 grid grid-cols-4 gap-2">
+              {([
+                { v: String(timeLeft.d), l: "일" },
+                { v: String(timeLeft.h).padStart(2, "0"), l: "시간" },
+                { v: String(timeLeft.m).padStart(2, "0"), l: "분" },
+                { v: String(timeLeft.s).padStart(2, "0"), l: "초" },
+              ]).map((u, i) => (
+                <div key={i} className="rounded-xl bg-gray-50 py-2.5 text-center">
+                  <div className="text-[22px] font-black tabular-nums leading-none text-gray-900">{u.v}</div>
+                  <div className="mt-1 text-[10px] font-bold tracking-wider text-gray-400">{u.l}</div>
+                </div>
+              ))}
             </div>
           )}
 
           {/* 마감 임박 배너 */}
           {isUrgent && !isEnded && (
-            <div className="mt-3 rounded-lg bg-red-50 p-3 text-center">
-              <p className="text-xs font-bold text-[#C41E1E]">⏰ 놓치면 후회할 마지막 기회</p>
+            <div className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-[#FFF0F0] px-3 py-1.5">
+              <Zap className="h-3.5 w-3.5 text-[#C41E1E]" strokeWidth={2.6} />
+              <p className="text-[11px] font-bold text-[#C41E1E]">놓치면 후회할 마지막 기회</p>
             </div>
           )}
 
           {isEnded && (
-            <div className="mt-3 rounded-lg bg-gray-100 p-3 text-center">
+            <div className="mt-4 rounded-xl bg-gray-100 px-3 py-2.5 text-center">
               <p className="text-xs font-bold text-gray-600">공구가 마감되었습니다</p>
             </div>
           )}
 
           {/* 진행률 바 */}
           {targetCount > 0 && (
-            <div className="mt-4">
-              <div className="mb-1.5 flex items-center justify-between text-[11px]">
-                <span className="font-medium text-gray-700">목표 수량</span>
-                <span className="font-bold text-[#C41E1E]">
-                  {soldCount} / {targetCount}개 ({progressPct.toFixed(0)}%)
+            <div className="mt-5">
+              <div className="mb-2 flex items-baseline justify-between">
+                <span className="text-[11px] font-bold text-gray-500">목표 수량</span>
+                <span className="text-[12px] font-black tabular-nums text-gray-900">
+                  <span className="text-[#C41E1E]">{soldCount}</span>
+                  <span className="text-gray-300 mx-0.5">/</span>
+                  {targetCount}
+                  <span className="ml-1 text-[10px] font-bold text-gray-400">({progressPct.toFixed(0)}%)</span>
                 </span>
               </div>
-              <div className="h-2.5 w-full overflow-hidden rounded-full bg-gray-100">
+              <div className="h-2 w-full overflow-hidden rounded-full bg-gray-100">
                 <div
-                  className="h-full bg-gradient-to-r from-[#C41E1E] to-[#FF6B6B] transition-all duration-500"
+                  className="h-full rounded-full bg-[#C41E1E] transition-all duration-500"
                   style={{ width: `${progressPct}%` }}
                 />
               </div>
               {progressPct >= 100 && (
-                <p className="mt-1.5 text-[11px] font-medium text-green-600">🎉 목표 달성!</p>
+                <p className="mt-2 inline-flex items-center gap-1 text-[11px] font-bold text-green-600">
+                  <CheckCircle2 className="h-3 w-3" strokeWidth={2.6} />
+                  목표 달성
+                </p>
               )}
               {progressPct >= 80 && progressPct < 100 && (
-                <p className="mt-1.5 text-[11px] font-medium text-[#C41E1E]">🔥 목표 달성 임박!</p>
+                <p className="mt-2 inline-flex items-center gap-1 text-[11px] font-bold text-[#C41E1E]">
+                  <Flame className="h-3 w-3" strokeWidth={2.6} />
+                  목표 달성 임박
+                </p>
               )}
             </div>
           )}
@@ -974,10 +1032,11 @@ function CampaignLiveBlock({ data, campaigns, slug }: { data: Record<string, unk
               target={buyUrl.startsWith("http") ? "_blank" : undefined}
               rel="noopener noreferrer"
               onClick={() => trackClick({ slug, sourceType: "campaign_live", targetUrl: buyUrl })}
-              className="mt-4 block w-full rounded-xl py-3 text-center text-sm font-bold text-white hover:opacity-90 transition-opacity"
+              className="mt-5 flex w-full items-center justify-center gap-1.5 rounded-xl py-3.5 text-[14px] font-bold text-white hover:opacity-90 transition-opacity"
               style={{ background: "var(--accent)" }}
             >
-              바로 구매하기 →
+              바로 구매하기
+              <ArrowRight className="h-4 w-4" strokeWidth={2.6} />
             </a>
           )}
         </div>
@@ -1060,35 +1119,35 @@ function CampaignTeaserBlock({ data, campaigns, creatorId }: {
 
   return (
     <section className="mx-auto max-w-2xl px-3 sm:px-4 py-3">
-      <div className="overflow-hidden rounded-2xl border border-blue-200 bg-gradient-to-br from-blue-50 to-white">
-        <div className="flex items-center gap-2 bg-blue-600 px-4 py-2 text-xs font-bold text-white">
-          🔔 곧 오픈!
+      <div className="overflow-hidden rounded-2xl bg-white ring-1 ring-gray-200">
+        <div className="flex items-center gap-2 bg-gray-900 px-4 py-2.5 text-white text-[11px] font-bold uppercase tracking-wider">
+          <Bell className="h-3.5 w-3.5" strokeWidth={2.6} />
+          곧 오픈
           {dday !== null && dday > 0 && (
-            <span className="ml-auto rounded-full bg-white/20 px-2 py-0.5">D-{dday}</span>
+            <span className="ml-auto rounded-full bg-white/15 px-2 py-0.5 tabular-nums tracking-tight normal-case">D-{dday}</span>
           )}
         </div>
 
-        <div className="p-4">
-          <div className="flex gap-3">
-            <div className="h-20 w-20 shrink-0 overflow-hidden rounded-xl bg-white shadow-sm">
+        <div className="p-5">
+          <div className="flex gap-4">
+            <div className="h-20 w-20 shrink-0 overflow-hidden rounded-xl bg-gray-100 ring-1 ring-gray-100">
               {product.image_url ? (
                 <img src={product.image_url} alt="" className="h-full w-full object-cover" />
               ) : (
-                <div className="flex h-full items-center justify-center text-gray-300">
-                  <svg className="h-7 w-7" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                  </svg>
+                <div className="flex h-full items-center justify-center">
+                  <Package className="h-7 w-7 text-gray-300" strokeWidth={1.5} />
                 </div>
               )}
             </div>
             <div className="min-w-0 flex-1">
-              <p className="line-clamp-2 text-sm font-bold text-gray-900 leading-snug">{product.product_name}</p>
+              <p className="line-clamp-2 text-[14px] font-bold text-gray-900 leading-snug">{product.product_name}</p>
               {product.price > 0 && (
-                <p className="mt-1 text-lg font-extrabold text-blue-600">{formatPrice(product.price)}</p>
+                <p className="mt-1.5 text-[18px] font-black tabular-nums tracking-tight text-gray-900">{formatPrice(product.price)}</p>
               )}
               {startDate && (
-                <p className="mt-0.5 text-[11px] text-gray-500">
-                  📅 {startDate.getMonth() + 1}월 {startDate.getDate()}일 오픈 예정
+                <p className="mt-1 inline-flex items-center gap-1 text-[11px] font-medium text-gray-500">
+                  <CalendarIcon className="h-3 w-3" strokeWidth={2.4} />
+                  {startDate.getMonth() + 1}월 {startDate.getDate()}일 오픈 예정
                 </p>
               )}
             </div>
@@ -1096,16 +1155,17 @@ function CampaignTeaserBlock({ data, campaigns, creatorId }: {
 
           {/* 참여자 수 */}
           {notifyCount !== null && notifyCount > 0 && (
-            <p className="mt-3 text-xs text-gray-600">
-              👥 이미 <b className="text-blue-600">{notifyCount}명</b>이 알림을 신청했어요
+            <p className="mt-3 inline-flex items-center gap-1 text-[11px] text-gray-600">
+              <Users className="h-3 w-3 text-gray-500" strokeWidth={2.4} />
+              이미 <b className="text-gray-900 tabular-nums">{notifyCount}명</b>이 알림 신청
             </p>
           )}
 
           {/* 알림 신청 폼 */}
           {submitted ? (
-            <div className="mt-4 rounded-xl bg-green-50 p-3 text-center">
-              <p className="text-sm font-bold text-green-700">✅ 알림 신청 완료!</p>
-              <p className="mt-0.5 text-xs text-green-600">오픈 시 가장 먼저 알려드릴게요</p>
+            <div className="mt-4 inline-flex items-center gap-2 rounded-full bg-green-50 px-3 py-2 text-[12px] font-bold text-green-700">
+              <CheckCircle2 className="h-3.5 w-3.5" strokeWidth={2.6} />
+              알림 신청 완료 — 오픈 시 가장 먼저 알려드릴게요
             </div>
           ) : (
             <div className="mt-4">
@@ -1115,19 +1175,19 @@ function CampaignTeaserBlock({ data, campaigns, creatorId }: {
                   value={email}
                   onChange={(e) => { setEmail(e.target.value); setError(""); }}
                   placeholder="이메일 주소"
-                  className="flex-1 rounded-lg border border-gray-300 px-3 py-2.5 text-sm outline-none focus:border-blue-500"
+                  className="flex-1 rounded-xl border border-gray-200 bg-gray-50 px-3.5 py-2.5 text-sm outline-none focus:border-gray-900 focus:bg-white transition-colors"
                   onKeyDown={(e) => { if (e.key === "Enter") handleSubmit(); }}
                 />
                 <button
                   onClick={handleSubmit}
                   disabled={submitting}
-                  className="cursor-pointer rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-blue-700 disabled:opacity-50"
+                  className="cursor-pointer rounded-xl bg-gray-900 px-5 py-2.5 text-sm font-bold text-white hover:bg-gray-800 disabled:opacity-50 transition-colors"
                 >
                   {submitting ? "처리 중" : "알림 신청"}
                 </button>
               </div>
               {error && <p className="mt-1.5 text-[11px] text-red-500">{error}</p>}
-              <p className="mt-1.5 text-[10px] text-gray-400">
+              <p className="mt-2 text-[10px] text-gray-400">
                 오픈 시 이메일로 알려드려요. 언제든 구독 해제 가능
               </p>
             </div>
@@ -1300,13 +1360,9 @@ export default function ShopPage({ params }: { params: Promise<{ slug: string }>
         />
       ))}
 
-      <footer className="border-t border-black/10 py-6 text-center">
-        <p className="text-xs opacity-50">
-          Powered by{" "}
-          <span className="font-semibold">
-            <span style={{ color: theme.accent }}>Tube</span>
-            <span>Ping</span>
-          </span>
+      <footer className="mt-8 border-t border-black/[0.06] py-8 text-center">
+        <p className="text-[10px] font-medium tracking-[0.15em] uppercase opacity-30">
+          Built on TubePing
         </p>
       </footer>
     </div>

@@ -38,7 +38,7 @@ export default function SignupPage() {
         <div className="text-center mb-6">
           <a href="/" className="inline-block">
             <span className="text-3xl font-extrabold tracking-tight">
-              <span className="text-[#E63946]">Tube</span>
+              <span className="text-[#C41E1E]">Tube</span>
               <span className="text-gray-900">Ping</span>
             </span>
           </a>
@@ -47,8 +47,8 @@ export default function SignupPage() {
 
         {/* 단계 표시 */}
         <div className="flex items-center justify-center gap-2 mb-5">
-          <span className={`h-1.5 w-12 rounded-full ${step >= 1 ? "bg-[#E63946]" : "bg-gray-200"}`} />
-          <span className={`h-1.5 w-12 rounded-full ${step >= 2 ? "bg-[#E63946]" : "bg-gray-200"}`} />
+          <span className={`h-1.5 w-12 rounded-full ${step >= 1 ? "bg-[#C41E1E]" : "bg-gray-200"}`} />
+          <span className={`h-1.5 w-12 rounded-full ${step >= 2 ? "bg-[#C41E1E]" : "bg-gray-200"}`} />
         </div>
 
         <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
@@ -68,7 +68,7 @@ export default function SignupPage() {
 
         <p className="mt-5 text-center text-xs text-gray-500">
           이미 계정이 있으신가요?{" "}
-          <a href="/login" className="font-bold text-[#E63946] hover:underline">로그인</a>
+          <a href="/login" className="font-bold text-[#C41E1E] hover:underline">로그인</a>
         </p>
       </div>
     </div>
@@ -92,7 +92,7 @@ function Step1Agree({
       {/* 전체 동의 */}
       <label className="flex items-center gap-3 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 cursor-pointer hover:bg-gray-100">
         <input type="checkbox" checked={allChecked} onChange={toggleAll}
-          className="h-4 w-4 rounded border-gray-300 accent-[#E63946] cursor-pointer" />
+          className="h-4 w-4 rounded border-gray-300 accent-[#C41E1E] cursor-pointer" />
         <span className="text-sm font-bold text-gray-900">전체 동의</span>
         <span className="ml-auto text-[10px] text-gray-400">선택 항목 포함</span>
       </label>
@@ -130,7 +130,7 @@ function Step1Agree({
       <button
         onClick={onNext}
         disabled={!allRequired}
-        className="cursor-pointer mt-5 w-full rounded-xl bg-[#E63946] py-2.5 text-sm font-bold text-white hover:bg-[#c92e3a] disabled:opacity-40 disabled:cursor-default"
+        className="cursor-pointer mt-5 w-full rounded-xl bg-[#C41E1E] py-2.5 text-sm font-bold text-white hover:bg-[#c92e3a] disabled:opacity-40 disabled:cursor-default"
       >
         다음
       </button>
@@ -145,7 +145,7 @@ function AgreeRow({ checked, onChange, label, required, link }: {
   return (
     <label className="flex items-center gap-2.5 cursor-pointer">
       <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)}
-        className="h-4 w-4 rounded border-gray-300 accent-[#E63946] cursor-pointer" />
+        className="h-4 w-4 rounded border-gray-300 accent-[#C41E1E] cursor-pointer" />
       <span className="text-xs text-gray-700">
         <span className={required ? "font-bold text-gray-900" : "text-gray-500"}>
           {required ? "(필수)" : "(선택)"}
@@ -154,7 +154,7 @@ function AgreeRow({ checked, onChange, label, required, link }: {
       </span>
       {link && (
         <a href={link.href} target="_blank" rel="noopener noreferrer"
-          className="ml-auto text-[10px] text-gray-400 hover:text-[#E63946] hover:underline shrink-0">
+          className="ml-auto text-[10px] text-gray-400 hover:text-[#C41E1E] hover:underline shrink-0">
           {link.text}
         </a>
       )}
@@ -281,30 +281,30 @@ function Step2Auth({ marketing, router }: { marketing: boolean; router: ReturnTy
             <label className="mb-1 block text-xs font-bold text-gray-700">이름</label>
             <input type="text" required value={name} onChange={(e) => setName(e.target.value)}
               placeholder="홍길동"
-              className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm outline-none focus:border-[#E63946]" />
+              className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm outline-none focus:border-[#C41E1E]" />
           </div>
           <div>
             <label className="mb-1 block text-xs font-bold text-gray-700">이메일</label>
             <input type="email" required autoComplete="email"
               value={email} onChange={(e) => setEmail(e.target.value)}
               placeholder="creator@example.com"
-              className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm outline-none focus:border-[#E63946]" />
+              className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm outline-none focus:border-[#C41E1E]" />
           </div>
           <div>
             <label className="mb-1 block text-xs font-bold text-gray-700">비밀번호 <span className="text-gray-400 font-normal text-[10px]">8자 이상</span></label>
             <input type="password" required autoComplete="new-password" minLength={8}
               value={password} onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm outline-none focus:border-[#E63946]" />
+              className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm outline-none focus:border-[#C41E1E]" />
           </div>
           <div>
             <label className="mb-1 block text-xs font-bold text-gray-700">비밀번호 확인</label>
             <input type="password" required autoComplete="new-password"
               value={confirm} onChange={(e) => setConfirm(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm outline-none focus:border-[#E63946]" />
+              className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm outline-none focus:border-[#C41E1E]" />
           </div>
           {err && <p className="text-xs text-red-600">{err}</p>}
           <button type="submit" disabled={loading || !email || !password || !confirm || !name}
-            className="cursor-pointer w-full rounded-xl bg-[#E63946] py-2.5 text-sm font-bold text-white hover:bg-[#c92e3a] disabled:opacity-40">
+            className="cursor-pointer w-full rounded-xl bg-[#C41E1E] py-2.5 text-sm font-bold text-white hover:bg-[#c92e3a] disabled:opacity-40">
             {loading ? "가입 중…" : "가입하기"}
           </button>
         </form>

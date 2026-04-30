@@ -431,7 +431,7 @@ export default function ContentAnalytics() {
         <div>
           <h2 className="text-xl font-bold text-gray-900">공구 스크립트</h2>
           <p className="mt-1 text-sm text-gray-500">
-            카페24 상품을 선택하고 AI가 공구 스크립트를 생성해드려요
+            카페24 상품을 선택하면 공구 대본 초안을 만들어드려요
           </p>
         </div>
         <button
@@ -824,12 +824,12 @@ export default function ContentAnalytics() {
                     </div>
                   </div>
 
-                  {/* 초안 생성 버튼 */}
+                  {/* 초안 생성 박스 */}
                   {isEditing && (
-                    <div className="mb-4 rounded-xl border-2 border-dashed border-purple-200 bg-purple-50/30 p-4">
-                      <div className="mb-3 flex items-center justify-between">
-                        <p className="text-xs font-semibold text-purple-800">📝 대본 초안 생성</p>
-                        <span className="text-[10px] text-purple-500">체험 포인트 + 가격 → 즉시 초안 생성</span>
+                    <div className="mb-4 rounded-2xl border border-gray-200 bg-white p-5">
+                      <div className="mb-4 flex items-center justify-between">
+                        <p className="text-sm font-bold text-gray-900">대본 초안 만들기</p>
+                        <span className="text-[11px] font-medium text-gray-400">체험 + 가격 입력 → 초안 자동 작성</span>
                       </div>
 
                       <div className="space-y-3">
@@ -842,7 +842,7 @@ export default function ContentAnalytics() {
                             onChange={e => handleSectionEdit(script.id, "experience", e.target.value)}
                             placeholder="예: 3개월 써봤는데 피부 속당김이 확실히 줄었어요. 특히 아침에 붓기가 덜해요. 기존에 쓰던 A 제품보다 발림성이 가볍고..."
                             rows={3}
-                            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-purple-400 focus:outline-none focus:ring-1 focus:ring-purple-400 resize-y"
+                            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-[#C41E1E] focus:outline-none focus:ring-1 focus:ring-[#C41E1E] resize-y"
                           />
                         </div>
 
@@ -854,7 +854,7 @@ export default function ContentAnalytics() {
                               value={script.target}
                               onChange={e => handleSectionEdit(script.id, "target", e.target.value)}
                               placeholder="예: 30대 워킹맘"
-                              className="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:border-purple-400 focus:outline-none"
+                              className="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:border-[#C41E1E] focus:outline-none"
                             />
                           </div>
                           <div>
@@ -862,7 +862,7 @@ export default function ContentAnalytics() {
                             <select
                               value={script.tone}
                               onChange={e => handleSectionEdit(script.id, "tone", e.target.value)}
-                              className="w-full cursor-pointer rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:border-purple-400 focus:outline-none"
+                              className="w-full cursor-pointer rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:border-[#C41E1E] focus:outline-none"
                             >
                               <option value="친근">친근</option>
                               <option value="전문">전문</option>
@@ -875,15 +875,15 @@ export default function ContentAnalytics() {
                         <button
                           onClick={() => handleGenerateAI(script)}
                           disabled={isGenerating}
-                          className="w-full cursor-pointer rounded-lg bg-gradient-to-r from-purple-600 to-[#C41E1E] px-4 py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
+                          className="w-full cursor-pointer rounded-xl bg-[#111111] px-4 py-3 text-sm font-bold text-white hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                         >
                           {isGenerating ? (
                             <span className="flex items-center justify-center gap-2">
                               <span className="h-3 w-3 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-                              생성 중...
+                              만드는 중
                             </span>
                           ) : (
-                            `📝 ${FORMAT_META[script.format].label} 초안 생성`
+                            `${FORMAT_META[script.format].label} 초안 만들기`
                           )}
                         </button>
 
@@ -995,13 +995,25 @@ export default function ContentAnalytics() {
       </div>
 
       {/* ── 하단 팁 ── */}
-      <div className="mt-6 rounded-xl bg-gray-50 border border-gray-200 p-4">
-        <p className="text-xs font-semibold text-gray-700 mb-2">대본 초안 생성 팁</p>
-        <ul className="space-y-1.5 text-[11px] text-gray-500">
-          <li className="flex gap-2"><span className="text-[#C41E1E]">1.</span> <b>체험 포인트</b>는 문장 단위로 쪼개서 — 마침표·쉼표로 구분되어 장점 bullet이 돼요</li>
-          <li className="flex gap-2"><span className="text-[#C41E1E]">2.</span> <b>"3개월 써봤는데"</b> 같이 기간을 포함하면 대본에 자동 반영됩니다</li>
-          <li className="flex gap-2"><span className="text-[#C41E1E]">3.</span> <b>공구가·기간</b>을 먼저 채우면 가격·할인율·마감일이 정확히 들어가요</li>
-          <li className="flex gap-2"><span className="text-[#C41E1E]">4.</span> 생성된 초안은 뼈대일 뿐 — 본인 말투·시그니처로 다듬는 걸 꼭 해주세요</li>
+      <div className="mt-8 rounded-2xl border border-gray-200 bg-white p-5">
+        <p className="text-sm font-bold text-gray-900 mb-3">초안 잘 뽑는 팁</p>
+        <ul className="space-y-2 text-[13px] leading-relaxed text-gray-600">
+          <li className="flex gap-3">
+            <span className="font-bold text-[#C41E1E] tabular-nums">01</span>
+            <span><b className="font-semibold text-gray-900">체험 포인트</b>는 문장 단위로. 마침표·쉼표로 끊어 쓰면 그대로 장점 bullet이 됩니다.</span>
+          </li>
+          <li className="flex gap-3">
+            <span className="font-bold text-[#C41E1E] tabular-nums">02</span>
+            <span><b className="font-semibold text-gray-900">&ldquo;3개월 써봤는데&rdquo;</b> 같이 기간을 적으면 대본에 자동 반영됩니다.</span>
+          </li>
+          <li className="flex gap-3">
+            <span className="font-bold text-[#C41E1E] tabular-nums">03</span>
+            <span><b className="font-semibold text-gray-900">공구가·기간</b>을 먼저 채우면 가격·할인율·마감일이 정확하게 들어가요.</span>
+          </li>
+          <li className="flex gap-3">
+            <span className="font-bold text-[#C41E1E] tabular-nums">04</span>
+            <span>초안은 뼈대일 뿐. 본인 말투·시그니처로 다듬는 게 핵심.</span>
+          </li>
         </ul>
       </div>
     </div>

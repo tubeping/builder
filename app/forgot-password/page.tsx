@@ -36,7 +36,7 @@ export default function ForgotPasswordPage() {
         <div className="text-center mb-8">
           <a href="/" className="inline-block">
             <span className="text-3xl font-extrabold tracking-tight">
-              <span className="text-[#E63946]">Tube</span>
+              <span className="text-[#C41E1E]">Tube</span>
               <span className="text-gray-900">Ping</span>
             </span>
           </a>
@@ -51,7 +51,7 @@ export default function ForgotPasswordPage() {
                 <b>{email}</b>로 비밀번호 재설정 링크를 보냈습니다.<br />
                 메일이 보이지 않으면 스팸함도 확인해주세요.
               </p>
-              <a href="/login" className="cursor-pointer mt-5 inline-block text-xs text-[#E63946] hover:underline">
+              <a href="/login" className="cursor-pointer mt-5 inline-block text-xs text-[#C41E1E] hover:underline">
                 로그인 페이지로 돌아가기
               </a>
             </div>
@@ -62,10 +62,10 @@ export default function ForgotPasswordPage() {
               <form onSubmit={handleSubmit} className="space-y-3">
                 <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)}
                   placeholder="creator@example.com"
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm outline-none focus:border-[#E63946]" />
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm outline-none focus:border-[#C41E1E]" />
                 {err && <p className="text-xs text-red-600">{err}</p>}
                 <button type="submit" disabled={loading || !email.trim()}
-                  className="cursor-pointer w-full rounded-xl bg-[#E63946] py-2.5 text-sm font-bold text-white hover:bg-[#c92e3a] disabled:opacity-40">
+                  className="cursor-pointer w-full rounded-xl bg-[#C41E1E] py-2.5 text-sm font-bold text-white hover:bg-[#c92e3a] disabled:opacity-40">
                   {loading ? "발송 중…" : "재설정 링크 보내기"}
                 </button>
               </form>

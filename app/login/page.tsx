@@ -62,7 +62,7 @@ export default function LoginPage() {
         <div className="text-center mb-8">
           <a href="/" className="inline-block">
             <span className="text-3xl font-extrabold tracking-tight">
-              <span className="text-[#E63946]">Tube</span>
+              <span className="text-[#C41E1E]">Tube</span>
               <span className="text-gray-900">Ping</span>
             </span>
           </a>
@@ -94,25 +94,25 @@ export default function LoginPage() {
                 type="email" required autoComplete="email"
                 value={email} onChange={(e) => setEmail(e.target.value)}
                 placeholder="creator@example.com"
-                className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm outline-none focus:border-[#E63946]"
+                className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm outline-none focus:border-[#C41E1E]"
               />
             </div>
             <div>
               <div className="flex items-baseline justify-between mb-1">
                 <label className="text-xs font-bold text-gray-700">비밀번호</label>
-                <a href="/forgot-password" className="text-[10px] text-[#E63946] hover:underline">잊으셨나요?</a>
+                <a href="/forgot-password" className="text-[10px] text-[#C41E1E] hover:underline">잊으셨나요?</a>
               </div>
               <input
                 type="password" required autoComplete="current-password"
                 value={password} onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
-                className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm outline-none focus:border-[#E63946]"
+                className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm outline-none focus:border-[#C41E1E]"
               />
             </div>
             {err && <p className="text-xs text-red-600">{err}</p>}
             <button
               type="submit" disabled={loading || !email.trim() || !password}
-              className="cursor-pointer w-full rounded-xl bg-[#E63946] py-2.5 text-sm font-bold text-white hover:bg-[#c92e3a] disabled:opacity-50"
+              className="cursor-pointer w-full rounded-xl bg-[#C41E1E] py-2.5 text-sm font-bold text-white hover:bg-[#c92e3a] disabled:opacity-50"
             >
               {loading ? "로그인 중…" : "로그인"}
             </button>
@@ -121,7 +121,7 @@ export default function LoginPage() {
 
         <p className="mt-5 text-center text-xs text-gray-500">
           아직 계정이 없으신가요?{" "}
-          <a href="/signup" className="font-bold text-[#E63946] hover:underline">회원가입</a>
+          <a href="/signup" className="font-bold text-[#C41E1E] hover:underline">회원가입</a>
         </p>
 
         <div className="mt-8 text-center text-[10px] text-gray-400 space-x-3">

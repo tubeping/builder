@@ -53,6 +53,47 @@ function endOrSoon(end?: string): string {
   return end ? `${end}까지` : "마감 임박";
 }
 
+// 한국어 조사 자동 선택 — 받침 유무 판별
+function hasFinalConsonant(word: string): boolean {
+  const last = word.trim().slice(-1);
+  if (!last) return false;
+  const code = last.charCodeAt(0);
+  // 한글 음절: 가(0xAC00) ~ 힣(0xD7A3), 받침 있으면 (code - 0xAC00) % 28 !== 0
+  if (code >= 0xac00 && code <= 0xd7a3) {
+    return (code - 0xac00) % 28 !== 0;
+  }
+  // 숫자: 1·3·6·7·8·0은 받침 있음으로 처리 (발음상)
+  if (/[0-9]/.test(last)) {
+    return "136780".includes(last);
+  }
+  // 영어: 자음으로 끝나면 받침 있음 처리
+  if (/[a-zA-Z]/.test(last)) {
+    return !/[aeiouAEIOU]/.test(last);
+  }
+  return false;
+}
+
+function josa(word: string, withFinal: string, withoutFinal: string): string {
+  return hasFinalConsonant(word) ? withFinal : withoutFinal;
+}
+
+// 을/를, 이/가, 은/는
+function objectJosa(word: string): string {
+  return josa(word, "을", "를");
+}
+
+// target 기본값 — "여러분" 같은 이미 '들' 포함된 말은 "분들" 안 붙임
+function targetPhrase(target: string | undefined, defaultPhrase = "이 영상 보시는 분"): {
+  bare: string;
+  withBun: string;
+} {
+  const t = (target || "").trim();
+  if (!t) {
+    return { bare: defaultPhrase, withBun: `${defaultPhrase}들` };
+  }
+  return { bare: t, withBun: `${t} 분들` };
+}
+
 // 짧은 상품명 (해시태그용): 앞 공백 단어 또는 10자 이내
 function shortProductName(name: string): string {
   const first = name.trim().split(/\s+/)[0];
@@ -66,33 +107,37 @@ function generateLongform(
   context: GenerationContext
 ): LongformOutput {
   const tone = context.tone || "친근";
-  const target = context.target?.trim() || "여러분";
-  const period = extractPeriod(context.experience) || "직접";
+  const tgt = targetPhrase(context.target);
+  const period = extractPeriod(context.experience);
+  const periodPhrase = period || "한동안"; // 기간 없을 때 자연스러운 대체어
+  const usedVerb = period ? "써봤어요" : "직접 써봤어요"; // "직접 직접" 중복 방지
   const bullets = splitToBullets(context.experience, 3);
   const discount = discountRate(product.originalPrice, product.gongguPrice);
   const save = saveAmount(product.originalPrice, product.gongguPrice);
+  const pn = product.productName;
+  const pnObj = `${pn}${objectJosa(pn)}`; // "~을" 또는 "~를"
 
   // Hook — 톤별 패턴
   let hook = "";
   if (tone === "전문") {
-    hook = `${product.productName} 관련해서 제대로 찾아보고 계신 ${target}, 잠깐 이 영상 봐주세요.\n저도 같은 고민이었거든요. 그래서 ${period} 직접 써봤습니다.`;
+    hook = `${pn} 관련해서 제대로 찾아보고 계신 ${tgt.withBun}, 잠깐 이 영상 봐주세요.\n저도 같은 고민이었거든요. 그래서 ${periodPhrase} 직접 써봤습니다.`;
   } else if (tone === "유머") {
-    hook = `${product.productName}, 진짜 ${period} 써봤어요.\n후기 먼저 말씀드리면 — 생각보다 훨씬 괜찮아서 놀랐어요.`;
+    hook = `${pn}, 진짜 ${periodPhrase} 써봤어요.\n후기 먼저 말씀드리면 — 생각보다 훨씬 괜찮아서 놀랐어요.`;
   } else if (tone === "공감") {
-    hook = `혹시 ${target}이세요?\n저랑 똑같은 고민 있으신 분들을 위해 ${product.productName} ${period} 써본 후기 가져왔어요.`;
+    hook = `혹시 ${tgt.bare}이세요?\n저랑 똑같은 고민 있으신 분들을 위해 ${pn} ${periodPhrase} 써본 후기 가져왔어요.`;
   } else {
-    hook = `안녕하세요!\n오늘은 ${period} 직접 써본 ${product.productName}, 솔직 후기 가져왔어요.\n${target} 분들께 특히 도움 될 거예요.`;
+    hook = `안녕하세요!\n오늘은 ${periodPhrase} 직접 써본 ${pn}, 솔직 후기 가져왔어요.\n${tgt.withBun}께 특히 도움 될 거예요.`;
   }
 
   // Intro
   const firstLine = context.experience.split(/[.。\n]/)[0]?.trim() || "";
   const intro = [
-    `${target} 분들, 혹시 이런 고민 있으시죠?`,
+    `${tgt.withBun}, 혹시 이런 고민 있으시죠?`,
     firstLine
       ? `${firstLine}${firstLine.endsWith(".") ? "" : "."} 저도 똑같았어요.`
       : "저도 이런저런 고민이 많았거든요.",
     ``,
-    `그러다 ${product.productName}을(를) 알게 됐고, ${period} 직접 써봤어요.`,
+    `그러다 ${pnObj} 알게 됐고, ${periodPhrase} ${usedVerb}.`,
     `오늘은 그 경험을 있는 그대로 공유드리려고 해요.`,
   ].join("\n");
 
@@ -103,12 +148,12 @@ function generateLongform(
       : `✅ (체험 포인트를 더 구체적으로 입력하시면 여기에 장점 3가지로 정리됩니다)`;
 
   const benefits = [
-    `제가 ${period} 써보면서 느낀 포인트 정리해드릴게요.`,
+    `제가 ${periodPhrase} 써보면서 느낀 포인트 정리해드릴게요.`,
     ``,
     bulletBlock,
     ``,
     `다른 제품들과 다르게 이 부분이 확실히 체감됐어요.`,
-    `특히 ${target} 분들이라면 더 크게 느끼실 거예요.`,
+    `특히 ${tgt.withBun}이라면 더 크게 느끼실 거예요.`,
   ].join("\n");
 
   // Deal info
@@ -147,20 +192,20 @@ function generateShorts(
   context: GenerationContext
 ): ShortsOutput {
   const tone = context.tone || "친근";
-  const period = extractPeriod(context.experience) || "직접";
+  const period = extractPeriod(context.experience);
   const discount = discountRate(product.originalPrice, product.gongguPrice);
   const firstBullet = splitToBullets(context.experience, 1)[0] || "";
 
   // Hook — 7단어 이하
   let hook = "";
   if (tone === "전문") {
-    hook = `${period} 써본 결과.`;
+    hook = period ? `${period} 써본 결과.` : `직접 써본 결과.`;
   } else if (tone === "유머") {
     hook = `이거 몰랐으면 후회할 뻔.`;
   } else if (tone === "공감") {
     hook = `이 고민, 저도 했거든요.`;
   } else {
-    hook = `${period} 써보고 놀란 이유.`;
+    hook = period ? `${period} 써보고 놀란 이유.` : `써보고 놀란 이유.`;
   }
 
   // Core
@@ -192,7 +237,7 @@ function generatePost(
   context: GenerationContext
 ): PostOutput {
   const target = context.target?.trim() || "";
-  const period = extractPeriod(context.experience) || "";
+  const period = extractPeriod(context.experience);
   const discount = discountRate(product.originalPrice, product.gongguPrice);
   const save = saveAmount(product.originalPrice, product.gongguPrice);
   const bullets = splitToBullets(context.experience, 3);

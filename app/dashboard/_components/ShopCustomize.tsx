@@ -19,6 +19,22 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import {
+  User,
+  Type,
+  Image as ImageIcon,
+  Radio,
+  Bell,
+  Megaphone,
+  Calendar,
+  Link2,
+  Package,
+  Play,
+  Minus,
+  Images,
+  X as XIcon,
+  type LucideIcon,
+} from "lucide-react";
+import {
   type ShopTheme, type ThemePreset, type BlockShape, type BlockShadow, type BlockAlign, type FontKey,
   DEFAULT_THEME, PRESETS, BG_COLORS, FONTS, normalizeTheme, themeToCssVars,
 } from "@/lib/shop-theme";
@@ -32,19 +48,19 @@ interface ShopBlock {
 
 interface LinkItem { id: string; label: string; url: string; icon: string; }
 
-const BLOCK_TYPES: { type: ShopBlock["type"]; label: string; icon: string; desc: string }[] = [
-  { type: "hero", label: "프로필", icon: "👤", desc: "커버·프로필·소개" },
-  { type: "text", label: "텍스트", icon: "📝", desc: "자유 텍스트" },
-  { type: "image", label: "이미지", icon: "🖼️", desc: "이미지 + 캡션" },
-  { type: "campaign_live", label: "공구 라이브", icon: "🔴", desc: "진행률+카운트다운" },
-  { type: "campaign_teaser", label: "공구 티저", icon: "🔔", desc: "오픈 전 알림 신청" },
-  { type: "banner", label: "배너", icon: "🔥", desc: "공구/이벤트" },
-  { type: "calendar", label: "공구 캘린더", icon: "📅", desc: "월별 공구 일정" },
-  { type: "links", label: "링크", icon: "🔗", desc: "SNS·외부 링크" },
-  { type: "picks", label: "상품", icon: "📦", desc: "내 PICK" },
-  { type: "video", label: "영상", icon: "▶️", desc: "유튜브" },
-  { type: "divider", label: "구분선", icon: "━", desc: "섹션 구분" },
-  { type: "gallery", label: "갤러리", icon: "🎨", desc: "이미지 그리드" },
+const BLOCK_TYPES: { type: ShopBlock["type"]; label: string; icon: LucideIcon; desc: string }[] = [
+  { type: "hero", label: "프로필", icon: User, desc: "커버·프로필·소개" },
+  { type: "text", label: "텍스트", icon: Type, desc: "자유 텍스트" },
+  { type: "image", label: "이미지", icon: ImageIcon, desc: "이미지 + 캡션" },
+  { type: "campaign_live", label: "공구 라이브", icon: Radio, desc: "진행률+카운트다운" },
+  { type: "campaign_teaser", label: "공구 티저", icon: Bell, desc: "오픈 전 알림 신청" },
+  { type: "banner", label: "배너", icon: Megaphone, desc: "공구/이벤트" },
+  { type: "calendar", label: "공구 캘린더", icon: Calendar, desc: "월별 공구 일정" },
+  { type: "links", label: "링크", icon: Link2, desc: "SNS·외부 링크" },
+  { type: "picks", label: "상품", icon: Package, desc: "내 PICK" },
+  { type: "video", label: "영상", icon: Play, desc: "유튜브" },
+  { type: "divider", label: "구분선", icon: Minus, desc: "섹션 구분" },
+  { type: "gallery", label: "갤러리", icon: Images, desc: "이미지 그리드" },
 ];
 
 const DEFAULT_BLOCKS: ShopBlock[] = [
@@ -63,15 +79,16 @@ function SortableBlock({ block, isSelected, onSelect, onDelete, compact }: {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: block.id });
   const style = { transform: CSS.Transform.toString(transform), transition, zIndex: isDragging ? 50 : undefined, opacity: isDragging ? 0.5 : 1 };
   const meta = BLOCK_TYPES.find(t => t.type === block.type);
+  const Icon = meta?.icon;
 
   if (compact) {
     return (
       <div ref={setNodeRef} style={style} onClick={onSelect} {...attributes} {...listeners}
         title={meta?.label}
         className={`relative flex h-10 w-10 items-center justify-center rounded-lg border transition-all cursor-pointer active:cursor-grabbing ${
-          isSelected ? "border-[#C41E1E] bg-[#FFF5F5] shadow-sm" : "border-gray-200 bg-white hover:border-gray-300"
+          isSelected ? "border-[#C41E1E] bg-[#FFF0F0] shadow-sm" : "border-gray-200 bg-white hover:border-gray-300"
         }`}>
-        <span className="text-base">{meta?.icon}</span>
+        {Icon && <Icon className={`h-[18px] w-[18px] ${isSelected ? "text-[#C41E1E]" : "text-gray-500"}`} strokeWidth={isSelected ? 2.4 : 2} />}
         {isSelected && (
           <span className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-[#C41E1E]" />
         )}
@@ -81,8 +98,8 @@ function SortableBlock({ block, isSelected, onSelect, onDelete, compact }: {
 
   return (
     <div ref={setNodeRef} style={style} onClick={onSelect}
-      className={`group flex items-center gap-2 rounded-xl border px-3 py-2.5 transition-all cursor-pointer ${
-        isSelected ? "border-[#C41E1E] bg-[#FFF5F5] shadow-sm" : "border-gray-200 bg-white hover:border-gray-300 hover:shadow-sm"
+      className={`group flex items-center gap-2.5 rounded-xl border px-3 py-2.5 transition-all cursor-pointer ${
+        isSelected ? "border-[#C41E1E] bg-[#FFF0F0] shadow-sm" : "border-gray-200 bg-white hover:border-gray-300 hover:shadow-sm"
       }`}>
       <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing text-gray-300 hover:text-gray-500 shrink-0">
         <svg className="h-4 w-4" viewBox="0 0 16 16" fill="currentColor">
@@ -91,11 +108,11 @@ function SortableBlock({ block, isSelected, onSelect, onDelete, compact }: {
           <circle cx="5" cy="13" r="1.5" /><circle cx="11" cy="13" r="1.5" />
         </svg>
       </div>
-      <span className="text-base shrink-0">{meta?.icon}</span>
-      <span className="flex-1 text-sm font-medium text-gray-800">{meta?.label}</span>
+      {Icon && <Icon className={`h-[18px] w-[18px] shrink-0 ${isSelected ? "text-[#C41E1E]" : "text-gray-500"}`} strokeWidth={isSelected ? 2.4 : 2} />}
+      <span className={`flex-1 text-[13.5px] ${isSelected ? "font-bold text-[#C41E1E]" : "font-semibold text-gray-800"}`}>{meta?.label}</span>
       <button onClick={e => { e.stopPropagation(); onDelete(); }}
-        className="cursor-pointer opacity-0 group-hover:opacity-100 rounded-md p-1 text-gray-300 hover:text-[#C41E1E] hover:bg-red-50 transition-all">
-        <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+        className="cursor-pointer opacity-0 group-hover:opacity-100 rounded-md p-1 text-gray-300 hover:text-[#C41E1E] hover:bg-[#FFF0F0] transition-all">
+        <XIcon className="h-3.5 w-3.5" strokeWidth={2.4} />
       </button>
     </div>
   );
@@ -105,14 +122,20 @@ function SortableBlock({ block, isSelected, onSelect, onDelete, compact }: {
 function BlockEditor({ block, onChange }: { block: ShopBlock; onChange: (data: Record<string, unknown>) => void }) {
   const d = block.data;
   const meta = BLOCK_TYPES.find(t => t.type === block.type);
+  const Icon = meta?.icon;
   const ic = "w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm outline-none focus:border-[#C41E1E] focus:bg-white focus:ring-1 focus:ring-[#C41E1E]/20 transition-all";
-  const lc = "mb-1.5 block text-xs font-semibold text-gray-600 uppercase tracking-wider";
+  const lc = "mb-1.5 block text-[11px] font-bold text-gray-600";
 
   return (
     <div>
-      <div className="flex items-center gap-2 mb-4 pb-3 border-b border-gray-100">
-        <span className="text-xl">{meta?.icon}</span>
-        <div><h4 className="text-sm font-bold text-gray-900">{meta?.label} 설정</h4><p className="text-[10px] text-gray-400">{meta?.desc}</p></div>
+      <div className="flex items-center gap-2.5 mb-4 pb-3 border-b border-gray-100">
+        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#FFF0F0]">
+          {Icon && <Icon className="h-[18px] w-[18px] text-[#C41E1E]" strokeWidth={2.4} />}
+        </div>
+        <div>
+          <h4 className="text-[14px] font-bold text-gray-900 tracking-tight">{meta?.label} 설정</h4>
+          <p className="text-[11px] text-gray-400">{meta?.desc}</p>
+        </div>
       </div>
       <div className="space-y-4">
         {block.type === "hero" && (<>
@@ -184,8 +207,8 @@ function BlockEditor({ block, onChange }: { block: ShopBlock; onChange: (data: R
                     </div>
                     <button type="button"
                       onClick={() => onChange({ ...d, images: imgs.filter((_, j) => j !== i) })}
-                      className="absolute top-1 right-1 h-5 w-5 rounded-full bg-black/60 text-white text-[10px] cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity">
-                      ✕
+                      className="absolute top-1 right-1 flex h-5 w-5 items-center justify-center rounded-full bg-black/60 text-white cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity">
+                      <XIcon className="h-3 w-3" strokeWidth={2.6} />
                     </button>
                   </div>
                 ))}
@@ -809,11 +832,11 @@ export default function ShopCustomize() {
           {sideTab === "blocks" && (
             <button onClick={() => setShowPalette(!showPalette)}
               title="블록 추가"
-              className={`cursor-pointer flex items-center justify-center rounded-lg md:w-full h-10 md:h-auto w-10 md:px-3 md:py-2 text-xs font-bold transition-all ${
+              className={`cursor-pointer flex items-center justify-center gap-1.5 rounded-lg md:w-full h-10 md:h-auto w-10 md:px-3 md:py-2 text-xs font-bold transition-all ${
                 showPalette ? "bg-gray-900 text-white" : "bg-[#C41E1E] text-white hover:bg-[#A01818] shadow-sm"
               }`}>
-              <span className="md:hidden text-lg">{showPalette ? "✕" : "+"}</span>
-              <span className="hidden md:inline">{showPalette ? "✕ 닫기" : "+ 블록 추가"}</span>
+              {showPalette ? <XIcon className="h-4 w-4" strokeWidth={2.6} /> : <span className="text-base leading-none">+</span>}
+              <span className="hidden md:inline">{showPalette ? "닫기" : "블록 추가"}</span>
             </button>
           )}
         </div>
@@ -826,28 +849,36 @@ export default function ShopCustomize() {
               <div className="absolute inset-x-0 bottom-0 rounded-t-2xl bg-white p-5 shadow-2xl" onClick={e => e.stopPropagation()}>
                 <div className="mb-3 flex items-center justify-between">
                   <h4 className="text-sm font-bold text-gray-900">블록 추가</h4>
-                  <button onClick={() => setShowPalette(false)} className="cursor-pointer text-gray-400 hover:text-gray-600 text-lg">✕</button>
+                  <button onClick={() => setShowPalette(false)} className="cursor-pointer text-gray-400 hover:text-gray-600">
+                    <XIcon className="h-4 w-4" strokeWidth={2.4} />
+                  </button>
                 </div>
                 <div className="grid grid-cols-3 gap-2">
-                  {BLOCK_TYPES.map(bt => (
-                    <button key={bt.type} onClick={() => addBlock(bt.type)} className="cursor-pointer flex flex-col items-center gap-1.5 rounded-xl border border-gray-100 bg-white p-3 hover:border-[#C41E1E] hover:shadow-md transition-all group">
-                      <span className="text-xl">{bt.icon}</span>
-                      <span className="text-[10px] font-bold text-gray-600">{bt.label}</span>
-                    </button>
-                  ))}
+                  {BLOCK_TYPES.map(bt => {
+                    const BtIcon = bt.icon;
+                    return (
+                      <button key={bt.type} onClick={() => addBlock(bt.type)} className="cursor-pointer flex flex-col items-center gap-1.5 rounded-xl border border-gray-100 bg-white p-3 hover:border-[#C41E1E] hover:shadow-md transition-all group">
+                        <BtIcon className="h-5 w-5 text-gray-700 group-hover:text-[#C41E1E]" strokeWidth={2} />
+                        <span className="text-[10px] font-bold text-gray-600 group-hover:text-[#C41E1E]">{bt.label}</span>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             </div>
 
             {/* PC: 인라인 팔레트 */}
-            <div className="hidden md:block p-4 border-b border-gray-100 bg-gradient-to-b from-gray-50 to-white">
+            <div className="hidden md:block p-4 border-b border-gray-100 bg-gray-50/60">
               <div className="grid grid-cols-3 gap-2">
-                {BLOCK_TYPES.map(bt => (
-                  <button key={bt.type} onClick={() => addBlock(bt.type)} className="cursor-pointer flex flex-col items-center gap-1.5 rounded-xl border border-gray-100 bg-white p-2.5 hover:border-[#C41E1E] hover:shadow-md transition-all group">
-                    <span className="text-lg group-hover:scale-110 transition-transform">{bt.icon}</span>
-                    <span className="text-[10px] font-bold text-gray-600 group-hover:text-[#C41E1E]">{bt.label}</span>
-                  </button>
-                ))}
+                {BLOCK_TYPES.map(bt => {
+                  const BtIcon = bt.icon;
+                  return (
+                    <button key={bt.type} onClick={() => addBlock(bt.type)} className="cursor-pointer flex flex-col items-center gap-1.5 rounded-xl border border-gray-100 bg-white p-2.5 hover:border-[#C41E1E] hover:shadow-md transition-all group">
+                      <BtIcon className="h-[18px] w-[18px] text-gray-700 group-hover:text-[#C41E1E] group-hover:scale-110 transition-all" strokeWidth={2} />
+                      <span className="text-[10px] font-bold text-gray-600 group-hover:text-[#C41E1E]">{bt.label}</span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
           </>
@@ -937,19 +968,21 @@ export default function ShopCustomize() {
               </div>
             ))}
             {blocks.length === 0 && <div className="flex items-center justify-center h-full opacity-40 text-xs">블록을 추가하세요</div>}
-            <div className="py-4 text-center"><p className="text-[7px] opacity-50">Powered by <span className="font-bold"><span style={{ color: theme.accent }}>Tube</span><span>Ping</span></span></p></div>
           </div>
           <div className="flex justify-center bg-gray-900 py-2"><div className="h-[4px] w-[80px] rounded-full bg-gray-600" /></div>
         </div>
       </div>
 
       {/* ─────────── Mobile 바텀시트: 편집 패널 ─────────── */}
-      {selectedBlock && (
+      {selectedBlock && (() => {
+        const SelectedMeta = BLOCK_TYPES.find(t => t.type === selectedBlock.type);
+        const SelectedIcon = SelectedMeta?.icon;
+        return (
         <div className="md:hidden fixed inset-x-0 bottom-0 z-40 bg-white border-t border-gray-200 rounded-t-2xl shadow-2xl max-h-[65vh] flex flex-col">
           <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-100">
             <div className="flex items-center gap-2">
-              <span className="text-lg">{BLOCK_TYPES.find(t => t.type === selectedBlock.type)?.icon}</span>
-              <span className="text-sm font-bold text-gray-900">{BLOCK_TYPES.find(t => t.type === selectedBlock.type)?.label} 설정</span>
+              {SelectedIcon && <SelectedIcon className="h-4 w-4 text-[#C41E1E]" strokeWidth={2.4} />}
+              <span className="text-sm font-bold text-gray-900">{SelectedMeta?.label} 설정</span>
             </div>
             <div className="flex items-center gap-1.5">
               <button onClick={() => { setBlocks(prev => prev.filter(b => b.id !== selectedBlock.id)); setSelectedId(null); }}
@@ -965,7 +998,8 @@ export default function ShopCustomize() {
             <BlockEditor block={selectedBlock} onChange={data => setBlocks(prev => prev.map(b => b.id === selectedBlock.id ? { ...b, data } : b))} />
           </div>
         </div>
-      )}
+        );
+      })()}
     </div>
   );
 }

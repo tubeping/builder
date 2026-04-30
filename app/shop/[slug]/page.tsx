@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { Share2, Package, Calendar as CalendarIcon, Megaphone } from "lucide-react";
 import { themeToCssVars, normalizeTheme } from "@/lib/shop-theme";
 
 // ─── 타입 ───
@@ -176,53 +177,80 @@ function HeroBlock({ data, creator, shop }: { data: Record<string, unknown>; cre
     });
   };
 
+  const initial = name?.trim()?.[0] || "?";
+
   return (
     <>
       <div className="relative">
         {coverUrl ? (
-          <img src={coverUrl} alt="" className="h-36 sm:h-48 w-full object-cover" />
+          <img src={coverUrl} alt="" className="h-44 sm:h-56 w-full object-cover" />
         ) : (
+          // fallback: brand 단색 + 채널명을 시각의 주인공으로 (그라데이션 X)
           <div
-            className="flex h-36 sm:h-48 w-full items-center justify-center"
-            style={{ background: "linear-gradient(to right, var(--accent), color-mix(in srgb, var(--accent) 35%, #111))" }}
+            className="relative h-44 sm:h-56 w-full overflow-hidden"
+            style={{ background: "var(--accent)" }}
           >
-            <span className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white/90">{name}</span>
+            {/* 부드러운 라이트 패턴 — AI 디폴트 그라데이션 회피 */}
+            <div
+              className="absolute inset-0 opacity-[0.12]"
+              style={{
+                backgroundImage:
+                  "radial-gradient(circle at 18% 25%, white 0, transparent 38%), radial-gradient(circle at 82% 78%, white 0, transparent 42%)",
+              }}
+            />
+            <div className="relative flex h-full items-end px-6 pb-12 sm:px-8 sm:pb-14">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-white/70">
+                  Creator
+                </p>
+                <h2 className="mt-1.5 text-3xl sm:text-4xl font-black tracking-tight text-white">
+                  {name}
+                </h2>
+              </div>
+            </div>
           </div>
         )}
-        <header className="absolute top-0 left-0 right-0 z-10">
-          <div className="mx-auto flex max-w-2xl items-center justify-between px-4 py-3">
-            <span className="text-lg font-extrabold tracking-tight drop-shadow-sm">
-              <span className="text-white">Tube</span><span className="text-white/70">Ping</span>
-            </span>
-          </div>
-        </header>
       </div>
-      <div className="mx-auto max-w-2xl px-3 sm:px-4">
-        <div className="relative -mt-8 sm:-mt-10 flex items-end gap-3 sm:gap-4">
-          <div className="flex h-16 w-16 sm:h-20 sm:w-20 shrink-0 items-center justify-center rounded-full border-4 border-white bg-gray-200 shadow-sm">
+
+      <div className="mx-auto max-w-2xl px-4 sm:px-5">
+        <div className="relative -mt-10 sm:-mt-12 flex items-end gap-4">
+          <div
+            className="relative flex h-20 w-20 sm:h-24 sm:w-24 shrink-0 items-center justify-center overflow-hidden rounded-full border-[3px] border-white shadow-md"
+            style={{ background: profileUrl ? "#F3F4F6" : "var(--accent)" }}
+          >
             {profileUrl ? (
-              <img src={profileUrl} alt={name} className="h-full w-full rounded-full object-cover" />
+              <img src={profileUrl} alt={name} className="h-full w-full object-cover" />
             ) : (
-              <svg className="h-8 w-8 sm:h-10 sm:w-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-              </svg>
+              <span className="text-2xl sm:text-3xl font-black tracking-tight text-white">
+                {initial}
+              </span>
             )}
           </div>
-          <div className="pb-1">
-            <h1 className="text-lg sm:text-xl font-bold text-gray-900">{name}</h1>
+          <div className="pb-2 min-w-0 flex-1">
+            <h1 className="truncate text-[22px] sm:text-2xl font-black tracking-tight text-gray-900">
+              {name}
+            </h1>
           </div>
         </div>
-        {bio && <p className="mt-2 text-sm text-gray-500">{bio}</p>}
-        <button onClick={handleShare} className="mt-3 flex cursor-pointer items-center gap-1.5 rounded-full bg-[#C41E1E] px-3.5 py-1.5 text-xs font-medium text-white hover:bg-[#A01818]">
-          <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
-          </svg>
+
+        {bio && (
+          <p className="mt-3 text-[14px] leading-relaxed text-gray-700">
+            {bio}
+          </p>
+        )}
+
+        <button
+          onClick={handleShare}
+          className="mt-4 inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-gray-200 bg-white px-3.5 py-1.5 text-[12px] font-bold text-gray-700 hover:border-gray-300 hover:bg-gray-50 transition-colors"
+        >
+          <Share2 className="h-3.5 w-3.5" strokeWidth={2.4} />
           공유하기
         </button>
       </div>
+
       {shareToast && (
-        <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-full bg-[#111111] px-5 py-2.5 text-sm text-white shadow-lg">
-          링크가 복사되었습니다!
+        <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-full bg-[#111111] px-5 py-2.5 text-sm font-medium text-white shadow-lg">
+          링크가 복사되었습니다
         </div>
       )}
     </>
@@ -279,25 +307,25 @@ function BannerBlock({ data, slug }: { data: Record<string, unknown>; slug: stri
         className="block overflow-hidden hover:shadow-lg transition-shadow"
         style={{
           borderRadius: "var(--block-radius)",
-          border: "1px solid var(--card-border)",
-          background: "linear-gradient(to right, var(--accent), color-mix(in srgb, var(--accent) 65%, #000))",
+          background: "var(--accent)",
         }}
       >
-        <div className="flex items-center p-5">
-          <div className="flex-1">
+        <div className="flex items-stretch overflow-hidden p-5">
+          <div className="flex-1 min-w-0">
             {dday !== undefined && (
-              <span className="inline-block rounded-full bg-white/20 px-3 py-1 text-xs font-bold text-white mb-2">
+              <span className="inline-flex items-center gap-1 rounded-full bg-white/15 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-white mb-2.5">
+                <Megaphone className="h-3 w-3" strokeWidth={2.6} />
                 D-{dday}
               </span>
             )}
-            <h3 className="text-lg font-bold text-white">{title}</h3>
-            {subtitle && <p className="mt-1 text-sm text-white/80">{subtitle}</p>}
-            <span className="mt-3 inline-block rounded-full bg-white px-4 py-1.5 text-xs font-bold" style={{ color: "var(--accent)" }}>
-              자세히 보기
+            <h3 className="text-lg font-black tracking-tight text-white">{title}</h3>
+            {subtitle && <p className="mt-1 text-[13px] leading-relaxed text-white/85 line-clamp-2">{subtitle}</p>}
+            <span className="mt-3 inline-flex items-center gap-1 rounded-full bg-white px-3.5 py-1.5 text-[11px] font-bold tracking-tight" style={{ color: "var(--accent)" }}>
+              자세히 보기 →
             </span>
           </div>
           {imageUrl && (
-            <img src={imageUrl} alt="" className="ml-4 h-24 w-24 rounded-xl object-cover" />
+            <img src={imageUrl} alt="" className="ml-4 h-24 w-24 shrink-0 rounded-xl object-cover ring-2 ring-white/20" />
           )}
         </div>
       </a>
@@ -465,11 +493,11 @@ function CalendarBlock({ data, campaigns, slug }: { data: Record<string, unknown
 
   return (
     <section className="mx-auto max-w-2xl px-3 sm:px-4 py-3">
-      <div className="flex items-center gap-2 mb-3">
-        <span className="text-xl">📅</span>
-        <h2 className="text-base font-bold text-gray-900">공구 캘린더</h2>
+      <div className="flex items-baseline gap-2 mb-4">
+        <CalendarIcon className="h-[18px] w-[18px] shrink-0 self-center text-gray-900" strokeWidth={2.4} />
+        <h2 className="text-[17px] font-black tracking-tight text-gray-900">공구 캘린더</h2>
         {monthEvents.length > 0 && (
-          <span className="ml-auto text-xs text-gray-400">{monthEvents.length}건 예정</span>
+          <span className="ml-auto rounded-full bg-gray-100 px-2.5 py-0.5 text-[11px] font-bold tabular-nums text-gray-600">{monthEvents.length}건</span>
         )}
       </div>
 
@@ -710,36 +738,45 @@ function PicksBlock({ picks, slug }: { picks: DisplayPick[]; slug: string }) {
 
   return (
     <section className="mx-auto max-w-2xl px-3 sm:px-4 py-3">
-      <div className="flex items-center gap-2 mb-3">
-        <span className="text-xl">📦</span>
-        <h2 className="text-base font-bold text-gray-900">PICK 컬렉션</h2>
-        <span className="ml-auto text-xs text-gray-400">{picks.length}개</span>
+      <div className="flex items-baseline gap-2 mb-4">
+        <Package className="h-[18px] w-[18px] shrink-0 self-center text-gray-900" strokeWidth={2.4} />
+        <h2 className="text-[17px] font-black tracking-tight text-gray-900">PICK</h2>
+        <span className="ml-auto rounded-full bg-gray-100 px-2.5 py-0.5 text-[11px] font-bold tabular-nums text-gray-600">
+          {picks.length}
+        </span>
       </div>
 
       {categories.length > 1 && (
-        <div className="mb-4 flex gap-2 overflow-x-auto pb-1">
-          <button onClick={() => setSelectedCategory(null)} className={`shrink-0 cursor-pointer rounded-full px-3.5 py-1.5 text-xs font-medium transition-colors ${selectedCategory === null ? "bg-[#111111] text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200"}`}>전체</button>
+        <div className="mb-4 flex gap-1.5 overflow-x-auto pb-1">
+          <button onClick={() => setSelectedCategory(null)} className={`shrink-0 cursor-pointer rounded-full px-3 py-1.5 text-[12px] font-bold transition-colors ${selectedCategory === null ? "bg-[#111111] text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200"}`}>전체</button>
           {categories.map((cat) => (
-            <button key={cat} onClick={() => setSelectedCategory(cat)} className={`shrink-0 cursor-pointer rounded-full px-3.5 py-1.5 text-xs font-medium transition-colors ${selectedCategory === cat ? "bg-[#111111] text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200"}`}>{cat}</button>
+            <button key={cat} onClick={() => setSelectedCategory(cat)} className={`shrink-0 cursor-pointer rounded-full px-3 py-1.5 text-[12px] font-bold transition-colors ${selectedCategory === cat ? "bg-[#111111] text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200"}`}>{cat}</button>
           ))}
         </div>
       )}
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         {filtered.map((pick) => {
           const badge = sourceBadge(pick.source);
           return (
-            <div key={pick.id} onClick={() => setDetail(pick)} className="group cursor-pointer overflow-hidden rounded-2xl border border-gray-200 bg-white hover:shadow-md transition-shadow">
-              <div className="relative aspect-square bg-gray-100">
-                {pick.image ? <img src={pick.image} alt="" className="h-full w-full object-cover" /> : <div className="flex h-full items-center justify-center">{IMG_PLACEHOLDER}</div>}
-                <span className={`absolute left-2 top-2 rounded-full px-2 py-0.5 text-[10px] font-medium ${badge.style}`}>{badge.label}</span>
+            <button
+              key={pick.id}
+              onClick={() => setDetail(pick)}
+              className="group cursor-pointer overflow-hidden rounded-2xl bg-white text-left transition-all hover:-translate-y-0.5"
+            >
+              <div className="relative aspect-square overflow-hidden rounded-xl bg-gray-100 ring-1 ring-gray-100 group-hover:ring-gray-200 transition-all">
+                {pick.image ? (
+                  <img src={pick.image} alt="" className="h-full w-full object-cover transition-transform group-hover:scale-[1.03]" />
+                ) : (
+                  <div className="flex h-full items-center justify-center">{IMG_PLACEHOLDER}</div>
+                )}
+                <span className={`absolute left-2 top-2 rounded-full px-2 py-0.5 text-[10px] font-bold tracking-tight ${badge.style}`}>{badge.label}</span>
               </div>
-              <div className="p-3">
-                <p className="line-clamp-2 text-sm font-medium text-gray-900 leading-snug min-h-[2.5rem]">{pick.name}</p>
-                <p className="mt-1.5 text-base font-bold text-[#C41E1E]">{formatPrice(pick.price)}</p>
-                <div className="mt-2 flex items-center justify-center rounded-lg bg-[#C41E1E] py-2 text-sm font-medium text-white group-hover:bg-[#A01818] transition-colors">상세보기</div>
+              <div className="px-1 pt-2.5 pb-1">
+                <p className="line-clamp-2 text-[13px] font-semibold text-gray-900 leading-snug min-h-[2.4em]">{pick.name}</p>
+                <p className="mt-1.5 text-[15px] font-black tabular-nums text-[#C41E1E]">{formatPrice(pick.price)}</p>
               </div>
-            </div>
+            </button>
           );
         })}
       </div>

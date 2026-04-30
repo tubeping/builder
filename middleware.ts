@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createServerClient } from "@supabase/ssr";
 
 // 커스텀 도메인 → slug 매핑 캐시 (5분 TTL)
 const domainCache = new Map<string, { slug: string; ts: number }>();
@@ -27,9 +28,7 @@ async function getSlugByDomain(hostname: string): Promise<string | null> {
   }
 }
 
-// TubePing 기본 도메인 목록 (builder가 서빙하는 도메인들)
-// 참고: tubeping.site는 별도 Vercel 프로젝트(tubeping/site)에서 서빙되므로
-// 이 middleware에 도달하지 않음 → 제외.
+// TubePing builder가 서빙하는 도메인 목록 (커스텀 도메인 라우팅 제외용)
 const DEFAULT_DOMAINS = ["localhost", "tubeping.com", "tubeping.shop", "tpng.kr", "vercel.app"];
 
 export async function middleware(request: NextRequest) {
@@ -49,7 +48,6 @@ export async function middleware(request: NextRequest) {
   }
 
   // ── 인증 가드 ──
-  // 보호 경로: 로그인 필수
   const protectedPaths = ["/dashboard", "/onboarding", "/settings"];
   const isProtected = protectedPaths.some((p) => pathname === p || pathname.startsWith(p + "/"));
 
@@ -57,42 +55,42 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Supabase 세션 확인 — Edge 호환 (REST API 직접 호출)
-  const accessToken = request.cookies.getAll()
-    .find(c => c.name.includes("auth-token") || c.name === "sb-access-token")?.value;
+  // Supabase 세션 검증 — createServerClient (SSR 쿠키 형식 정확히 파싱)
+  let response = NextResponse.next({ request });
 
-  if (!accessToken) {
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return request.cookies.getAll();
+        },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
+          response = NextResponse.next({ request });
+          cookiesToSet.forEach(({ name, value, options }) =>
+            response.cookies.set(name, value, options)
+          );
+        },
+      },
+    }
+  );
+
+  const { data: { user } } = await supabase.auth.getUser();
+
+  if (!user) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     url.searchParams.set("next", pathname);
     return NextResponse.redirect(url);
   }
 
-  try {
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-    if (!supabaseUrl || !supabaseKey) return NextResponse.next();
-
-    const res = await fetch(`${supabaseUrl}/auth/v1/user`, {
-      headers: { apikey: supabaseKey, Authorization: `Bearer ${accessToken}` },
-    });
-
-    if (!res.ok) {
-      const url = request.nextUrl.clone();
-      url.pathname = "/login";
-      url.searchParams.set("next", pathname);
-      return NextResponse.redirect(url);
-    }
-  } catch {
-    return NextResponse.next();
-  }
-
-  return NextResponse.next();
+  return response;
 }
 
 export const config = {
   matcher: [
-    "/dashboard/:path*",
     "/((?!_next/static|_next/image|favicon.ico|robots.txt|sitemap.xml).*)",
   ],
 };

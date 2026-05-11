@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   Inbox,
   Sparkles,
@@ -15,10 +16,12 @@ import {
   Users,
   Settings as SettingsIcon,
   ExternalLink,
+  LogOut,
   Menu,
   X,
   type LucideIcon,
 } from "lucide-react";
+import { createSupabaseBrowser } from "@/lib/supabase-browser";
 import CampaignInbox from "./_components/CampaignInbox";
 import MyPicks from "./_components/MyPicks";
 import ProductRecommend from "./_components/ProductRecommend";
@@ -72,6 +75,20 @@ export default function DashboardPage() {
 
   const ActiveIcon = activeLabel?.icon;
 
+  const router = useRouter();
+  const [loggingOut, setLoggingOut] = useState(false);
+
+  const handleLogout = async () => {
+    setLoggingOut(true);
+    try {
+      const supabase = createSupabaseBrowser();
+      await supabase.auth.signOut();
+      router.push("/login");
+    } catch {
+      setLoggingOut(false);
+    }
+  };
+
   return (
     <div className="flex h-screen flex-col md:flex-row bg-[#F7F7F8]">
       {/* ── 모바일 상단 바 ── */}
@@ -118,11 +135,19 @@ export default function DashboardPage() {
             href="/shop/gwibinjeong"
             target="_blank"
             rel="noopener noreferrer"
-            className="mx-4 my-3 flex items-center justify-center gap-2 rounded-xl bg-[#111111] py-3 text-sm font-bold text-white active:bg-gray-800"
+            className="mx-4 mt-3 flex items-center justify-center gap-2 rounded-xl bg-[#111111] py-3 text-sm font-bold text-white active:bg-gray-800"
           >
             내 쇼핑몰 보기
             <ExternalLink className="h-4 w-4" />
           </a>
+          <button
+            onClick={handleLogout}
+            disabled={loggingOut}
+            className="mx-4 mt-2 mb-3 flex w-[calc(100%-2rem)] items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white py-2.5 text-sm font-medium text-gray-600 active:bg-gray-50 disabled:opacity-50"
+          >
+            <LogOut className="h-4 w-4" />
+            {loggingOut ? "로그아웃 중…" : "로그아웃"}
+          </button>
         </div>
       )}
 
@@ -172,7 +197,7 @@ export default function DashboardPage() {
         </nav>
 
         {/* 내 쇼핑몰 보기 */}
-        <div className="px-4 pb-5 pt-4 border-t border-gray-100">
+        <div className="px-4 pb-5 pt-4 border-t border-gray-100 space-y-2">
           <a
             href="/shop/gwibinjeong"
             target="_blank"
@@ -182,6 +207,14 @@ export default function DashboardPage() {
             내 쇼핑몰 보기
             <ExternalLink className="h-3.5 w-3.5" />
           </a>
+          <button
+            onClick={handleLogout}
+            disabled={loggingOut}
+            className="flex w-full items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white py-2.5 text-[12px] font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors cursor-pointer disabled:opacity-50"
+          >
+            <LogOut className="h-3.5 w-3.5" />
+            {loggingOut ? "로그아웃 중…" : "로그아웃"}
+          </button>
         </div>
       </aside>
 

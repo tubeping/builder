@@ -146,18 +146,92 @@ function BlockEditor({ block, onChange }: { block: ShopBlock; onChange: (data: R
         </div>
       </div>
       <div className="space-y-4">
-        {block.type === "hero" && (<>
-          <div><label className={lc}>쇼핑몰 이름</label><input type="text" value={(d.name as string) || ""} onChange={e => onChange({ ...d, name: e.target.value })} className={ic} /></div>
-          <div><label className={lc}>소개글</label><textarea value={(d.bio as string) || ""} onChange={e => onChange({ ...d, bio: e.target.value })} rows={3} placeholder="나를 소개하는 글" className={ic + " resize-none"} /></div>
-          <div>
-            <label className={lc}>커버 이미지 <span className="text-[10px] font-normal text-gray-400">16:9 권장</span></label>
-            <ImageUpload value={(d.cover_url as string) || ""} onChange={(url) => onChange({ ...d, cover_url: url })} aspect="16/9" label="커버" />
-          </div>
-          <div>
-            <label className={lc}>프로필 이미지 <span className="text-[10px] font-normal text-gray-400">정사각형 · 원형 크롭</span></label>
-            <ImageUpload value={(d.profile_url as string) || ""} onChange={(url) => onChange({ ...d, profile_url: url })} aspect="1/1" rounded label="프로필" />
-          </div>
-        </>)}
+        {block.type === "hero" && (() => {
+          type ChipTone = "brand" | "amber" | "rose" | "mint" | "sky" | "purple" | "neutral";
+          interface HeroChip { label: string; tone?: ChipTone }
+          const chips = (d.chips as HeroChip[]) || [];
+          const TONE_PREVIEW: Record<ChipTone, string> = {
+            brand:   "bg-[#FFF0F0] text-[#C41E1E]",
+            amber:   "bg-[#FEF3C7] text-[#92400E]",
+            rose:    "bg-[#FFE4E6] text-[#9F1239]",
+            mint:    "bg-[#D1FAE5] text-[#065F46]",
+            sky:     "bg-[#DBEAFE] text-[#1E40AF]",
+            purple:  "bg-[#EDE9FE] text-[#5B21B6]",
+            neutral: "bg-gray-100 text-gray-700",
+          };
+          const TONES: ChipTone[] = ["brand", "amber", "rose", "mint", "sky", "purple", "neutral"];
+
+          return (
+            <>
+              <div><label className={lc}>쇼핑몰 이름</label><input type="text" value={(d.name as string) || ""} onChange={e => onChange({ ...d, name: e.target.value })} className={ic} /></div>
+              <div><label className={lc}>소개글</label><textarea value={(d.bio as string) || ""} onChange={e => onChange({ ...d, bio: e.target.value })} rows={3} placeholder="나를 소개하는 글" className={ic + " resize-none"} /></div>
+
+              {/* 태그 (Chips) */}
+              <div>
+                <label className={lc}>태그 <span className="text-[10px] font-normal text-gray-400">· {chips.length}/4 추천</span></label>
+                <div className="space-y-2">
+                  {chips.map((chip, i) => (
+                    <div key={i} className="rounded-xl bg-gray-50 p-2.5 space-y-2">
+                      <div className="flex items-center gap-2">
+                        <span className={`shrink-0 inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold ${TONE_PREVIEW[chip.tone || "neutral"]}`}>
+                          {chip.label || "미리보기"}
+                        </span>
+                        <input
+                          type="text"
+                          value={chip.label}
+                          onChange={e => {
+                            const next = [...chips];
+                            next[i] = { ...chip, label: e.target.value };
+                            onChange({ ...d, chips: next });
+                          }}
+                          placeholder="예: 직접개발"
+                          className="flex-1 rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-xs outline-none focus:border-[#C41E1E]"
+                        />
+                        <button
+                          onClick={() => onChange({ ...d, chips: chips.filter((_, j) => j !== i) })}
+                          className="cursor-pointer text-[10px] text-red-400 hover:text-red-600"
+                        >
+                          삭제
+                        </button>
+                      </div>
+                      <div className="flex flex-wrap gap-1">
+                        {TONES.map(t => (
+                          <button
+                            key={t}
+                            onClick={() => {
+                              const next = [...chips];
+                              next[i] = { ...chip, tone: t };
+                              onChange({ ...d, chips: next });
+                            }}
+                            title={t}
+                            className={`h-5 w-5 rounded-full cursor-pointer ring-2 transition-all ${
+                              (chip.tone || "neutral") === t ? "ring-gray-900 ring-offset-1" : "ring-transparent hover:ring-gray-300"
+                            } ${TONE_PREVIEW[t].split(" ")[0]}`}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                  <button
+                    onClick={() => onChange({ ...d, chips: [...chips, { label: "", tone: "neutral" }] })}
+                    className="cursor-pointer w-full rounded-xl border-2 border-dashed border-gray-200 py-2.5 text-xs font-medium text-gray-400 hover:border-[#C41E1E] hover:text-[#C41E1E] transition-colors"
+                  >
+                    + 태그 추가
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className={lc}>커버 이미지 <span className="text-[10px] font-normal text-gray-400">16:9 권장</span></label>
+                <ImageUpload value={(d.cover_url as string) || ""} onChange={(url) => onChange({ ...d, cover_url: url })} aspect="16/9" label="커버" />
+              </div>
+              <div>
+                <label className={lc}>프로필 이미지 <span className="text-[10px] font-normal text-gray-400">정사각형 · 원형 크롭</span></label>
+                <ImageUpload value={(d.profile_url as string) || ""} onChange={(url) => onChange({ ...d, profile_url: url })} aspect="1/1" rounded label="프로필" />
+              </div>
+            </>
+          );
+        })()}
         {block.type === "text" && (<div><label className={lc}>내용</label><textarea value={(d.content as string) || ""} onChange={e => onChange({ ...d, content: e.target.value })} rows={6} placeholder="자유롭게 텍스트를 입력하세요" className={ic + " resize-none"} /></div>)}
         {block.type === "image" && (<>
           <div>

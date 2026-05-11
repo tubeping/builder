@@ -178,11 +178,26 @@ function trackClick(params: {
 
 // ─── 블록 렌더러들 ───
 
+// chip 톤 시스템 — 따뜻한 다양 톤 (brand red 1색 강제 회피)
+type ChipTone = "brand" | "amber" | "rose" | "mint" | "sky" | "purple" | "neutral";
+interface HeroChip { label: string; tone?: ChipTone }
+
+const CHIP_TONE_STYLE: Record<ChipTone, string> = {
+  brand:   "bg-[#FFF0F0] text-[#C41E1E]",
+  amber:   "bg-[#FEF3C7] text-[#92400E]",
+  rose:    "bg-[#FFE4E6] text-[#9F1239]",
+  mint:    "bg-[#D1FAE5] text-[#065F46]",
+  sky:     "bg-[#DBEAFE] text-[#1E40AF]",
+  purple:  "bg-[#EDE9FE] text-[#5B21B6]",
+  neutral: "bg-gray-100 text-gray-700",
+};
+
 function HeroBlock({ data, creator, shop }: { data: Record<string, unknown>; creator: ShopApiResponse["creator"]; shop: ShopApiResponse["shop"] }) {
   const coverUrl = (data.cover_url as string) || shop?.cover_url;
   const profileUrl = (data.profile_url as string) || shop?.profile_url;
   const name = (data.name as string) || creator.name;
   const bio = (data.bio as string) || shop?.tagline || "";
+  const chips = (data.chips as HeroChip[]) || [];
   const [shareToast, setShareToast] = useState(false);
 
   const handleShare = () => {
@@ -252,6 +267,19 @@ function HeroBlock({ data, creator, shop }: { data: Record<string, unknown>; cre
           <p className="mt-3 text-[14px] leading-relaxed text-gray-700">
             {bio}
           </p>
+        )}
+
+        {chips.length > 0 && (
+          <div className="mt-3 flex flex-wrap gap-1.5">
+            {chips.map((chip, i) => (
+              <span
+                key={i}
+                className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-bold tracking-tight ${CHIP_TONE_STYLE[chip.tone || "neutral"]}`}
+              >
+                {chip.label}
+              </span>
+            ))}
+          </div>
         )}
 
         <button

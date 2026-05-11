@@ -35,6 +35,11 @@ import {
   Check,
   AlignLeft,
   AlignCenter,
+  LayoutGrid,
+  Paintbrush,
+  MousePointer2,
+  Trash2,
+  ExternalLink,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -955,13 +960,17 @@ export default function ShopCustomize() {
           {/* 모바일: 아이콘 2개 수직 */}
           <div className="md:hidden flex flex-col items-center gap-1.5 mb-2">
             <button onClick={() => setSideTab("blocks")} title="블록"
-              className={`h-9 w-9 cursor-pointer rounded-lg flex items-center justify-center text-base ${
+              className={`h-9 w-9 cursor-pointer rounded-lg flex items-center justify-center transition-colors ${
                 sideTab === "blocks" ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-500"
-              }`}>🧱</button>
+              }`}>
+              <LayoutGrid className="h-4 w-4" strokeWidth={sideTab === "blocks" ? 2.4 : 2} />
+            </button>
             <button onClick={() => setSideTab("style")} title="스타일"
-              className={`h-9 w-9 cursor-pointer rounded-lg flex items-center justify-center text-base ${
+              className={`h-9 w-9 cursor-pointer rounded-lg flex items-center justify-center transition-colors ${
                 sideTab === "style" ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-500"
-              }`}>🎨</button>
+              }`}>
+              <Paintbrush className="h-4 w-4" strokeWidth={sideTab === "style" ? 2.4 : 2} />
+            </button>
           </div>
 
           {sideTab === "blocks" && (
@@ -1060,8 +1069,8 @@ export default function ShopCustomize() {
           {saveMsg && <p className="hidden md:block text-center text-[10px] text-gray-500">{saveMsg}</p>}
           <a href="/shop/gwibinjeong" target="_blank" rel="noopener noreferrer"
             title="내 쇼핑몰 보기"
-            className="flex items-center justify-center gap-2 w-full rounded-xl border border-gray-200 h-10 md:py-2.5 text-xs font-medium text-gray-600 hover:bg-gray-50">
-            <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+            className="flex items-center justify-center gap-2 w-full rounded-xl bg-[#111111] h-10 md:py-2.5 text-xs font-bold text-white hover:bg-gray-800 transition-colors">
+            <ExternalLink className="h-3.5 w-3.5" strokeWidth={2.4} />
             <span className="hidden md:inline">내 쇼핑몰 보기</span>
           </a>
         </div>
@@ -1076,9 +1085,13 @@ export default function ShopCustomize() {
         ) : (
           <div className="flex-1 flex items-center justify-center p-6 text-center">
             <div>
-              <p className="text-3xl mb-3">👈</p>
-              <p className="text-sm font-medium text-gray-900">블록을 선택하세요</p>
-              <p className="text-xs text-gray-400 mt-1">왼쪽에서 편집할 블록을<br />클릭하면 여기에 표시됩니다</p>
+              <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-gray-100">
+                <MousePointer2 className="h-5 w-5 text-gray-400" strokeWidth={2} />
+              </div>
+              <p className="text-sm font-bold text-gray-900">블록을 선택하세요</p>
+              <p className="mt-1 text-[12px] text-gray-400 leading-relaxed">
+                왼쪽에서 편집할 블록을 클릭하면<br />여기에 설정이 표시돼요
+              </p>
             </div>
           </div>
         )}
@@ -1121,11 +1134,13 @@ export default function ShopCustomize() {
             </div>
             <div className="flex items-center gap-1.5">
               <button onClick={() => { setBlocks(prev => prev.filter(b => b.id !== selectedBlock.id)); setSelectedId(null); }}
-                className="cursor-pointer rounded-md p-1.5 text-gray-400 hover:text-[#C41E1E] hover:bg-red-50">
-                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                className="cursor-pointer rounded-md p-1.5 text-gray-400 hover:text-[#C41E1E] hover:bg-[#FFF0F0] transition-colors"
+                aria-label="블록 삭제">
+                <Trash2 className="h-4 w-4" strokeWidth={2} />
               </button>
-              <button onClick={() => setSelectedId(null)} className="cursor-pointer rounded-md p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100">
-                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+              <button onClick={() => setSelectedId(null)} className="cursor-pointer rounded-md p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+                aria-label="패널 닫기">
+                <XIcon className="h-4 w-4" strokeWidth={2.4} />
               </button>
             </div>
           </div>

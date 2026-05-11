@@ -106,6 +106,35 @@ function formatNumber(n: number) {
   if (n >= 10000) return (n / 10000).toFixed(1) + "만";
   return n.toLocaleString("ko-KR");
 }
+/**
+ * 추천 키워드 근거를 점수 기반으로 자연어 생성 (rule-based).
+ * 페르소나 Round 4: "왜 이 추천인지 명확히"
+ */
+function generateRecommendReason(it: RecommendItem): string {
+  const scores = [
+    { key: "콘텐츠", value: it.contentScore, msg: "당신 영상의 키워드와 강하게 일치" },
+    { key: "구매의도", value: it.purchaseScore, msg: "이 키워드 검색자의 구매 전환율 우수" },
+    { key: "수요", value: it.demandScore, msg: "최근 검색량이 충분히 높음" },
+    { key: "트렌드", value: it.trendScore, msg: "지금 시점·시즌에 잘 맞음" },
+    { key: "구독자", value: it.audienceScore, msg: "당신 구독자 연령대가 이 카테고리를 선호" },
+    { key: "공구실적", value: it.cafe24Score ?? 0, msg: "유사 카테고리 과거 공구 달성률이 높음" },
+  ];
+  const strong = scores.filter((s) => s.value >= 75).slice(0, 2);
+  const total = it.score;
+
+  if (strong.length === 0) {
+    return `종합 점수 ${total.toFixed(0)}점. 안정적이지만 두드러진 강점은 없어요 — 콘텐츠 톤·연령대 매칭 보강 시 잘 나갈 가능성.`;
+  }
+
+  const intro = strong.map((s) => s.msg).join("하고, ");
+  const ctr = it.ctr;
+  const ctrHint = ctr >= 5 ? `CTR ${ctr.toFixed(1)}%로 클릭률도 높아` : ctr >= 2 ? `CTR ${ctr.toFixed(1)}%` : "클릭률은 평범";
+  const volume = it.searchVolume;
+  const volHint = volume >= 10000 ? `월 검색 ${formatNumber(volume)}회` : volume >= 1000 ? `검색량 ${formatNumber(volume)}회` : "소수 검색";
+
+  return `${intro}합니다. ${volHint} · ${ctrHint} 영상으로 풀면 매출 가능성 큼.`;
+}
+
 function starsText(stars: number) {
   const full = Math.floor(stars);
   const half = stars - full >= 0.5 ? "½" : "";
@@ -581,18 +610,34 @@ export default function ProductRecommend() {
 
                     {isExpanded && (
                       <div className="border-t border-gray-100 px-4 pb-4 pt-3 bg-gray-50/50">
+                        {/* AI 추천 이유 카드 — 점수 기반 자동 생성 (페르소나 Round 4) */}
+                        <div className="mb-3 rounded-lg bg-gradient-to-br from-amber-50/60 to-white border border-amber-100 p-3">
+                          <div className="flex items-start gap-2">
+                            <span className="text-base">🤖</span>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-[10px] font-bold uppercase tracking-wide text-amber-600 mb-1">왜 이 키워드?</p>
+                              <p className="text-xs text-gray-700 leading-relaxed">
+                                {generateRecommendReason(it)}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+
                         <p className="text-xs font-semibold text-gray-700 mb-2">점수 내역</p>
                         <div className="grid grid-cols-2 sm:grid-cols-6 gap-2">
                           {[
-                            { label: "콘텐츠매칭", value: it.contentScore, color: "bg-purple-400" },
-                            { label: "구매의도", value: it.purchaseScore, color: "bg-pink-400" },
-                            { label: "검색수요", value: it.demandScore, color: "bg-blue-400" },
-                            { label: "트렌드/시즌", value: it.trendScore, color: "bg-green-400" },
-                            { label: "연령대매칭", value: it.audienceScore, color: "bg-amber-400" },
-                            { label: "공구 실적", value: it.cafe24Score ?? 50, color: "bg-[#C41E1E]" },
+                            { label: "콘텐츠매칭", value: it.contentScore, color: "bg-purple-400", help: "당신 영상의 키워드·주제와 이 추천 키워드의 일치도" },
+                            { label: "구매의도", value: it.purchaseScore, color: "bg-pink-400", help: "이 키워드 검색 사용자의 구매로 이어지는 확률" },
+                            { label: "검색수요", value: it.demandScore, color: "bg-blue-400", help: "최근 30일 네이버·구글 검색량 (높을수록 트래픽 ↑)" },
+                            { label: "트렌드/시즌", value: it.trendScore, color: "bg-green-400", help: "계절·이슈 적합도 (지금 시점에 잘 팔리는지)" },
+                            { label: "연령대매칭", value: it.audienceScore, color: "bg-amber-400", help: "당신 구독자의 핵심 연령대가 이 카테고리를 사는지" },
+                            { label: "공구 실적", value: it.cafe24Score ?? 50, color: "bg-[#C41E1E]", help: "유사 카테고리 과거 공구의 평균 달성률" },
                           ].map((s) => (
-                            <div key={s.label} className="rounded-lg bg-white p-2.5 border border-gray-100">
-                              <p className="text-[10px] text-gray-500 mb-1">{s.label}</p>
+                            <div key={s.label} className="rounded-lg bg-white p-2.5 border border-gray-100" title={s.help}>
+                              <p className="text-[10px] text-gray-500 mb-1 flex items-center gap-1">
+                                <span>{s.label}</span>
+                                <span className="text-gray-300 cursor-help">ⓘ</span>
+                              </p>
                               <div className="flex items-center gap-2">
                                 <div className="flex-1 h-1.5 overflow-hidden rounded-full bg-gray-100">
                                   <div className={`h-full rounded-full ${s.color}`} style={{ width: `${Math.min(100, s.value)}%` }} />

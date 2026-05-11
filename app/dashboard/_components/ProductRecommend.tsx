@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import ProductRecommendIntake, { type IntakeChannelInput } from "./ProductRecommendIntake";
 
 // ─── 타입 (API 응답과 매핑) ───
 interface RecommendItem {
@@ -111,20 +112,6 @@ function starsText(stars: number) {
   return "★".repeat(full) + half;
 }
 
-// ─── 추천 분석을 위한 입력 폼 데이터 ───
-interface ChannelLookupResult {
-  id: string;
-  title: string;
-  thumbnail: string;
-  subscriberCount: string;
-  description: string;
-}
-
-const INTEREST_CATEGORIES = [
-  "뷰티", "패션", "리빙", "주방", "건강·식품", "유아·아동",
-  "반려동물", "디지털·가전", "운동·아웃도어", "취미·문구", "여행", "기타",
-];
-
 // ─── 메인 컴포넌트 ───
 export default function ProductRecommend() {
   const [channels, setChannels] = useState<string[]>([]);
@@ -135,16 +122,7 @@ export default function ProductRecommend() {
   const [activeCategory, setActiveCategory] = useState<string>("");
   const [expandedKeyword, setExpandedKeyword] = useState<string | null>(null);
   const [showPersona, setShowPersona] = useState(false);
-
-  // 분석 요청 폼 상태
   const [channelsLoaded, setChannelsLoaded] = useState(false);
-  const [formChannelUrl, setFormChannelUrl] = useState("");
-  const [formLookupLoading, setFormLookupLoading] = useState(false);
-  const [formLookupError, setFormLookupError] = useState("");
-  const [formChannel, setFormChannel] = useState<ChannelLookupResult | null>(null);
-  const [formInterests, setFormInterests] = useState<string[]>([]);
-  const [formSubmitting, setFormSubmitting] = useState(false);
-  const [formSubmitted, setFormSubmitted] = useState(false);
 
   // 채널 목록 로드
   useEffect(() => {
@@ -159,51 +137,12 @@ export default function ProductRecommend() {
       .finally(() => setChannelsLoaded(true));
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // 채널 URL 조회 (유튜브 메타 확인)
-  async function handleChannelLookup() {
-    const url = formChannelUrl.trim();
-    if (!url) {
-      setFormLookupError("채널 URL을 입력해주세요");
-      return;
-    }
-    setFormLookupLoading(true);
-    setFormLookupError("");
-    try {
-      const res = await fetch(`/api/youtube?url=${encodeURIComponent(url)}`);
-      const result = await res.json();
-      if (!res.ok) {
-        setFormLookupError(result.error || "채널을 찾을 수 없습니다");
-        setFormChannel(null);
-        return;
-      }
-      setFormChannel(result);
-    } catch {
-      setFormLookupError("네트워크 오류가 발생했습니다");
-    } finally {
-      setFormLookupLoading(false);
-    }
-  }
-
-  function toggleInterest(cat: string) {
-    setFormInterests((prev) =>
-      prev.includes(cat) ? prev.filter((c) => c !== cat) : [...prev, cat]
-    );
-  }
-
-  async function handleSubmitAnalysisRequest() {
-    if (!formChannel) {
-      setFormLookupError("채널을 먼저 조회해주세요");
-      return;
-    }
-    setFormSubmitting(true);
-    try {
-      // TODO: POST /api/recommendations/request 로 분석 요청 전송 (백엔드 연결 후)
-      // 현재는 클라이언트 측에서 접수 안내만 표시
-      await new Promise((r) => setTimeout(r, 600));
-      setFormSubmitted(true);
-    } finally {
-      setFormSubmitting(false);
-    }
+  // 분석 요청 — 입력 폼 제출 핸들러
+  async function handleIntakeSubmit(intake: IntakeChannelInput) {
+    // TODO: POST /api/recommendations/request 로 분석 요청 전송 (백엔드 연결 후)
+    // 현재는 클라이언트 측에서 접수 안내만 표시
+    console.log("[ProductRecommend] 분석 요청 접수:", intake);
+    await new Promise((r) => setTimeout(r, 600));
   }
 
   // 선택 채널 데이터 로드
@@ -272,129 +211,8 @@ export default function ProductRecommend() {
         </div>
       )}
 
-      {!loading && !error && !data && channelsLoaded && channels.length === 0 && !formSubmitted && (
-        <div className="rounded-2xl border border-gray-200 bg-white p-5 sm:p-7">
-          <div className="mb-5">
-            <h3 className="text-lg font-bold text-gray-900">맞춤 상품 추천을 받아보세요</h3>
-            <p className="mt-1.5 text-sm text-gray-500 leading-relaxed">
-              유튜브 채널을 연결하면 시청자 연령·관심사 분석으로
-              <br className="hidden sm:block" />
-              공구 가능한 상품을 점수화해서 추천해드려요.
-            </p>
-          </div>
-
-          {/* Step 1: 채널 URL */}
-          <div className="mb-5">
-            <div className="mb-2 flex items-center gap-2">
-              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#C41E1E] text-[11px] font-bold text-white">1</span>
-              <label className="text-sm font-semibold text-gray-900">유튜브 채널 URL</label>
-            </div>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={formChannelUrl}
-                onChange={(e) => {
-                  setFormChannelUrl(e.target.value);
-                  setFormLookupError("");
-                }}
-                placeholder="https://youtube.com/@채널명"
-                className="flex-1 rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm focus:border-[#C41E1E] focus:outline-none focus:ring-2 focus:ring-[#C41E1E]/15"
-                onKeyDown={(e) => e.key === "Enter" && handleChannelLookup()}
-              />
-              <button
-                onClick={handleChannelLookup}
-                disabled={formLookupLoading}
-                className="cursor-pointer whitespace-nowrap rounded-xl bg-[#111111] px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {formLookupLoading ? "조회중..." : "조회"}
-              </button>
-            </div>
-            {formLookupError && (
-              <p className="mt-1.5 text-xs text-red-500">{formLookupError}</p>
-            )}
-            {formChannel && (
-              <div className="mt-3 flex items-center gap-3 rounded-xl border border-gray-100 bg-gray-50 p-3">
-                <img
-                  src={formChannel.thumbnail}
-                  alt={formChannel.title}
-                  className="h-12 w-12 rounded-full object-cover"
-                />
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-semibold text-gray-900">{formChannel.title}</p>
-                  <p className="text-xs text-gray-500">구독자 {formChannel.subscriberCount}명</p>
-                </div>
-                <svg className="h-5 w-5 shrink-0 text-green-500" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                </svg>
-              </div>
-            )}
-          </div>
-
-          {/* Step 2: 관심 카테고리 */}
-          <div className="mb-6">
-            <div className="mb-2 flex items-center gap-2">
-              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#C41E1E] text-[11px] font-bold text-white">2</span>
-              <label className="text-sm font-semibold text-gray-900">관심 카테고리</label>
-              <span className="text-[11px] text-gray-400">선택 · 다중 선택 가능</span>
-            </div>
-            <p className="mb-2.5 text-xs text-gray-500">평소 다루는 주제나 시청자가 좋아할 카테고리를 선택해주세요.</p>
-            <div className="flex flex-wrap gap-2">
-              {INTEREST_CATEGORIES.map((cat) => {
-                const active = formInterests.includes(cat);
-                return (
-                  <button
-                    key={cat}
-                    type="button"
-                    onClick={() => toggleInterest(cat)}
-                    className={`cursor-pointer rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
-                      active
-                        ? "border-[#C41E1E] bg-[#C41E1E] text-white"
-                        : "border-gray-200 bg-white text-gray-600 hover:border-gray-300 hover:bg-gray-50"
-                    }`}
-                  >
-                    {cat}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          <button
-            onClick={handleSubmitAnalysisRequest}
-            disabled={!formChannel || formSubmitting}
-            className="w-full cursor-pointer rounded-xl bg-[#C41E1E] px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#A81818] disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            {formSubmitting ? "분석 요청 중..." : "분석 시작하기"}
-          </button>
-          <p className="mt-2.5 text-[11px] text-gray-400 text-center">
-            분석에는 보통 1~2영업일이 소요됩니다.
-          </p>
-        </div>
-      )}
-
-      {formSubmitted && (
-        <div className="rounded-2xl border border-green-200 bg-gradient-to-br from-green-50 to-white p-6 text-center">
-          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-green-500 text-white">
-            <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-            </svg>
-          </div>
-          <h3 className="mb-1.5 text-base font-bold text-gray-900">분석 요청이 접수되었습니다</h3>
-          <p className="text-sm text-gray-600 leading-relaxed">
-            <span className="font-semibold text-gray-900">{formChannel?.title}</span> 채널 분석을 시작합니다.
-            <br />
-            보통 1~2영업일 내에 추천 결과가 준비됩니다.
-          </p>
-          {formInterests.length > 0 && (
-            <div className="mt-4 flex flex-wrap justify-center gap-1.5">
-              {formInterests.map((cat) => (
-                <span key={cat} className="rounded-full bg-white border border-gray-200 px-2.5 py-1 text-[11px] text-gray-600">
-                  {cat}
-                </span>
-              ))}
-            </div>
-          )}
-        </div>
+      {!loading && !error && !data && channelsLoaded && channels.length === 0 && (
+        <ProductRecommendIntake onSubmit={handleIntakeSubmit} />
       )}
 
       {data && (

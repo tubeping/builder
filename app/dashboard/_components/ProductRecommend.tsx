@@ -143,28 +143,32 @@ function starsText(stars: number) {
 
 // ─── 메인 컴포넌트 ───
 export default function ProductRecommend() {
-  const [channels, setChannels] = useState<string[]>([]);
-  const [selectedChannel, setSelectedChannel] = useState<string>("");
+  const [myChannel, setMyChannel] = useState<string>("");
   const [data, setData] = useState<RecData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeCategory, setActiveCategory] = useState<string>("");
   const [expandedKeyword, setExpandedKeyword] = useState<string | null>(null);
   const [showPersona, setShowPersona] = useState(false);
-  const [channelsLoaded, setChannelsLoaded] = useState(false);
+  const [meLoaded, setMeLoaded] = useState(false);
 
-  // 채널 목록 로드
+  // 본인 크리에이터 정보 → 채널명 결정
   useEffect(() => {
-    fetch("/api/recommendations")
-      .then((r) => r.json())
-      .then((d) => {
-        const list: string[] = d.channels || [];
-        setChannels(list);
-        if (list.length > 0 && !selectedChannel) setSelectedChannel(list[0]);
-      })
-      .catch(() => setChannels([]))
-      .finally(() => setChannelsLoaded(true));
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    let alive = true;
+    (async () => {
+      try {
+        const res = await fetch("/api/me");
+        if (!res.ok) return;
+        const me = await res.json();
+        if (alive && me?.name) setMyChannel(me.name);
+      } catch {
+        // 인증 실패 등 — 입력 폼으로 분기
+      } finally {
+        if (alive) setMeLoaded(true);
+      }
+    })();
+    return () => { alive = false; };
+  }, []);
 
   // 분석 요청 — 입력 폼 제출 핸들러
   async function handleIntakeSubmit(intake: IntakeChannelInput) {
@@ -174,12 +178,16 @@ export default function ProductRecommend() {
     await new Promise((r) => setTimeout(r, 600));
   }
 
-  // 선택 채널 데이터 로드
+  // 본인 채널 추천 데이터 로드 (없으면 입력 폼)
   const loadChannel = useCallback(async (name: string) => {
     setLoading(true);
     setError(null);
     try {
       const res = await fetch(`/api/recommendations?channel=${encodeURIComponent(name)}`);
+      if (res.status === 404) {
+        setData(null);
+        return;
+      }
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const d: RecData = await res.json();
       setData(d);
@@ -194,8 +202,8 @@ export default function ProductRecommend() {
   }, []);
 
   useEffect(() => {
-    if (selectedChannel) loadChannel(selectedChannel);
-  }, [selectedChannel, loadChannel]);
+    if (myChannel) loadChannel(myChannel);
+  }, [myChannel, loadChannel]);
 
   const categories = data ? Object.keys(data.recommendations) : [];
   const activeBlock = data && activeCategory ? data.recommendations[activeCategory] : null;
@@ -211,20 +219,6 @@ export default function ProductRecommend() {
           </p>
         </div>
 
-        {channels.length > 0 && (
-          <div className="flex items-center gap-2">
-            <label className="text-xs text-gray-500">채널</label>
-            <select
-              value={selectedChannel}
-              onChange={(e) => setSelectedChannel(e.target.value)}
-              className="cursor-pointer rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm focus:border-[#C41E1E] focus:outline-none"
-            >
-              {channels.map((c) => (
-                <option key={c} value={c}>{c}</option>
-              ))}
-            </select>
-          </div>
-        )}
       </div>
 
       {/* 로딩/에러 */}
@@ -240,7 +234,7 @@ export default function ProductRecommend() {
         </div>
       )}
 
-      {!loading && !error && !data && channelsLoaded && channels.length === 0 && (
+      {!loading && !error && !data && meLoaded && (
         <ProductRecommendIntake onSubmit={handleIntakeSubmit} />
       )}
 

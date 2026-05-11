@@ -69,7 +69,20 @@ interface Campaign {
   reasons: string[];
 }
 
-type Status = "pending" | "approved" | "rejected";
+type Status = "pending" | "approved" | "rejected" | "negotiating";
+
+interface RejectFeedback {
+  reason: "category" | "price" | "audience" | "supplier" | "other";
+  excludeCategory?: boolean;
+  note?: string;
+}
+
+interface NegotiateRequest {
+  targetPrice?: number;
+  targetCommission?: number;
+  startDate?: string;
+  note: string;
+}
 
 // ─── 유틸 ───
 function formatPrice(n: number) {
@@ -100,17 +113,30 @@ function ddayTone(dday: number) {
 export default function CampaignInbox() {
   const [statusMap, setStatusMap] = useState<Record<string, Status>>({});
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [rejectingId, setRejectingId] = useState<string | null>(null);
+  const [negotiatingId, setNegotiatingId] = useState<string | null>(null);
 
   const pending = DUMMY_PROPOSALS.filter((p) => (statusMap[p.id] || "pending") === "pending");
   const approvedCount = Object.values(statusMap).filter((s) => s === "approved").length;
   const rejectedCount = Object.values(statusMap).filter((s) => s === "rejected").length;
+  const negotiatingCount = Object.values(statusMap).filter((s) => s === "negotiating").length;
 
   const handleApprove = (id: string) => {
     setStatusMap((prev) => ({ ...prev, [id]: "approved" }));
   };
 
-  const handleReject = (id: string) => {
+  const handleReject = (id: string, _feedback: RejectFeedback) => {
     setStatusMap((prev) => ({ ...prev, [id]: "rejected" }));
+    setRejectingId(null);
+    // TODO: 백엔드 — 거절 사유 학습 데이터로 전송
+    // /api/campaigns/{id}/reject  body: { reason, excludeCategory, note }
+  };
+
+  const handleNegotiate = (id: string, _request: NegotiateRequest) => {
+    setStatusMap((prev) => ({ ...prev, [id]: "negotiating" }));
+    setNegotiatingId(null);
+    // TODO: 백엔드 — 운영팀에 협상 요청 전달 (Slack/이메일)
+    // /api/campaigns/{id}/negotiate  body: { targetPrice, targetCommission, startDate, note }
   };
 
   // 총 예상 수익 (대기 중)
@@ -149,6 +175,10 @@ export default function CampaignInbox() {
         <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-600">
           <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
           승인 {approvedCount}
+        </span>
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-600">
+          <span className="h-1.5 w-1.5 rounded-full bg-blue-500" />
+          협상 {negotiatingCount}
         </span>
         <span className="inline-flex items-center gap-1.5 rounded-full bg-gray-100 px-3 py-1.5 text-xs font-semibold text-gray-500">
           <span className="h-1.5 w-1.5 rounded-full bg-gray-400" />
@@ -262,18 +292,30 @@ export default function CampaignInbox() {
                       </p>
                     </div>
 
-                    <div className="flex gap-2">
+                    <div className="grid grid-cols-3 gap-2">
                       <button
-                        onClick={() => handleReject(c.id)}
-                        className="flex-1 cursor-pointer rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-50"
+                        onClick={() => setRejectingId(c.id)}
+                        title="거절"
+                        className="cursor-pointer rounded-lg border border-gray-200 bg-white px-2 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-50 flex flex-col items-center gap-0.5"
                       >
-                        거절
+                        <span className="text-base">👎</span>
+                        <span>거절</span>
+                      </button>
+                      <button
+                        onClick={() => setNegotiatingId(c.id)}
+                        title="협상 — 가격·시점 변경 요청"
+                        className="cursor-pointer rounded-lg border border-blue-200 bg-blue-50 px-2 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-100 flex flex-col items-center gap-0.5"
+                      >
+                        <span className="text-base">💬</span>
+                        <span>협상</span>
                       </button>
                       <button
                         onClick={() => handleApprove(c.id)}
-                        className="flex-[2] cursor-pointer rounded-lg bg-[#C41E1E] px-3 py-2 text-xs font-bold text-white shadow-sm hover:bg-[#A01818] active:translate-y-px"
+                        title="승인 — 즉시 실행"
+                        className="cursor-pointer rounded-lg bg-[#C41E1E] px-2 py-2 text-xs font-bold text-white shadow-sm hover:bg-[#A01818] active:translate-y-px flex flex-col items-center gap-0.5"
                       >
-                        승인하기
+                        <span className="text-base">👍</span>
+                        <span>승인</span>
                       </button>
                     </div>
 
@@ -311,6 +353,164 @@ export default function CampaignInbox() {
           })}
         </div>
       )}
+
+      {/* ── 거절 모달 ── */}
+      {rejectingId && (() => {
+        const c = DUMMY_PROPOSALS.find((x) => x.id === rejectingId);
+        if (!c) return null;
+        return <RejectModal campaign={c} onClose={() => setRejectingId(null)} onSubmit={(f) => handleReject(c.id, f)} />;
+      })()}
+
+      {/* ── 협상 모달 ── */}
+      {negotiatingId && (() => {
+        const c = DUMMY_PROPOSALS.find((x) => x.id === negotiatingId);
+        if (!c) return null;
+        return <NegotiateModal campaign={c} onClose={() => setNegotiatingId(null)} onSubmit={(r) => handleNegotiate(c.id, r)} />;
+      })()}
+    </div>
+  );
+}
+
+// ─── 거절 모달 ───
+function RejectModal({ campaign, onClose, onSubmit }: {
+  campaign: Campaign;
+  onClose: () => void;
+  onSubmit: (f: RejectFeedback) => void;
+}) {
+  const [reason, setReason] = useState<RejectFeedback["reason"]>("category");
+  const [excludeCategory, setExcludeCategory] = useState(false);
+  const [note, setNote] = useState("");
+
+  const REASONS: { value: RejectFeedback["reason"]; label: string }[] = [
+    { value: "category", label: "카테고리가 채널과 안 맞음" },
+    { value: "price", label: "가격대가 부담스러움" },
+    { value: "audience", label: "구독자층과 안 맞음" },
+    { value: "supplier", label: "공급사를 모름·신뢰 X" },
+    { value: "other", label: "기타" },
+  ];
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+      <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+        <h3 className="text-base font-bold text-gray-900">제안 거절</h3>
+        <p className="mt-1 text-xs text-gray-500 truncate">{campaign.productName}</p>
+
+        <div className="mt-4">
+          <label className="mb-2 block text-xs font-bold text-gray-700">왜 거절하시나요?</label>
+          <div className="space-y-1.5">
+            {REASONS.map((r) => (
+              <label key={r.value} className="flex items-center gap-2 cursor-pointer rounded-lg border border-gray-200 px-3 py-2 hover:bg-gray-50">
+                <input type="radio" name="reason" checked={reason === r.value} onChange={() => setReason(r.value)}
+                  className="h-3.5 w-3.5 accent-[#C41E1E]" />
+                <span className="text-sm text-gray-700">{r.label}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+
+        {reason === "category" && (
+          <label className="mt-3 flex items-center gap-2 cursor-pointer rounded-lg bg-amber-50 border border-amber-200 px-3 py-2">
+            <input type="checkbox" checked={excludeCategory} onChange={(e) => setExcludeCategory(e.target.checked)}
+              className="h-3.5 w-3.5 accent-amber-600" />
+            <span className="text-xs text-amber-800">앞으로 <b>{campaign.category}</b> 카테고리 추천 받지 않기</span>
+          </label>
+        )}
+
+        <div className="mt-3">
+          <label className="mb-1 block text-xs font-bold text-gray-700">추가 의견 <span className="font-normal text-gray-400">(선택)</span></label>
+          <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2}
+            placeholder="예: 더 가격대가 낮은 상품 추천 부탁드려요"
+            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-[#C41E1E] resize-none" />
+        </div>
+
+        <div className="mt-5 flex gap-2">
+          <button onClick={onClose}
+            className="flex-1 cursor-pointer rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50">
+            취소
+          </button>
+          <button onClick={() => onSubmit({ reason, excludeCategory, note })}
+            className="flex-1 cursor-pointer rounded-lg bg-gray-900 px-4 py-2.5 text-sm font-bold text-white hover:bg-gray-800">
+            거절 확정
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── 협상 모달 ───
+function NegotiateModal({ campaign, onClose, onSubmit }: {
+  campaign: Campaign;
+  onClose: () => void;
+  onSubmit: (r: NegotiateRequest) => void;
+}) {
+  const [targetPrice, setTargetPrice] = useState<string>("");
+  const [targetCommission, setTargetCommission] = useState<string>("");
+  const [startDate, setStartDate] = useState<string>("");
+  const [note, setNote] = useState<string>("");
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+      <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+        <div className="flex items-start gap-3 mb-4">
+          <span className="text-2xl">💬</span>
+          <div>
+            <h3 className="text-base font-bold text-gray-900">조건 협상 요청</h3>
+            <p className="mt-0.5 text-xs text-gray-500">
+              운영팀에 협상 요청을 보냅니다. 영업일 기준 1~2일 내 답변드립니다.
+            </p>
+          </div>
+        </div>
+
+        <div className="rounded-lg bg-gray-50 px-3 py-2 mb-4">
+          <p className="text-xs text-gray-500 truncate"><b>{campaign.productName}</b></p>
+          <p className="text-[10px] text-gray-400 mt-0.5">
+            현재: 공구가 {formatPrice(campaign.suggestedPrice)} · 수수료 {campaign.commission}%
+          </p>
+        </div>
+
+        <div className="space-y-3">
+          <div>
+            <label className="mb-1 block text-xs font-bold text-gray-700">희망 공구가 (원) <span className="font-normal text-gray-400">(선택)</span></label>
+            <input type="number" value={targetPrice} onChange={(e) => setTargetPrice(e.target.value)}
+              placeholder={String(campaign.suggestedPrice)}
+              className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-blue-500" />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-bold text-gray-700">희망 수수료 (%) <span className="font-normal text-gray-400">(선택)</span></label>
+            <input type="number" value={targetCommission} onChange={(e) => setTargetCommission(e.target.value)}
+              placeholder={String(campaign.commission)} min={0} max={50}
+              className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-blue-500" />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-bold text-gray-700">희망 시작일 <span className="font-normal text-gray-400">(선택)</span></label>
+            <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)}
+              className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-blue-500" />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-bold text-gray-700">요청 내용 <span className="text-[#C41E1E]">*</span></label>
+            <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={3} required
+              placeholder="예: 가격을 25,000원으로 낮춰주시면 영상 톡톡까지 가능해요"
+              className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-blue-500 resize-none" />
+          </div>
+        </div>
+
+        <div className="mt-5 flex gap-2">
+          <button onClick={onClose}
+            className="flex-1 cursor-pointer rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50">
+            취소
+          </button>
+          <button onClick={() => onSubmit({
+              targetPrice: targetPrice ? parseInt(targetPrice) : undefined,
+              targetCommission: targetCommission ? parseInt(targetCommission) : undefined,
+              startDate: startDate || undefined,
+              note,
+            })} disabled={!note.trim()}
+            className="flex-1 cursor-pointer rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-blue-700 disabled:opacity-40 disabled:cursor-default">
+            협상 요청
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

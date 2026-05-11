@@ -1,6 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { createSupabaseBrowser } from "@/lib/supabase-browser";
 
 // ─── 메인 컴포넌트 ───
 export default function Settings() {
@@ -54,16 +56,234 @@ export default function Settings() {
 }
 
 // ─── 계정 섹션 ───
+interface AccountUser {
+  email: string;
+  name?: string;
+  shop_slug?: string;
+  channel_url?: string;
+  role?: string;
+  created_at?: string;
+  provider?: string;
+}
+
 function AccountSection() {
+  const router = useRouter();
+  const [account, setAccount] = useState<AccountUser | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const supabase = createSupabaseBrowser();
+    Promise.all([
+      fetch("/api/me").then(r => r.ok ? r.json() : null).catch(() => null),
+      supabase.auth.getUser(),
+    ]).then(([me, { data }]) => {
+      if (me) {
+        setAccount({
+          email: me.email || data.user?.email || "",
+          name: me.name,
+          shop_slug: me.shop_slug,
+          channel_url: me.channel_url,
+          role: me.role,
+          created_at: data.user?.created_at,
+          provider: data.user?.app_metadata?.provider || "email",
+        });
+      }
+      setLoading(false);
+    });
+  }, []);
+
+  if (loading) {
+    return <div className="rounded-xl border border-gray-200 p-5 text-center text-sm text-gray-400">로딩 중…</div>;
+  }
+
+  if (!account) {
+    return <div className="rounded-xl border border-gray-200 p-5 text-center text-sm text-gray-400">계정 정보를 불러올 수 없습니다</div>;
+  }
+
+  const providerLabel: Record<string, string> = {
+    google: "Google 계정",
+    email: "이메일/비밀번호",
+  };
+
+  const joinDate = account.created_at ? new Date(account.created_at).toLocaleDateString("ko-KR") : "—";
+
+  return (
+    <div className="space-y-4">
+      {/* 계정 정보 */}
+      <div className="rounded-xl border border-gray-200 p-5">
+        <h3 className="mb-4 text-base font-semibold text-gray-900">계정 정보</h3>
+        <div className="space-y-3">
+          <Field label="이메일" value={account.email} />
+          <Field label="이름" value={account.name || "—"} />
+          <Field label="쇼핑몰 슬러그" value={account.shop_slug || "—"} suffix=" (URL: /shop/{slug})" />
+          <Field label="채널 URL" value={account.channel_url || "—"} />
+          <Field label="가입 방식" value={providerLabel[account.provider || "email"] || account.provider || "—"} />
+          <Field label="가입일" value={joinDate} />
+          {account.role && account.role !== "creator" && (
+            <Field label="권한" value={account.role === "super_admin" ? "최고 관리자" : "관리자"} />
+          )}
+        </div>
+      </div>
+
+      {/* 비밀번호 변경 */}
+      <PasswordChangeCard provider={account.provider || "email"} />
+
+      {/* 회원 탈퇴 */}
+      <DeleteAccountCard onDeleted={() => router.push("/login")} />
+    </div>
+  );
+}
+
+function PasswordChangeCard({ provider }: { provider: string }) {
+  const [open, setOpen] = useState(false);
+  const [current, setCurrent] = useState("");
+  const [next, setNext] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [msg, setMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  const handleSubmit = async () => {
+    if (next.length < 8) { setMsg({ type: "error", text: "비밀번호는 8자 이상이어야 합니다" }); return; }
+    if (next !== confirm) { setMsg({ type: "error", text: "비밀번호가 일치하지 않습니다" }); return; }
+
+    setMsg(null); setLoading(true);
+    try {
+      const supabase = createSupabaseBrowser();
+      const { error } = await supabase.auth.updateUser({ password: next });
+      if (error) {
+        setMsg({ type: "error", text: error.message });
+      } else {
+        setMsg({ type: "success", text: "비밀번호가 변경되었습니다" });
+        setCurrent(""); setNext(""); setConfirm("");
+        setTimeout(() => { setMsg(null); setOpen(false); }, 2000);
+      }
+    } catch (e) {
+      setMsg({ type: "error", text: e instanceof Error ? e.message : "오류" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="rounded-xl border border-gray-200 p-5">
-      <h3 className="mb-4 text-base font-semibold text-gray-900">계정 정보</h3>
-      <div className="space-y-3">
-        <Field label="이름" value="김수현" />
-        <Field label="이메일" value="sh.kim@example.com" />
-        <Field label="전화번호" value="010-1234-5678" />
-        <Field label="쇼핑몰 slug" value="gwibinjeong" suffix=".tubeping.shop" />
+      <div className="flex items-start justify-between">
+        <div>
+          <h3 className="text-base font-semibold text-gray-900">비밀번호</h3>
+          <p className="mt-1 text-xs text-gray-500">
+            {provider === "google"
+              ? "Google 계정으로 가입하셨어요. 별도 비밀번호를 설정하면 이메일 로그인도 가능합니다."
+              : "보안을 위해 주기적으로 변경하는 것을 권장합니다."}
+          </p>
+        </div>
+        {!open && (
+          <button onClick={() => { setOpen(true); setMsg(null); }}
+            className="cursor-pointer rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
+            {provider === "google" ? "비밀번호 설정" : "변경"}
+          </button>
+        )}
       </div>
+
+      {open && (
+        <div className="mt-4 space-y-3 border-t border-gray-100 pt-4">
+          <div>
+            <label className="mb-1 block text-xs font-bold text-gray-700">새 비밀번호 <span className="text-gray-400 font-normal">8자 이상</span></label>
+            <input type="password" value={next} onChange={(e) => setNext(e.target.value)} minLength={8}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm outline-none focus:border-[#C41E1E]" />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-bold text-gray-700">새 비밀번호 확인</label>
+            <input type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm outline-none focus:border-[#C41E1E]" />
+          </div>
+          {msg && (
+            <p className={`text-xs ${msg.type === "success" ? "text-green-600" : "text-red-600"}`}>{msg.text}</p>
+          )}
+          <div className="flex gap-2 pt-1">
+            <button onClick={() => { setOpen(false); setMsg(null); setNext(""); setConfirm(""); }}
+              className="cursor-pointer rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50">
+              취소
+            </button>
+            <button onClick={handleSubmit} disabled={loading || !next || !confirm}
+              className="cursor-pointer rounded-lg bg-[#C41E1E] px-4 py-2 text-sm font-bold text-white hover:bg-[#A01818] disabled:opacity-40">
+              {loading ? "변경 중…" : "비밀번호 변경"}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DeleteAccountCard({ onDeleted }: { onDeleted: () => void }) {
+  const [step, setStep] = useState<"idle" | "confirm" | "loading" | "error">("idle");
+  const [errorMsg, setErrorMsg] = useState("");
+  const [confirmText, setConfirmText] = useState("");
+
+  const handleDelete = async () => {
+    if (confirmText !== "탈퇴합니다") {
+      setErrorMsg("'탈퇴합니다'를 정확히 입력해주세요");
+      return;
+    }
+    setStep("loading"); setErrorMsg("");
+    try {
+      const res = await fetch("/api/auth/delete-account", { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) {
+        setErrorMsg(data.detail || data.error || "탈퇴 처리 실패");
+        setStep("error");
+        return;
+      }
+      onDeleted();
+    } catch (e) {
+      setErrorMsg(e instanceof Error ? e.message : "네트워크 오류");
+      setStep("error");
+    }
+  };
+
+  return (
+    <div className="rounded-xl border border-red-200 bg-red-50/30 p-5">
+      <h3 className="text-base font-semibold text-red-700">회원 탈퇴</h3>
+      <p className="mt-1 text-xs text-red-600/80 leading-relaxed">
+        탈퇴 시 본인의 PICK, 캠페인, 통계 등 <b>모든 데이터가 영구 삭제</b>됩니다.
+        외부 플랫폼 연동도 즉시 해제되며, 복구는 불가합니다.
+        법령상 보관 의무가 있는 데이터(결제·청약 기록)는 5년 동안 안전하게 분리 보관됩니다.
+      </p>
+
+      {step === "idle" && (
+        <button onClick={() => setStep("confirm")}
+          className="mt-4 cursor-pointer rounded-lg border border-red-300 bg-white px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-50">
+          회원 탈퇴
+        </button>
+      )}
+
+      {(step === "confirm" || step === "error") && (
+        <div className="mt-4 space-y-3 rounded-lg border border-red-200 bg-white p-4">
+          <p className="text-xs text-gray-700">
+            계속하시려면 아래에 <b className="text-red-600">탈퇴합니다</b>를 정확히 입력해주세요.
+          </p>
+          <input type="text" value={confirmText} onChange={(e) => setConfirmText(e.target.value)}
+            placeholder="탈퇴합니다"
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-red-500" />
+          {errorMsg && <p className="text-xs text-red-600">{errorMsg}</p>}
+          <div className="flex gap-2">
+            <button onClick={() => { setStep("idle"); setConfirmText(""); setErrorMsg(""); }}
+              className="cursor-pointer rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50">
+              취소
+            </button>
+            <button onClick={handleDelete} disabled={confirmText !== "탈퇴합니다"}
+              className="cursor-pointer rounded-lg bg-red-600 px-4 py-2 text-sm font-bold text-white hover:bg-red-700 disabled:opacity-40 disabled:cursor-default">
+              탈퇴 처리
+            </button>
+          </div>
+        </div>
+      )}
+
+      {step === "loading" && (
+        <div className="mt-4 flex items-center justify-center py-3">
+          <div className="h-5 w-5 animate-spin rounded-full border-2 border-red-200 border-t-red-600" />
+          <span className="ml-2 text-sm text-red-600">탈퇴 처리 중…</span>
+        </div>
+      )}
     </div>
   );
 }

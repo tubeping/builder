@@ -40,6 +40,8 @@ import {
   MousePointer2,
   Trash2,
   ExternalLink,
+  Search,
+  Mail,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -50,7 +52,7 @@ import {
 // ─── 타입 ───
 interface ShopBlock {
   id: string;
-  type: "hero" | "text" | "image" | "banner" | "links" | "picks" | "video" | "divider" | "gallery" | "calendar" | "campaign_live" | "campaign_teaser";
+  type: "hero" | "text" | "image" | "banner" | "links" | "picks" | "video" | "divider" | "gallery" | "calendar" | "campaign_live" | "campaign_teaser" | "search" | "biz_contact";
   data: Record<string, unknown>;
 }
 
@@ -58,6 +60,8 @@ interface LinkItem { id: string; label: string; url: string; icon: string; }
 
 const BLOCK_TYPES: { type: ShopBlock["type"]; label: string; icon: LucideIcon; desc: string }[] = [
   { type: "hero", label: "프로필", icon: User, desc: "커버·프로필·소개" },
+  { type: "search", label: "검색", icon: Search, desc: "상품·콘텐츠 검색" },
+  { type: "biz_contact", label: "비즈 제안", icon: Mail, desc: "협업 문의 받기" },
   { type: "text", label: "텍스트", icon: Type, desc: "자유 텍스트" },
   { type: "image", label: "이미지", icon: ImageIcon, desc: "이미지 + 캡션" },
   { type: "campaign_live", label: "공구 라이브", icon: Radio, desc: "진행률+카운트다운" },
@@ -489,6 +493,17 @@ function BlockEditor({ block, onChange }: { block: ShopBlock; onChange: (data: R
         })()}
         {block.type === "campaign_live" && (<p className="text-xs text-gray-400 bg-gray-50 rounded-lg p-3 text-center">진행 중인 공구가 자동 표시됩니다</p>)}
         {block.type === "campaign_teaser" && (<p className="text-xs text-gray-400 bg-gray-50 rounded-lg p-3 text-center">오픈 예정 공구가 자동 표시됩니다</p>)}
+
+        {block.type === "search" && (<>
+          <div><label className={lc}>안내 문구 (placeholder)</label><input type="text" value={(d.placeholder as string) || ""} onChange={e => onChange({ ...d, placeholder: e.target.value })} placeholder="예: 상품·키워드 검색" className={ic} /></div>
+          <p className="text-[11px] text-gray-400 leading-relaxed">검색은 페이지 내 PICK·공구·블록 텍스트를 대상으로 작동합니다.</p>
+        </>)}
+
+        {block.type === "biz_contact" && (<>
+          <div><label className={lc}>버튼 라벨</label><input type="text" value={(d.label as string) || ""} onChange={e => onChange({ ...d, label: e.target.value })} placeholder="예: 비즈니스 제안" className={ic} /></div>
+          <div><label className={lc}>받는 이메일</label><input type="email" value={(d.email as string) || ""} onChange={e => onChange({ ...d, email: e.target.value })} placeholder="contact@example.com" className={ic} /></div>
+          <div><label className={lc}>설명 (선택)</label><input type="text" value={(d.note as string) || ""} onChange={e => onChange({ ...d, note: e.target.value })} placeholder="협업·광고 문의 환영" className={ic} /></div>
+        </>)}
       </div>
     </div>
   );

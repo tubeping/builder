@@ -16,6 +16,8 @@ import {
   ArrowRight,
   ChevronLeft,
   ChevronRight,
+  Search,
+  Mail,
 } from "lucide-react";
 import { themeToCssVars, normalizeTheme } from "@/lib/shop-theme";
 
@@ -55,7 +57,7 @@ interface LinkBlock {
 }
 
 interface ShopBlock {
-  type: "hero" | "text" | "image" | "gallery" | "banner" | "links" | "picks" | "video" | "divider" | "reviews" | "newsletter" | "html" | "calendar" | "campaign_live" | "campaign_teaser";
+  type: "hero" | "text" | "image" | "gallery" | "banner" | "links" | "picks" | "video" | "divider" | "reviews" | "newsletter" | "html" | "calendar" | "campaign_live" | "campaign_teaser" | "search" | "biz_contact";
   data: Record<string, unknown>;
 }
 
@@ -448,6 +450,75 @@ function DividerBlock() {
     <div className="mx-auto max-w-2xl px-3 sm:px-4 py-3">
       <hr className="border-gray-200" />
     </div>
+  );
+}
+
+// ─── 검색 블록 (페이지 내 비주얼 검색 박스) ───
+function SearchBlock({ data }: { data: Record<string, unknown> }) {
+  const placeholder = (data.placeholder as string) || "상품 · 키워드 검색";
+  const [query, setQuery] = useState("");
+
+  const handleSearch = () => {
+    if (!query.trim()) return;
+    // 페이지 내 텍스트 매칭 — 첫 매칭 요소로 스크롤
+    const target = Array.from(document.querySelectorAll<HTMLElement>("section, h1, h2, h3, p, a, button")).find(el =>
+      el.innerText?.toLowerCase().includes(query.trim().toLowerCase())
+    );
+    target?.scrollIntoView({ behavior: "smooth", block: "center" });
+  };
+
+  return (
+    <section className="mx-auto max-w-2xl px-3 sm:px-4 py-3">
+      <div className="flex items-center gap-2 rounded-full bg-white px-4 py-3 ring-1 ring-gray-200 focus-within:ring-2 focus-within:ring-gray-900 transition-all">
+        <Search className="h-4 w-4 shrink-0 text-gray-400" strokeWidth={2.4} />
+        <input
+          type="text"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") handleSearch(); }}
+          placeholder={placeholder}
+          className="flex-1 bg-transparent text-[14px] text-gray-900 outline-none placeholder:text-gray-400"
+        />
+        {query && (
+          <button
+            onClick={handleSearch}
+            className="cursor-pointer rounded-full bg-gray-900 px-3 py-1 text-[11px] font-bold text-white hover:bg-gray-800"
+          >
+            검색
+          </button>
+        )}
+      </div>
+    </section>
+  );
+}
+
+// ─── 비즈 제안 블록 (협업 문의 mailto CTA) ───
+function BizContactBlock({ data, creator }: { data: Record<string, unknown>; creator: ShopApiResponse["creator"] }) {
+  const label = (data.label as string) || "비즈니스 제안";
+  const email = (data.email as string) || "";
+  const note = (data.note as string) || "";
+
+  if (!email) return null;
+
+  const subject = encodeURIComponent(`[${creator.name}] 비즈니스 제안`);
+  const href = `mailto:${email}?subject=${subject}`;
+
+  return (
+    <section className="mx-auto max-w-2xl px-3 sm:px-4 py-3">
+      <a
+        href={href}
+        className="group flex items-center gap-3 rounded-2xl bg-white px-4 py-3.5 ring-1 ring-gray-200 hover:ring-gray-300 hover:-translate-y-0.5 transition-all"
+      >
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gray-900">
+          <Mail className="h-[18px] w-[18px] text-white" strokeWidth={2.2} />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-[14px] font-bold tracking-tight text-gray-900">{label}</p>
+          {note && <p className="mt-0.5 text-[11px] text-gray-500 truncate">{note}</p>}
+        </div>
+        <ArrowRight className="h-4 w-4 text-gray-300 group-hover:text-gray-700 transition-colors" strokeWidth={2.4} />
+      </a>
+    </section>
   );
 }
 
@@ -1311,6 +1382,8 @@ function BlockRenderer({ block, creator, shop, picks, reviews, campaigns, slug }
     case "calendar": return <CalendarBlock data={block.data} campaigns={campaigns} slug={slug} />;
     case "campaign_live": return <CampaignLiveBlock data={block.data} campaigns={campaigns} slug={slug} />;
     case "campaign_teaser": return <CampaignTeaserBlock data={block.data} campaigns={campaigns} creatorId={creator.id} />;
+    case "search": return <SearchBlock data={block.data} />;
+    case "biz_contact": return <BizContactBlock data={block.data} creator={creator} />;
     default: return null;
   }
 }

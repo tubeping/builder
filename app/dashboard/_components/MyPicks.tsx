@@ -1,10 +1,74 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, createContext, useContext } from "react";
 
 // ─── 타입 ───
 type SourceType = "tubeping_campaign" | "coupang" | "naver" | "own" | "other";
 type FilterKey = "all" | SourceType;
+
+// ─── PICK 카드별 미니 통계 (pick_clicks 집계) ───
+interface PickStat {
+  clicks: number;
+  visitors: number;
+  ctr: number;
+  top_source: string | null;
+  top_source_pct: number;
+  last_clicked_at: string | null;
+  by_source: { source: string; clicks: number }[];
+}
+
+const PickStatsContext = createContext<Record<string, PickStat> | null>(null);
+
+const SOURCE_DISPLAY: Record<string, { label: string; emoji: string }> = {
+  instagram: { label: "인스타", emoji: "📷" },
+  youtube: { label: "유튜브", emoji: "🎬" },
+  kakao: { label: "카톡", emoji: "💬" },
+  naver: { label: "네이버", emoji: "N" },
+  tiktok: { label: "틱톡", emoji: "🎵" },
+  threads: { label: "스레드", emoji: "🧵" },
+  tubeping: { label: "튜핑", emoji: "🔗" },
+  direct: { label: "다이렉트", emoji: "→" },
+  link: { label: "SNS링크", emoji: "🔗" },
+  banner: { label: "배너", emoji: "🔥" },
+  campaign_live: { label: "공구LIVE", emoji: "🔴" },
+  tubeping_campaign: { label: "공구", emoji: "🛍️" },
+  coupang: { label: "쿠팡", emoji: "쿠" },
+};
+
+/**
+ * PICK 카드 하단 30일 통계 미니 라벨.
+ * "어떤 경로로 들어와서 판매됐는지" 페르소나 니즈에 직결.
+ */
+function PickStatsLabel({ pickId, brandColor = "#C41E1E" }: { pickId: string; brandColor?: string }) {
+  const stats = useContext(PickStatsContext);
+  const stat = stats?.[pickId];
+
+  if (!stat || stat.clicks === 0) {
+    return (
+      <p className="mt-1 text-[9px] text-gray-300 italic">최근 30일 활동 없음</p>
+    );
+  }
+
+  const src = stat.top_source ? SOURCE_DISPLAY[stat.top_source] || { label: stat.top_source, emoji: "•" } : null;
+
+  return (
+    <div className="mt-1 flex items-center gap-1.5 text-[10px]">
+      <span className="text-gray-400">방문</span>
+      <span className="font-bold text-gray-700">{stat.visitors.toLocaleString()}</span>
+      <span className="text-gray-300">·</span>
+      <span className="text-gray-400">클릭</span>
+      <span className="font-bold" style={{ color: brandColor }}>{stat.clicks.toLocaleString()}</span>
+      {src && (
+        <>
+          <span className="text-gray-300">·</span>
+          <span className="text-gray-500" title={`${src.label}에서 ${stat.top_source_pct}% 유입`}>
+            {src.emoji} {stat.top_source_pct}%
+          </span>
+        </>
+      )}
+    </div>
+  );
+}
 
 // ─── 수익 계산 정책 ───
 // 공식: 순마진 = (판매가 - 공급가 - PG수수료 3%) × (1 - 세금 10%)
@@ -670,10 +734,7 @@ function GongguTab({
                           + 코멘트 추가
                         </button>
                       )}
-                      <div className="mt-1.5 flex items-center gap-2 text-[10px] text-gray-400">
-                        <span>클릭 {pick.clicks}</span>
-                        <span>전환 {pick.conversions}</span>
-                      </div>
+                      <PickStatsLabel pickId={pick.id} brandColor="#C41E1E" />
                       <div className="mt-1.5 flex gap-1">
                         <button onClick={() => onToggleVisible(pick.id)}
                           className={`cursor-pointer rounded px-2 py-0.5 text-[9px] font-medium ${pick.visible ? "bg-green-100 text-green-700" : "bg-gray-200 text-gray-500"}`}>
@@ -1292,13 +1353,12 @@ function CoupangTab({
                       <p className="mt-0.5 text-sm font-bold text-[#C41E1E]">{formatPrice(pick.price)}</p>
                       <div className="mt-1.5 flex items-center gap-2 text-[10px] text-gray-400">
                         <span>수수료 3%</span>
-                        <span>·</span>
-                        <span>클릭 {pick.clicks}</span>
                         {pick.external_url && (
                           <a href={pick.external_url} target="_blank" rel="noopener noreferrer"
                             className="ml-auto text-[#C41E1E] hover:underline">링크 ↗</a>
                         )}
                       </div>
+                      <PickStatsLabel pickId={pick.id} brandColor="#C41E1E" />
                       <div className="mt-1.5 flex gap-1">
                         <button onClick={() => onToggleVisible(pick.id)}
                           className={`cursor-pointer rounded px-2 py-0.5 text-[9px] font-medium ${pick.visible ? "bg-green-100 text-green-700" : "bg-gray-200 text-gray-500"}`}>
@@ -1658,12 +1718,12 @@ function NaverTab({
                       <p className="mt-0.5 text-sm font-bold text-[#03C75A]">{formatPrice(pick.price)}</p>
                     )}
                     <div className="mt-1.5 flex items-center gap-2 text-[10px] text-gray-400">
-                      <span>클릭 {pick.clicks}</span>
                       {pick.external_url && (
                         <a href={pick.external_url} target="_blank" rel="noopener noreferrer"
-                          className="text-[#03C75A] hover:underline">링크 ↗</a>
+                          className="ml-auto text-[#03C75A] hover:underline">링크 ↗</a>
                       )}
                     </div>
+                    <PickStatsLabel pickId={pick.id} brandColor="#03C75A" />
                     <div className="mt-1.5 flex gap-1">
                       <button onClick={() => onToggleVisible(pick.id)}
                         className={`cursor-pointer rounded px-2 py-0.5 text-[9px] font-medium ${pick.visible ? "bg-green-100 text-green-700" : "bg-gray-200 text-gray-500"}`}>
@@ -2022,6 +2082,20 @@ export default function MyPicks() {
   const [picks, setPicks] = useState<PickItem[]>(FALLBACK_PICKS);
   const [filter, setFilter] = useState<FilterKey>("all");
   const [isDbConnected, setIsDbConnected] = useState(false);
+  const [pickStats, setPickStats] = useState<Record<string, PickStat>>({});
+
+  // 30일 통계 fetch (페르소나: "어떤 경로로 들어와서 판매됐는지")
+  const loadStats = useCallback(async () => {
+    try {
+      const res = await fetch("/api/picks/stats?days=30");
+      if (res.ok) {
+        const data = await res.json();
+        if (data?.stats) setPickStats(data.stats);
+      }
+    } catch { /* 무시 — 통계 없어도 PICK 자체는 작동 */ }
+  }, []);
+
+  useEffect(() => { loadStats(); }, [loadStats]);
 
   const loadPicks = useCallback(async () => {
     try {
@@ -2104,6 +2178,7 @@ export default function MyPicks() {
   ];
 
   return (
+    <PickStatsContext.Provider value={pickStats}>
     <div className="p-6">
       <div className="mb-5">
         <h2 className="text-xl font-bold text-gray-900">내 PICK</h2>
@@ -2127,5 +2202,6 @@ export default function MyPicks() {
       {filter === "coupang" && <CoupangTab picks={picks} onAddPick={addPick} onRemovePick={removePick} onToggleVisible={toggleVisible} />}
       {filter === "naver" && <NaverTab picks={picks} onAddPick={addPick} onRemovePick={removePick} onToggleVisible={toggleVisible} />}
     </div>
+    </PickStatsContext.Provider>
   );
 }

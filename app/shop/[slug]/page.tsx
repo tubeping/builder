@@ -14,6 +14,8 @@ import {
   Star,
   CheckCircle2,
   ArrowRight,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { themeToCssVars, normalizeTheme } from "@/lib/shop-theme";
 
@@ -522,119 +524,116 @@ function CalendarBlock({ data, campaigns, slug }: { data: Record<string, unknown
     return { label: "종료", style: "bg-gray-400 text-white" };
   };
 
+  const MONTH_EN = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
   return (
     <section className="mx-auto max-w-2xl px-3 sm:px-4 py-3">
-      <div className="flex items-baseline gap-2 mb-4">
-        <CalendarIcon className="h-[18px] w-[18px] shrink-0 self-center text-gray-900" strokeWidth={2.4} />
-        <h2 className="text-[17px] font-black tracking-tight text-gray-900">공구 캘린더</h2>
-        {monthEvents.length > 0 && (
-          <span className="ml-auto rounded-full bg-gray-100 px-2.5 py-0.5 text-[11px] font-bold tabular-nums text-gray-600">{monthEvents.length}건</span>
-        )}
-      </div>
-
-      <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white">
-        {/* 월 네비게이션 */}
-        <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3">
-          <button onClick={goPrevMonth} className="cursor-pointer rounded-lg p-1.5 text-gray-500 hover:bg-gray-50">
-            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-          </button>
-          <p className="text-sm font-bold text-gray-900">
-            {year}년 {month + 1}월
-          </p>
-          <button onClick={goNextMonth} className="cursor-pointer rounded-lg p-1.5 text-gray-500 hover:bg-gray-50">
-            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-            </svg>
-          </button>
-        </div>
-
-        {/* 요일 헤더 */}
-        <div className="grid grid-cols-7 border-b border-gray-100">
-          {["일", "월", "화", "수", "목", "금", "토"].map((d, i) => (
-            <div key={d} className={`py-2 text-center text-[11px] font-medium ${i === 0 ? "text-red-500" : i === 6 ? "text-blue-500" : "text-gray-500"}`}>
-              {d}
+      <div className="overflow-hidden rounded-2xl bg-[#FAF7F2] p-4 sm:p-5">
+        {/* 시그니처 헤더 — 큰 월 숫자 + 영문 월 + 네비 */}
+        <div className="mb-4 flex items-end justify-between">
+          <div className="flex items-end gap-3">
+            <div className="text-[56px] sm:text-[64px] font-black leading-[0.85] tracking-tighter text-gray-900 tabular-nums">
+              {month + 1}
             </div>
-          ))}
+            <div className="pb-1.5">
+              <p className="text-[18px] sm:text-[20px] font-bold text-gray-900 leading-none">
+                {MONTH_EN[month]}
+              </p>
+              <p className="mt-1 text-[12px] font-medium text-gray-500 tabular-nums">{year}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-1 pb-1">
+            {monthEvents.length > 0 && (
+              <span className="mr-1 inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-1 text-[11px] font-bold text-gray-700 ring-1 ring-gray-200">
+                <CalendarIcon className="h-3 w-3 text-[#C41E1E]" strokeWidth={2.6} />
+                <span className="tabular-nums">{monthEvents.length}건</span>
+              </span>
+            )}
+            <button onClick={goPrevMonth} className="cursor-pointer flex h-8 w-8 items-center justify-center rounded-full bg-white text-gray-500 ring-1 ring-gray-200 hover:bg-gray-50 hover:text-gray-900 transition-colors" aria-label="이전 달">
+              <ChevronLeft className="h-4 w-4" strokeWidth={2.4} />
+            </button>
+            <button onClick={goNextMonth} className="cursor-pointer flex h-8 w-8 items-center justify-center rounded-full bg-white text-gray-500 ring-1 ring-gray-200 hover:bg-gray-50 hover:text-gray-900 transition-colors" aria-label="다음 달">
+              <ChevronRight className="h-4 w-4" strokeWidth={2.4} />
+            </button>
+          </div>
         </div>
 
-        {/* 날짜 그리드 */}
-        <div className="grid grid-cols-7">
-          {cells.map((cell, i) => {
-            if (!cell.date) {
-              return <div key={i} className="min-h-[56px] border-r border-b border-gray-50 last:border-r-0" />;
-            }
-            const date = cell.date;
-            const isToday = date.getTime() === today.getTime();
-            const cellEvents = eventsOnDate(date);
-            const hasActive = cellEvents.some((e) => e.status === "active");
-            const hasUpcoming = cellEvents.some((e) => e.status === "upcoming");
-            const dayOfWeek = date.getDay();
-            const isSelected = selectedDate?.getTime() === date.getTime();
+        {/* 캘린더 그리드 컨테이너 */}
+        <div className="overflow-hidden rounded-xl bg-white shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
+          {/* 요일 헤더 */}
+          <div className="grid grid-cols-7 border-b border-gray-100">
+            {["일", "월", "화", "수", "목", "금", "토"].map((d, i) => (
+              <div key={d} className={`py-2.5 text-center text-[11px] font-bold ${i === 0 ? "text-[#C41E1E]" : i === 6 ? "text-blue-500" : "text-gray-400"}`}>
+                {d}
+              </div>
+            ))}
+          </div>
 
-            return (
-              <button
-                key={i}
-                onClick={() => setSelectedDate(cellEvents.length > 0 ? date : null)}
-                disabled={cellEvents.length === 0}
-                className={`relative min-h-[56px] cursor-pointer border-r border-b border-gray-50 p-1 text-left transition-colors last:border-r-0 ${
-                  cellEvents.length > 0 ? "hover:bg-gray-50" : "cursor-default"
-                } ${isSelected ? "bg-[#fff0f0]" : ""}`}
-              >
-                <div className="flex items-center justify-between">
-                  <span
-                    className={`flex h-5 w-5 items-center justify-center text-[11px] font-medium ${
-                      isToday
-                        ? "rounded-full bg-[#C41E1E] text-white"
-                        : dayOfWeek === 0
-                        ? "text-red-500"
-                        : dayOfWeek === 6
-                        ? "text-blue-500"
-                        : "text-gray-700"
-                    }`}
-                  >
-                    {date.getDate()}
-                  </span>
-                </div>
-                {/* 이벤트 표시 */}
-                {cellEvents.length > 0 && (
-                  <div className="mt-0.5 space-y-0.5">
-                    {cellEvents.slice(0, 2).map((e, idx) => (
-                      <div
-                        key={idx}
-                        className={`truncate rounded px-1 py-0.5 text-[9px] font-medium ${
-                          e.status === "active"
-                            ? "bg-[#C41E1E] text-white"
-                            : e.status === "upcoming"
-                            ? "bg-blue-100 text-blue-700"
-                            : "bg-gray-100 text-gray-500"
-                        }`}
-                      >
-                        {e.title}
-                      </div>
-                    ))}
-                    {cellEvents.length > 2 && (
-                      <div className="text-[9px] text-gray-400">+{cellEvents.length - 2}</div>
-                    )}
+          {/* 날짜 그리드 — thumbnail 인라인 */}
+          <div className="grid grid-cols-7">
+            {cells.map((cell, i) => {
+              if (!cell.date) {
+                return <div key={i} className="min-h-[64px] border-r border-b border-gray-50 last:border-r-0" />;
+              }
+              const date = cell.date;
+              const isToday = date.getTime() === today.getTime();
+              const cellEvents = eventsOnDate(date);
+              const hasActive = cellEvents.some((e) => e.status === "active");
+              const hasUpcoming = cellEvents.some((e) => e.status === "upcoming");
+              const dayOfWeek = date.getDay();
+              const isSelected = selectedDate?.getTime() === date.getTime();
+              const firstEvent = cellEvents[0];
+              const firstEventImage = firstEvent?.image;
+
+              return (
+                <button
+                  key={i}
+                  onClick={() => setSelectedDate(cellEvents.length > 0 ? date : null)}
+                  disabled={cellEvents.length === 0}
+                  className={`relative min-h-[64px] cursor-pointer border-r border-b border-gray-50 p-1.5 text-left transition-colors last:border-r-0 ${
+                    cellEvents.length > 0 ? "hover:bg-gray-50/70" : "cursor-default"
+                  } ${isSelected ? "bg-[#FFF0F0]" : ""}`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span
+                      className={`flex h-5 w-5 items-center justify-center text-[11px] font-bold tabular-nums ${
+                        isToday
+                          ? "rounded-full bg-[#C41E1E] text-white"
+                          : dayOfWeek === 0
+                          ? "text-[#C41E1E]"
+                          : dayOfWeek === 6
+                          ? "text-blue-500"
+                          : "text-gray-700"
+                      }`}
+                    >
+                      {date.getDate()}
+                    </span>
                   </div>
-                )}
-                {/* 점 인디케이터 (공간 부족할 때 폴백) */}
-                {cellEvents.length > 0 && (hasActive || hasUpcoming) && (
-                  <div className="absolute bottom-1 right-1 flex gap-0.5">
-                    {hasActive && <span className="h-1.5 w-1.5 rounded-full bg-[#C41E1E]" />}
-                    {hasUpcoming && !hasActive && <span className="h-1.5 w-1.5 rounded-full bg-blue-400" />}
-                  </div>
-                )}
-              </button>
-            );
-          })}
+                  {/* 이벤트 표시 — thumbnail 우선 + 카운트 */}
+                  {cellEvents.length > 0 && (
+                    <div className="mt-1 flex items-center gap-0.5">
+                      {firstEventImage ? (
+                        <span className={`relative inline-block h-7 w-7 overflow-hidden rounded-md ring-2 ${hasActive ? "ring-[#C41E1E]" : "ring-white"} shadow-sm`}>
+                          <img src={firstEventImage} alt="" className="h-full w-full object-cover" />
+                        </span>
+                      ) : (
+                        <span className={`inline-block h-1.5 w-1.5 rounded-full ${hasActive ? "bg-[#C41E1E]" : hasUpcoming ? "bg-blue-400" : "bg-gray-300"}`} />
+                      )}
+                      {cellEvents.length > 1 && (
+                        <span className="text-[9px] font-bold tabular-nums text-gray-500">+{cellEvents.length - 1}</span>
+                      )}
+                    </div>
+                  )}
+                </button>
+              );
+            })}
+          </div>
         </div>
 
         {/* 선택된 날짜 이벤트 상세 */}
         {selectedDate && selectedEvents.length > 0 && (
-          <div className="border-t border-gray-100 bg-gray-50 p-4">
-            <p className="mb-2 text-xs font-medium text-gray-500">
+          <div className="mt-3">
+            <p className="mb-2 text-[12px] font-bold text-gray-700 tabular-nums">
               {selectedDate.getMonth() + 1}월 {selectedDate.getDate()}일 ({["일", "월", "화", "수", "목", "금", "토"][selectedDate.getDay()]})
             </p>
             <div className="space-y-2">
@@ -644,31 +643,28 @@ function CalendarBlock({ data, campaigns, slug }: { data: Record<string, unknown
                   <a
                     key={e.id}
                     href={e.link_url ? addUtm(e.link_url, slug) : "#"}
-                    className="flex items-center gap-3 rounded-lg border border-gray-200 bg-white p-3 hover:border-gray-300 hover:shadow-sm transition-all"
+                    className="flex items-center gap-3 rounded-xl bg-white p-3 ring-1 ring-gray-200 hover:ring-gray-300 hover:-translate-y-0.5 transition-all"
                   >
-                    <div className="h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-gray-100">
+                    <div className="h-14 w-14 shrink-0 overflow-hidden rounded-lg bg-gray-100 ring-1 ring-gray-100">
                       {e.image ? (
                         <img src={e.image} alt="" className="h-full w-full object-cover" />
                       ) : (
-                        <div className="flex h-full items-center justify-center text-gray-300">
-                          <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
-                            <path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                          </svg>
+                        <div className="flex h-full items-center justify-center">
+                          <Package className="h-5 w-5 text-gray-300" strokeWidth={1.5} />
                         </div>
                       )}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-1.5">
-                        <span className={`rounded-full px-1.5 py-0.5 text-[9px] font-medium ${badge.style}`}>{badge.label}</span>
-                      </div>
-                      <p className="mt-1 line-clamp-1 text-sm font-medium text-gray-900">{e.title}</p>
-                      <p className="text-[10px] text-gray-400">
+                      <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-bold tracking-tight ${badge.style}`}>{badge.label}</span>
+                      <p className="mt-1 line-clamp-1 text-[13px] font-bold text-gray-900">{e.title}</p>
+                      <p className="text-[11px] text-gray-400 tabular-nums">
                         {new Date(e.start_date).getMonth() + 1}/{new Date(e.start_date).getDate()}
                         {" ~ "}
                         {new Date(e.end_date).getMonth() + 1}/{new Date(e.end_date).getDate()}
                         {e.price ? ` · ${formatPrice(e.price)}` : ""}
                       </p>
                     </div>
+                    <ArrowRight className="h-4 w-4 shrink-0 text-gray-300" strokeWidth={2.4} />
                   </a>
                 );
               })}
@@ -677,15 +673,15 @@ function CalendarBlock({ data, campaigns, slug }: { data: Record<string, unknown
         )}
 
         {/* 범례 */}
-        <div className="flex items-center gap-3 border-t border-gray-100 px-4 py-2.5 text-[10px] text-gray-400">
+        <div className="mt-3 flex items-center gap-3 text-[10px] font-medium text-gray-400">
           <span className="flex items-center gap-1">
-            <span className="h-2 w-2 rounded-full bg-[#C41E1E]" /> 진행중
+            <span className="h-1.5 w-1.5 rounded-full bg-[#C41E1E]" /> 진행중
           </span>
           <span className="flex items-center gap-1">
-            <span className="h-2 w-2 rounded-full bg-blue-400" /> 예정
+            <span className="h-1.5 w-1.5 rounded-full bg-blue-400" /> 예정
           </span>
           <span className="flex items-center gap-1">
-            <span className="h-2 w-2 rounded-full bg-gray-400" /> 종료
+            <span className="h-1.5 w-1.5 rounded-full bg-gray-400" /> 종료
           </span>
         </div>
       </div>

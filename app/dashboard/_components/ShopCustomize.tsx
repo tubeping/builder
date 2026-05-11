@@ -199,6 +199,29 @@ function BlockEditor({ block, onChange }: { block: ShopBlock; onChange: (data: R
         {block.type === "video" && (<div><label className={lc}>유튜브 URL</label><input type="url" value={(d.youtube_url as string) || ""} onChange={e => onChange({ ...d, youtube_url: e.target.value })} placeholder="https://youtube.com/watch?v=..." className={ic} /></div>)}
         {block.type === "picks" && (<>
           <p className="text-xs text-gray-500 bg-gray-50 rounded-lg p-3">내 PICK에 등록된 상품이 자동 표시됩니다</p>
+          <div>
+            <label className={lc}>표시 방식</label>
+            <div className="grid grid-cols-2 gap-2">
+              {([
+                { key: "filter", label: "필터", desc: "카테고리 chip으로 전환" },
+                { key: "group", label: "그룹", desc: "카테고리별 섹션 분리" },
+              ] as const).map(opt => {
+                const active = ((d.display as string) || "filter") === opt.key;
+                return (
+                  <button
+                    key={opt.key}
+                    onClick={() => onChange({ ...d, display: opt.key })}
+                    className={`cursor-pointer rounded-xl px-3 py-2.5 text-left transition-all ${
+                      active ? "bg-[#FFF0F0] ring-2 ring-[#C41E1E]" : "bg-white ring-1 ring-gray-200 hover:ring-gray-300"
+                    }`}
+                  >
+                    <p className={`text-[12px] font-bold ${active ? "text-[#C41E1E]" : "text-gray-900"}`}>{opt.label}</p>
+                    <p className="mt-0.5 text-[10px] text-gray-400 leading-tight">{opt.desc}</p>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
           <div><label className={lc}>표시 개수</label><input type="number" value={(d.limit as number) || 12} onChange={e => onChange({ ...d, limit: parseInt(e.target.value) || 12 })} min={1} max={50} className="w-24 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm outline-none focus:border-[#C41E1E]" /></div>
         </>)}
         {block.type === "gallery" && (() => {

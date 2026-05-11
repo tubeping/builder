@@ -763,9 +763,12 @@ function HtmlBlock({ data }: { data: Record<string, unknown> }) {
 }
 
 // ─── PICK 그리드 ───
-function PicksBlock({ picks, slug }: { picks: DisplayPick[]; slug: string }) {
+function PicksBlock({ data, picks, slug }: { data?: Record<string, unknown>; picks: DisplayPick[]; slug: string }) {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [detail, setDetail] = useState<DisplayPick | null>(null);
+
+  // display mode: "filter" (기존 - chip 필터) | "group" (인포크 스타일 - 카테고리별 section)
+  const displayMode = ((data?.display as string) || "filter") as "filter" | "group";
 
   const categories = [...new Set(picks.map((p) => p.category).filter(Boolean))];
   const filtered = selectedCategory ? picks.filter((p) => p.category === selectedCategory) : picks;
@@ -776,6 +779,88 @@ function PicksBlock({ picks, slug }: { picks: DisplayPick[]; slug: string }) {
     </svg>
   );
 
+  // 상품 카드 (모드 공용 — 일관성 유지)
+  const renderCard = (pick: DisplayPick) => {
+    const badge = sourceBadge(pick.source);
+    return (
+      <button
+        key={pick.id}
+        onClick={() => setDetail(pick)}
+        className="group cursor-pointer overflow-hidden rounded-2xl bg-white text-left transition-all hover:-translate-y-0.5"
+      >
+        <div className="relative aspect-square overflow-hidden rounded-xl bg-gray-100 ring-1 ring-gray-100 group-hover:ring-gray-200 transition-all">
+          {pick.image ? (
+            <img src={pick.image} alt="" className="h-full w-full object-cover transition-transform group-hover:scale-[1.03]" />
+          ) : (
+            <div className="flex h-full items-center justify-center">{IMG_PLACEHOLDER}</div>
+          )}
+          <span className={`absolute left-2 top-2 rounded-full px-2 py-0.5 text-[10px] font-bold tracking-tight ${badge.style}`}>{badge.label}</span>
+        </div>
+        <div className="px-1 pt-2.5 pb-1">
+          <p className="line-clamp-2 text-[13px] font-semibold text-gray-900 leading-snug min-h-[2.4em]">{pick.name}</p>
+          <p className="mt-1.5 text-[15px] font-black tabular-nums text-[#C41E1E]">{formatPrice(pick.price)}</p>
+        </div>
+      </button>
+    );
+  };
+
+  // ─── 그룹 모드 (카테고리별 section) — 인포크 스타일 ───
+  if (displayMode === "group" && categories.length > 1) {
+    return (
+      <section className="mx-auto max-w-2xl px-3 sm:px-4 py-3">
+        <div className="flex items-baseline gap-2 mb-5">
+          <Package className="h-[18px] w-[18px] shrink-0 self-center text-gray-900" strokeWidth={2.4} />
+          <h2 className="text-[17px] font-black tracking-tight text-gray-900">PICK</h2>
+          <span className="ml-auto rounded-full bg-gray-100 px-2.5 py-0.5 text-[11px] font-bold tabular-nums text-gray-600">
+            {picks.length}
+          </span>
+        </div>
+
+        <div className="space-y-7">
+          {categories.map((cat) => {
+            const items = picks.filter((p) => p.category === cat);
+            if (items.length === 0) return null;
+            return (
+              <div key={cat}>
+                <div className="mb-3 flex items-baseline gap-2">
+                  <h3 className="text-[15px] font-bold tracking-tight text-gray-900">{cat}</h3>
+                  <span className="text-[11px] font-bold tabular-nums text-gray-400">{items.length}</span>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  {items.map(renderCard)}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* 상세 모달 (filter 모드와 동일 JSX — 기존 함수 끝 모달 재사용) */}
+        {detail && (
+          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40" onClick={() => setDetail(null)}>
+            <div className="w-full max-w-md rounded-t-2xl sm:rounded-2xl bg-white p-4 sm:p-5 shadow-xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+              <div className="mb-4 aspect-[4/3] sm:aspect-square w-full overflow-hidden rounded-xl bg-gray-100">
+                {detail.image ? <img src={detail.image} alt="" className="h-full w-full object-cover" /> : <div className="flex h-full items-center justify-center">{IMG_PLACEHOLDER}</div>}
+              </div>
+              <span className={`inline-block rounded-full px-2.5 py-0.5 text-[10px] font-medium ${sourceBadge(detail.source).style}`}>{sourceBadge(detail.source).label}</span>
+              <h3 className="mt-2 text-base font-semibold text-gray-900 leading-snug">{detail.name}</h3>
+              <p className="mt-2 text-xl font-bold text-[#C41E1E]">{formatPrice(detail.price)}</p>
+              {detail.category && <p className="mt-1 text-xs text-gray-400">카테고리: {detail.category}</p>}
+              {detail.curationComment && <p className="mt-2 text-sm text-gray-600 italic">&ldquo;{detail.curationComment}&rdquo;</p>}
+              <div className="mt-5 flex gap-2">
+                <button onClick={() => setDetail(null)} className="flex-1 cursor-pointer rounded-xl border border-gray-300 py-3 text-sm font-medium text-gray-600 hover:bg-gray-50">닫기</button>
+                <a href={addUtm(detail.buyUrl, slug)} target="_blank" rel="noopener noreferrer"
+                  onClick={() => trackClick({ slug, pickId: detail.id, sourceType: detail.source, targetUrl: detail.buyUrl })}
+                  className="flex-[2] flex items-center justify-center rounded-xl py-3 text-sm font-medium text-white hover:opacity-90"
+                  style={{ background: "var(--accent)" }}>구매하러 가기</a>
+              </div>
+            </div>
+          </div>
+        )}
+      </section>
+    );
+  }
+
+  // ─── 필터 모드 (기존) — 단일 grid + chip ───
   return (
     <section className="mx-auto max-w-2xl px-3 sm:px-4 py-3">
       <div className="flex items-baseline gap-2 mb-4">
@@ -796,29 +881,7 @@ function PicksBlock({ picks, slug }: { picks: DisplayPick[]; slug: string }) {
       )}
 
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-        {filtered.map((pick) => {
-          const badge = sourceBadge(pick.source);
-          return (
-            <button
-              key={pick.id}
-              onClick={() => setDetail(pick)}
-              className="group cursor-pointer overflow-hidden rounded-2xl bg-white text-left transition-all hover:-translate-y-0.5"
-            >
-              <div className="relative aspect-square overflow-hidden rounded-xl bg-gray-100 ring-1 ring-gray-100 group-hover:ring-gray-200 transition-all">
-                {pick.image ? (
-                  <img src={pick.image} alt="" className="h-full w-full object-cover transition-transform group-hover:scale-[1.03]" />
-                ) : (
-                  <div className="flex h-full items-center justify-center">{IMG_PLACEHOLDER}</div>
-                )}
-                <span className={`absolute left-2 top-2 rounded-full px-2 py-0.5 text-[10px] font-bold tracking-tight ${badge.style}`}>{badge.label}</span>
-              </div>
-              <div className="px-1 pt-2.5 pb-1">
-                <p className="line-clamp-2 text-[13px] font-semibold text-gray-900 leading-snug min-h-[2.4em]">{pick.name}</p>
-                <p className="mt-1.5 text-[15px] font-black tabular-nums text-[#C41E1E]">{formatPrice(pick.price)}</p>
-              </div>
-            </button>
-          );
-        })}
+        {filtered.map(renderCard)}
       </div>
 
       {/* 상품 상세 모달 */}
@@ -1211,7 +1274,7 @@ function BlockRenderer({ block, creator, shop, picks, reviews, campaigns, slug }
     case "gallery": return <GalleryBlock data={block.data} />;
     case "banner": return <BannerBlock data={block.data} slug={slug} />;
     case "links": return <LinksBlock data={block.data} slug={slug} />;
-    case "picks": return <PicksBlock picks={picks} slug={slug} />;
+    case "picks": return <PicksBlock data={block.data} picks={picks} slug={slug} />;
     case "video": return <VideoBlock data={block.data} />;
     case "divider": return <DividerBlock />;
     case "reviews": return <ReviewsBlock reviews={reviews} />;

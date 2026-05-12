@@ -70,6 +70,16 @@ function LoginPageInner() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: email.trim(), event_type: "login_success", method: "email" }),
       }).catch(() => {});
+
+      // MFA 활성 사용자는 /verify-mfa로 우회
+      try {
+        const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+        if (aal?.nextLevel === "aal2" && aal.currentLevel !== "aal2") {
+          router.push(`/verify-mfa?next=${encodeURIComponent(next)}`);
+          return;
+        }
+      } catch { /* MFA 미설정 시 무시 */ }
+
       router.push(next);
     } catch (e) {
       setErr(e instanceof Error ? e.message : "로그인 실패");

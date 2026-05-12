@@ -625,19 +625,192 @@ function SecuritySection() {
         )}
       </div>
 
-      {/* 2FA 자리 — Phase 4 */}
-      <div className="rounded-xl border-2 border-dashed border-gray-200 p-5">
-        <div className="flex items-start gap-3">
-          <span className="text-2xl">🔐</span>
-          <div className="flex-1">
-            <h3 className="text-base font-semibold text-gray-900">2단계 인증 (2FA)</h3>
-            <p className="mt-1 text-xs text-gray-500">
-              비밀번호 외 추가 인증으로 계정 보안을 강화합니다. 곧 출시 예정.
-            </p>
-          </div>
-          <span className="rounded-full bg-gray-100 px-2.5 py-0.5 text-[10px] font-bold text-gray-500">준비 중</span>
+      <TwoFactorSection />
+    </div>
+  );
+}
+
+// ─── 2FA (TOTP) ───
+interface TotpFactor {
+  id: string;
+  friendly_name?: string;
+  status: "verified" | "unverified";
+  created_at: string;
+}
+
+function TwoFactorSection() {
+  const [factors, setFactors] = useState<TotpFactor[]>([]);
+  const [step, setStep] = useState<"loading" | "idle" | "enrolling" | "verifying" | "active">("loading");
+  const [qrSvg, setQrSvg] = useState("");
+  const [secret, setSecret] = useState("");
+  const [factorId, setFactorId] = useState("");
+  const [code, setCode] = useState("");
+  const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const refresh = async () => {
+    const supabase = createSupabaseBrowser();
+    const { data } = await supabase.auth.mfa.listFactors();
+    const totps = (data?.totp || []) as TotpFactor[];
+    setFactors(totps);
+    const verified = totps.find((f) => f.status === "verified");
+    setStep(verified ? "active" : "idle");
+  };
+
+  useEffect(() => { refresh(); }, []);
+
+  const handleEnroll = async () => {
+    setErr(""); setBusy(true);
+    try {
+      const supabase = createSupabaseBrowser();
+      const { data, error } = await supabase.auth.mfa.enroll({
+        factorType: "totp",
+        friendlyName: "TubePing-" + new Date().toISOString().slice(0, 10),
+      });
+      if (error) { setErr(error.message); return; }
+      setQrSvg(data.totp.qr_code);
+      setSecret(data.totp.secret);
+      setFactorId(data.id);
+      setStep("verifying");
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "오류");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleVerify = async () => {
+    if (!/^\d{6}$/.test(code)) { setErr("6자리 숫자 코드를 입력해주세요"); return; }
+    setErr(""); setBusy(true);
+    try {
+      const supabase = createSupabaseBrowser();
+      const { data: challenge, error: chErr } = await supabase.auth.mfa.challenge({ factorId });
+      if (chErr) { setErr(chErr.message); return; }
+      const { error: vErr } = await supabase.auth.mfa.verify({
+        factorId, challengeId: challenge.id, code,
+      });
+      if (vErr) { setErr("코드가 일치하지 않아요. 다시 시도해주세요"); return; }
+      await refresh();
+      setQrSvg(""); setSecret(""); setFactorId(""); setCode("");
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "검증 실패");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleDisable = async (fid: string) => {
+    if (!confirm("2단계 인증을 해제하시겠어요? 계정 보안이 약해집니다.")) return;
+    setBusy(true);
+    try {
+      const supabase = createSupabaseBrowser();
+      await supabase.auth.mfa.unenroll({ factorId: fid });
+      await refresh();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleCancelEnroll = async () => {
+    if (factorId) {
+      const supabase = createSupabaseBrowser();
+      await supabase.auth.mfa.unenroll({ factorId });
+    }
+    setQrSvg(""); setSecret(""); setFactorId(""); setCode(""); setErr("");
+    await refresh();
+  };
+
+  if (step === "loading") {
+    return (
+      <div className="rounded-xl border border-gray-200 p-5">
+        <div className="flex items-center justify-center py-6">
+          <div className="h-5 w-5 animate-spin rounded-full border-2 border-gray-200 border-t-[#C41E1E]" />
         </div>
       </div>
+    );
+  }
+
+  return (
+    <div className="rounded-xl border border-gray-200 p-5">
+      <div className="flex items-start gap-3 mb-4">
+        <span className="text-2xl">🔐</span>
+        <div className="flex-1">
+          <h3 className="text-base font-semibold text-gray-900">2단계 인증 (TOTP)</h3>
+          <p className="mt-1 text-xs text-gray-500 leading-relaxed">
+            Google Authenticator·1Password·Authy 등 OTP 앱과 연동하여 로그인 시 6자리 코드를 추가로 요구합니다.
+          </p>
+        </div>
+        {step === "active" && (
+          <span className="rounded-full bg-green-100 px-2.5 py-0.5 text-[10px] font-bold text-green-700">활성</span>
+        )}
+      </div>
+
+      {/* idle — 활성화 전 */}
+      {step === "idle" && (
+        <button onClick={handleEnroll} disabled={busy}
+          className="cursor-pointer rounded-lg bg-gray-900 px-5 py-2.5 text-sm font-bold text-white hover:bg-gray-800 disabled:opacity-50">
+          {busy ? "준비 중…" : "2단계 인증 활성화"}
+        </button>
+      )}
+
+      {/* verifying — QR 표시 + 코드 입력 */}
+      {step === "verifying" && (
+        <div className="space-y-4">
+          <div className="rounded-lg bg-gray-50 p-4 text-center">
+            <p className="mb-2 text-xs font-bold text-gray-700">1️⃣ OTP 앱에서 QR 스캔 또는 시크릿 키 입력</p>
+            <div className="mx-auto mb-2 inline-block bg-white p-3 rounded-lg border border-gray-200"
+              dangerouslySetInnerHTML={{ __html: qrSvg }} />
+            <p className="mt-2 text-[10px] text-gray-400">또는 시크릿 키 직접 입력:</p>
+            <code className="mt-1 inline-block rounded bg-white px-2 py-1 text-[11px] font-mono text-gray-700 border border-gray-200">{secret}</code>
+          </div>
+
+          <div>
+            <label className="mb-1 block text-xs font-bold text-gray-700">2️⃣ 앱에 표시된 6자리 코드 입력</label>
+            <input type="text" value={code}
+              onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+              placeholder="000000" maxLength={6}
+              className="w-full rounded-lg border border-gray-300 px-3 py-3 text-center text-lg font-mono tracking-[0.3em] outline-none focus:border-[#C41E1E]" />
+          </div>
+
+          {err && <p className="text-xs text-red-600">{err}</p>}
+
+          <div className="flex gap-2">
+            <button onClick={handleCancelEnroll} disabled={busy}
+              className="flex-1 cursor-pointer rounded-lg border border-gray-300 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50">
+              취소
+            </button>
+            <button onClick={handleVerify} disabled={busy || code.length !== 6}
+              className="flex-1 cursor-pointer rounded-lg bg-[#C41E1E] py-2.5 text-sm font-bold text-white hover:bg-[#A01818] disabled:opacity-40">
+              {busy ? "검증 중…" : "활성화"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* active — 활성 상태 */}
+      {step === "active" && factors.length > 0 && (
+        <div className="space-y-2">
+          {factors.filter(f => f.status === "verified").map((f) => (
+            <div key={f.id} className="flex items-center justify-between rounded-lg border border-gray-100 bg-gray-50/50 px-3 py-2.5">
+              <div className="text-xs">
+                <p className="font-bold text-gray-900">{f.friendly_name || "OTP 앱"}</p>
+                <p className="mt-0.5 text-[10px] text-gray-500">
+                  등록일: {new Date(f.created_at).toLocaleDateString("ko-KR")}
+                </p>
+              </div>
+              <button onClick={() => handleDisable(f.id)} disabled={busy}
+                className="cursor-pointer rounded-md border border-red-200 bg-white px-3 py-1.5 text-[11px] font-medium text-red-600 hover:bg-red-50">
+                해제
+              </button>
+            </div>
+          ))}
+          <p className="mt-2 text-[10px] text-gray-400">
+            ✅ 다음 로그인부터 6자리 코드를 추가로 요구합니다.
+          </p>
+        </div>
+      )}
+
+      {step === "idle" && err && <p className="mt-3 text-xs text-red-600">{err}</p>}
     </div>
   );
 }

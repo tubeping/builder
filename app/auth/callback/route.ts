@@ -36,6 +36,20 @@ export async function GET(request: NextRequest) {
 
   const user = sessionData.user;
 
+  // 로그인 이벤트 로그 (fire-and-forget)
+  const userAgent = request.headers.get("user-agent") || "";
+  const provider = user.app_metadata?.provider || "email";
+  void fetch(`${origin}/api/auth/log-event`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "User-Agent": userAgent },
+    body: JSON.stringify({
+      email: user.email || "",
+      event_type: "login_success",
+      method: provider === "google" ? "google" : "email",
+      user_id: user.id,
+    }),
+  }).catch(() => { /* swallow */ });
+
   // creators 테이블에 행이 없으면 신규 — 자동 생성 + 온보딩 강제
   const { data: existing } = await supabase
     .from("creators")

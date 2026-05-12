@@ -54,8 +54,22 @@ function LoginPageInner() {
       if (error) {
         setErr(translateAuthError(error.message));
         setLoading(false);
+        void fetch("/api/auth/log-event", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: email.trim(), event_type: "login_failed", method: "email",
+            error_message: error.message,
+          }),
+        }).catch(() => {});
         return;
       }
+      // 이메일 로그인 성공 로그 (Google은 callback에서 처리)
+      void fetch("/api/auth/log-event", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim(), event_type: "login_success", method: "email" }),
+      }).catch(() => {});
       router.push(next);
     } catch (e) {
       setErr(e instanceof Error ? e.message : "로그인 실패");

@@ -6,10 +6,11 @@ import { createSupabaseBrowser } from "@/lib/supabase-browser";
 
 // ─── 메인 컴포넌트 ───
 export default function Settings() {
-  const [activeSection, setActiveSection] = useState<"account" | "notify" | "bank" | "biz" | "affiliate">("account");
+  const [activeSection, setActiveSection] = useState<"account" | "security" | "notify" | "bank" | "biz" | "affiliate">("account");
 
   const SECTIONS = [
     { key: "account" as const, label: "계정", icon: "👤" },
+    { key: "security" as const, label: "보안 / 로그인 이력", icon: "🔒" },
     { key: "notify" as const, label: "알림", icon: "🔔" },
     { key: "bank" as const, label: "은행 계좌", icon: "🏦" },
     { key: "biz" as const, label: "사업자 정보", icon: "📋" },
@@ -45,6 +46,7 @@ export default function Settings() {
         {/* 콘텐츠 */}
         <div className="flex-1">
           {activeSection === "account" && <AccountSection />}
+          {activeSection === "security" && <SecuritySection />}
           {activeSection === "notify" && <NotifySection />}
           {activeSection === "bank" && <BankSection />}
           {activeSection === "biz" && <BizSection />}
@@ -552,6 +554,90 @@ function Toggle({ label, desc, value, onChange }: { label: string; desc: string;
           }`}
         />
       </button>
+    </div>
+  );
+}
+
+// ─── 보안 / 로그인 이력 섹션 ───
+interface LoginLog {
+  id: string;
+  event_type: string;
+  method: string | null;
+  device: string | null;
+  ip_hash: string | null;
+  error_message: string | null;
+  created_at: string;
+}
+
+const EVENT_META: Record<string, { label: string; bg: string; color: string; icon: string }> = {
+  login_success: { label: "로그인 성공", bg: "bg-green-50", color: "text-green-700", icon: "✅" },
+  login_failed: { label: "로그인 실패", bg: "bg-red-50", color: "text-red-700", icon: "⚠️" },
+  logout: { label: "로그아웃", bg: "bg-gray-50", color: "text-gray-600", icon: "🚪" },
+  password_reset: { label: "비번 재설정", bg: "bg-blue-50", color: "text-blue-700", icon: "🔑" },
+  signup: { label: "가입", bg: "bg-purple-50", color: "text-purple-700", icon: "✨" },
+};
+
+function SecuritySection() {
+  const [logs, setLogs] = useState<LoginLog[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch("/api/auth/login-history")
+      .then(r => r.ok ? r.json() : { logs: [] })
+      .then(d => { setLogs(d.logs || []); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, []);
+
+  return (
+    <div className="space-y-4">
+      <div className="rounded-xl border border-gray-200 p-5">
+        <h3 className="text-base font-semibold text-gray-900">로그인 활동 이력</h3>
+        <p className="mt-1 text-xs text-gray-500">
+          본인 계정의 최근 50건 로그인·로그아웃 기록입니다. 본인 활동이 아닌 게 있으면 즉시 비밀번호를 변경하세요.
+        </p>
+
+        {loading ? (
+          <div className="py-8 flex justify-center">
+            <div className="h-6 w-6 animate-spin rounded-full border-2 border-gray-200 border-t-[#C41E1E]" />
+          </div>
+        ) : logs.length === 0 ? (
+          <p className="mt-4 py-6 text-center text-xs text-gray-400">아직 기록이 없어요</p>
+        ) : (
+          <div className="mt-4 space-y-1.5 max-h-[400px] overflow-y-auto">
+            {logs.map((l) => {
+              const meta = EVENT_META[l.event_type] || { label: l.event_type, bg: "bg-gray-50", color: "text-gray-600", icon: "•" };
+              const dt = new Date(l.created_at).toLocaleString("ko-KR", { dateStyle: "short", timeStyle: "short" });
+              return (
+                <div key={l.id} className="flex items-center gap-3 rounded-lg border border-gray-100 p-2.5">
+                  <span className={`shrink-0 inline-flex items-center gap-1 rounded-full ${meta.bg} ${meta.color} px-2 py-0.5 text-[10px] font-bold`}>
+                    <span>{meta.icon}</span>{meta.label}
+                  </span>
+                  <div className="flex-1 min-w-0 flex items-center gap-2 text-[11px] text-gray-500">
+                    {l.method && <span>{l.method === "google" ? "🔵 Google" : l.method === "email" ? "📧 이메일" : l.method}</span>}
+                    {l.device && <span>· {l.device === "mobile" ? "📱" : l.device === "tablet" ? "📲" : "💻"} {l.device}</span>}
+                    {l.error_message && <span className="text-red-500 truncate">· {l.error_message}</span>}
+                  </div>
+                  <span className="text-[10px] text-gray-400 shrink-0">{dt}</span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* 2FA 자리 — Phase 4 */}
+      <div className="rounded-xl border-2 border-dashed border-gray-200 p-5">
+        <div className="flex items-start gap-3">
+          <span className="text-2xl">🔐</span>
+          <div className="flex-1">
+            <h3 className="text-base font-semibold text-gray-900">2단계 인증 (2FA)</h3>
+            <p className="mt-1 text-xs text-gray-500">
+              비밀번호 외 추가 인증으로 계정 보안을 강화합니다. 곧 출시 예정.
+            </p>
+          </div>
+          <span className="rounded-full bg-gray-100 px-2.5 py-0.5 text-[10px] font-bold text-gray-500">준비 중</span>
+        </div>
+      </div>
     </div>
   );
 }

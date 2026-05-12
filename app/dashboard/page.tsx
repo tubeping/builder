@@ -101,6 +101,14 @@ export default function DashboardPage() {
     setLoggingOut(true);
     try {
       const supabase = createSupabaseBrowser();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user?.email) {
+        void fetch("/api/auth/log-event", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: user.email, event_type: "logout" }),
+        }).catch(() => {});
+      }
       await supabase.auth.signOut();
       router.push("/login");
     } catch {

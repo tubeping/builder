@@ -39,7 +39,7 @@ export default function OnboardingPage() {
   const [slugChecking, setSlugChecking] = useState(false);
   const [slugStatus, setSlugStatus] = useState<"" | "available" | "taken" | "invalid">("");
 
-  // 1) 인증 + 기존 온보딩 완료 여부 확인
+  // 1) 인증 + 기존 온보딩 완료 여부 확인 + 동의 audit 기록 (OAuth 신규 가입자)
   useEffect(() => {
     let alive = true;
     (async () => {
@@ -50,6 +50,29 @@ export default function OnboardingPage() {
         if (!user) {
           router.replace("/login?next=/onboarding");
           return;
+        }
+
+        // OAuth 가입자 동의 audit 기록 (sessionStorage에 보관된 정보)
+        if (typeof window !== "undefined" && user.email) {
+          const pendingRaw = sessionStorage.getItem("tubeping_consent_pending");
+          if (pendingRaw) {
+            try {
+              const pending = JSON.parse(pendingRaw);
+              await fetch("/api/auth/consent", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  email: user.email,
+                  age_14_consent: pending.age_14_consent,
+                  terms_consent: pending.terms_consent,
+                  privacy_consent: pending.privacy_consent,
+                  marketing_consent: pending.marketing_consent,
+                  signup_method: pending.signup_method || "google",
+                }),
+              });
+              sessionStorage.removeItem("tubeping_consent_pending");
+            } catch { /* audit 실패해도 진행 */ }
+          }
         }
 
         // /api/me에서 기존 creator 정보 확인

@@ -175,13 +175,23 @@ function Step2Auth({ marketing, router }: { marketing: boolean; router: ReturnTy
   const handleGoogle = async () => {
     setErr(""); setLoading(true);
     try {
+      // 동의 정보를 sessionStorage에 보관 — callback에서 audit 기록 시 사용
+      if (typeof window !== "undefined") {
+        sessionStorage.setItem(
+          "tubeping_consent_pending",
+          JSON.stringify({
+            age_14_consent: true, terms_consent: true, privacy_consent: true,
+            marketing_consent: marketing, signup_method: "google",
+            consented_at: new Date().toISOString(),
+          })
+        );
+      }
       const supabase = createSupabaseBrowser();
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
           redirectTo: `${window.location.origin}/auth/callback?next=/onboarding`,
           queryParams: {
-            // 약관 동의 사실을 metadata로 전달 (callback에서 creators 테이블 기록)
             tubeping_marketing_opt_in: marketing ? "1" : "0",
           },
         },
@@ -190,6 +200,26 @@ function Step2Auth({ marketing, router }: { marketing: boolean; router: ReturnTy
     } catch (e) {
       setErr(e instanceof Error ? e.message : "가입 실패");
       setLoading(false);
+    }
+  };
+
+  // 동의 audit 기록 (이메일 가입 시 즉시 호출)
+  const recordConsent = async (signupMethod: "google" | "email", emailValue: string) => {
+    try {
+      await fetch("/api/auth/consent", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: emailValue,
+          age_14_consent: true,
+          terms_consent: true,
+          privacy_consent: true,
+          marketing_consent: marketing,
+          signup_method: signupMethod,
+        }),
+      });
+    } catch {
+      // audit 실패해도 가입은 진행
     }
   };
 
@@ -218,6 +248,8 @@ function Step2Auth({ marketing, router }: { marketing: boolean; router: ReturnTy
         setLoading(false);
         return;
       }
+      // 동의 audit 기록 (가입 직후, fire-and-forget)
+      void recordConsent("email", email.trim());
       setSuccess(true);
       setLoading(false);
     } catch (e) {

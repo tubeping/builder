@@ -1448,6 +1448,7 @@ function NaverTab({
   const [price, setPrice] = useState("");
   const [imageUrl, setImageUrl] = useState("");
   const [siteName, setSiteName] = useState("");
+  const [category, setCategory] = useState("");
   const [comment, setComment] = useState("");
   const [toastMessage, setToastMessage] = useState("");
   const [fetching, setFetching] = useState(false);
@@ -1455,6 +1456,8 @@ function NaverTab({
   const [imageError, setImageError] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [uploadError, setUploadError] = useState("");
+
+  const CATEGORIES = ["식품", "생활/건강", "뷰티/화장품", "패션/의류", "디지털/가전", "주방용품", "가구/인테리어", "유아동", "반려동물", "스포츠/레저", "기타"];
 
   // URL에서 도메인 추출 (미리보기 카드 표시용)
   const displayDomain = (() => {
@@ -1531,7 +1534,7 @@ function NaverTab({
 
   const resetForm = () => {
     setUrl(""); setName(""); setPrice(""); setImageUrl(""); setSiteName("");
-    setComment(""); setImageError(false); setFetchMsg(""); setUploadError("");
+    setCategory(""); setComment(""); setImageError(false); setFetchMsg(""); setUploadError("");
   };
 
   const handleSubmit = () => {
@@ -1542,7 +1545,7 @@ function NaverTab({
       source_type: "naver",
       name: name.trim(),
       price: parseInt(price) || 0,
-      category: "",
+      category,
       image: imageUrl.trim() || null,
       external_url: url.trim(),
       affiliate_code: null,
@@ -1551,6 +1554,7 @@ function NaverTab({
         name: name.trim(),
         price: parseInt(price) || 0,
         image: imageUrl.trim() || null,
+        category,
         source_url: url.trim(),
         site_name: siteName || displayDomain || "링크",
       },
@@ -1705,15 +1709,28 @@ function NaverTab({
             />
           </div>
 
-          <div>
-            <label className="mb-1.5 block text-xs font-medium text-gray-700">가격 (원) <span className="text-[10px] text-gray-400 font-normal">선택</span></label>
-            <input
-              type="number"
-              value={price}
-              onChange={(e) => setPrice(e.target.value)}
-              placeholder="35000"
-              className="w-full rounded-lg border border-gray-300 px-3.5 py-2 text-sm outline-none focus:border-[#03C75A]"
-            />
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1.5 block text-xs font-medium text-gray-700">가격 (원) <span className="text-[10px] text-gray-400 font-normal">선택</span></label>
+              <input
+                type="number"
+                value={price}
+                onChange={(e) => setPrice(e.target.value)}
+                placeholder="35000"
+                className="w-full rounded-lg border border-gray-300 px-3.5 py-2 text-sm outline-none focus:border-[#03C75A]"
+              />
+            </div>
+            <div>
+              <label className="mb-1.5 block text-xs font-medium text-gray-700">카테고리 <span className="text-[10px] text-gray-400 font-normal">선택</span></label>
+              <select
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+                className="w-full rounded-lg border border-gray-300 px-3.5 py-2 text-sm outline-none focus:border-[#03C75A] bg-white"
+              >
+                <option value="">선택 안 함</option>
+                {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
           </div>
 
           {/* 이미지: 파일 업로드 + URL 입력 */}

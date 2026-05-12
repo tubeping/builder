@@ -36,6 +36,31 @@ interface UnfurlResult {
   siteName: string;
   currency: string;
   via: string;            // 어떤 파서가 사용됐는지 (debug)
+  blocked?: boolean;      // 사이트가 자동 접근을 차단한 경우 (에러 페이지 감지)
+  blockedReason?: string; // 차단된 이유 (사용자에게 보여줄 메시지)
+}
+
+// 사이트가 차단했음을 알리는 에러 페이지 패턴
+const BLOCKED_PATTERNS = [
+  /\[에러\]/i,
+  /시스템\s*오류/i,
+  /에러\s*페이지/i,
+  /access\s*denied/i,
+  /please\s*verify\s*you\s*are/i,
+  /captcha/i,
+  /403\s*forbidden/i,
+  /접근이\s*차단/i,
+  /비정상적인\s*접근/i,
+];
+
+function detectBlocked(title: string, description: string): { blocked: boolean; reason: string } {
+  const combined = `${title} ${description}`.trim();
+  for (const re of BLOCKED_PATTERNS) {
+    if (re.test(combined)) {
+      return { blocked: true, reason: `사이트가 자동 접근을 차단했어요 — "${title.slice(0, 40)}"` };
+    }
+  }
+  return { blocked: false, reason: "" };
 }
 
 type CacheEntry = { data: UnfurlResult; expiresAt: number };
@@ -375,13 +400,30 @@ export async function GET(request: NextRequest) {
     const browser = await getBrowser();
     page = await browser.newPage();
 
-    // 봇 감지 우회
+    // 봇 감지 우회 — UA + 정교한 client hints (네이버/쿠팡 등 엄격한 사이트 대응)
     await page.setUserAgent(
       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
     );
     await page.setExtraHTTPHeaders({
       "Accept-Language": "ko-KR,ko;q=0.9,en;q=0.8",
-      "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+      "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+      "Accept-Encoding": "gzip, deflate, br",
+      "Sec-Ch-Ua": '"Chromium";v="124", "Not:A-Brand";v="24", "Google Chrome";v="124"',
+      "Sec-Ch-Ua-Mobile": "?0",
+      "Sec-Ch-Ua-Platform": '"Windows"',
+      "Sec-Fetch-Dest": "document",
+      "Sec-Fetch-Mode": "navigate",
+      "Sec-Fetch-Site": "none",
+      "Sec-Fetch-User": "?1",
+      "Upgrade-Insecure-Requests": "1",
+    });
+
+    // navigator.webdriver 제거 (간단한 stealth)
+    await page.evaluateOnNewDocument(() => {
+      Object.defineProperty(navigator, "webdriver", { get: () => undefined });
+      // Chrome runtime spoof
+      // @ts-expect-error - test stub
+      window.chrome = window.chrome || { runtime: {} };
     });
 
     // 페이지 로드 (리다이렉트 자동 추적)
@@ -427,20 +469,27 @@ export async function GET(request: NextRequest) {
       validImages.push(c);
     }
 
+    // 사이트 차단 페이지 감지 (title/description 패턴)
+    const { blocked, reason } = detectBlocked(raw.title, raw.description);
+
     const result: UnfurlResult = {
       url: finalUrl,
-      title: raw.title || "",
-      image: validImages[0] || "",
-      imageCandidates: validImages,
-      description: raw.description || "",
-      price: raw.price || 0,
+      title: blocked ? "" : (raw.title || ""), // 차단 페이지의 "[에러]..." 같은 제목은 채우지 않음
+      image: blocked ? "" : (validImages[0] || ""),
+      imageCandidates: blocked ? [] : validImages,
+      description: blocked ? "" : (raw.description || ""),
+      price: blocked ? 0 : (raw.price || 0),
       siteName: raw.siteName || "",
       currency: raw.currency || "KRW",
       via: parserName,
+      blocked,
+      blockedReason: blocked ? reason : undefined,
     };
 
-    // 캐시 저장 (정규화 키)
-    cache.set(cacheKey, { data: result, expiresAt: Date.now() + TTL_MS });
+    // 차단된 경우는 캐시하지 않음 (재시도 가능하게)
+    if (!blocked) {
+      cache.set(cacheKey, { data: result, expiresAt: Date.now() + TTL_MS });
+    }
     if (cache.size > 200) {
       const oldest = cache.keys().next().value;
       if (oldest) cache.delete(oldest);

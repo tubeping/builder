@@ -1478,6 +1478,13 @@ function NaverTab({
       if (!res.ok) { setFetchMsg("자동 추출에 실패했어요. 아래에 직접 입력해주세요"); return; }
       const data = await res.json();
 
+      // 사이트가 자동 접근을 차단 (네이버 등 봇 감지)
+      if (data.blocked) {
+        setFetchMsg("🚫 이 사이트는 자동 추출을 차단해요 — 아래에서 제목·이미지를 직접 입력/업로드해주세요");
+        // 차단된 경우 어떤 필드도 자동 채우지 않음 (에러 페이지 제목이 들어가는 것 방지)
+        return;
+      }
+
       const isGeneric = !data.title || /네이버\s*브랜드\s*커넥트/i.test(data.title);
       const hasImage = !!data.image;
 
@@ -1497,7 +1504,7 @@ function NaverTab({
       setFetchMsg("네트워크 오류. 직접 입력해주세요");
     } finally {
       setFetching(false);
-      setTimeout(() => setFetchMsg(""), 5000);
+      setTimeout(() => setFetchMsg(""), 8000);
     }
   }, [url]);
 
@@ -1641,6 +1648,7 @@ function NaverTab({
             <p className={`mt-2 text-xs ${
               fetchMsg.startsWith("✅") ? "text-green-600" :
               fetchMsg.startsWith("⚠️") ? "text-amber-600" :
+              fetchMsg.startsWith("🚫") ? "text-orange-600 font-medium" :
               "text-red-500"
             }`}>{fetchMsg}</p>
           )}

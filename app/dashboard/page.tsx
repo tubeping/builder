@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   Inbox,
@@ -34,10 +34,15 @@ import FanInsights from "./_components/FanInsights";
 import Settings from "./_components/Settings";
 import Stats from "./_components/Stats";
 import ShareLinks from "./_components/ShareLinks";
+import AdminPanel from "./_components/AdminPanel";
+import { isAdminRole } from "@/lib/auth-roles";
+import { ShieldCheck } from "lucide-react";
 
-type MenuKey = "inbox" | "recommend" | "picks" | "partners" | "shop" | "share" | "stats" | "analytics" | "autodm" | "earnings" | "fans" | "settings";
+type MenuKey = "inbox" | "recommend" | "picks" | "partners" | "shop" | "share" | "stats" | "analytics" | "autodm" | "earnings" | "fans" | "settings" | "admin";
 
-const MENU_ITEMS: { key: MenuKey; label: string; icon: LucideIcon }[] = [
+interface MenuItem { key: MenuKey; label: string; icon: LucideIcon; adminOnly?: boolean }
+
+const MENU_ITEMS: MenuItem[] = [
   { key: "inbox", label: "공구 제안함", icon: Inbox },
   { key: "recommend", label: "상품 추천", icon: Sparkles },
   { key: "picks", label: "내 PICK", icon: Package },
@@ -50,11 +55,24 @@ const MENU_ITEMS: { key: MenuKey; label: string; icon: LucideIcon }[] = [
   { key: "earnings", label: "수익", icon: Wallet },
   { key: "fans", label: "팬 인사이트", icon: Users },
   { key: "settings", label: "설정", icon: SettingsIcon },
+  { key: "admin", label: "관리자", icon: ShieldCheck, adminOnly: true },
 ];
 
 export default function DashboardPage() {
   const [activeMenu, setActiveMenu] = useState<MenuKey>("inbox");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [userRole, setUserRole] = useState<string | null>(null);
+
+  // role 로드 (admin 메뉴 노출 여부)
+  useEffect(() => {
+    fetch("/api/me")
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d?.role) setUserRole(d.role); })
+      .catch(() => { /* 무시 */ });
+  }, []);
+
+  // role 기반 메뉴 필터링
+  const visibleMenuItems = MENU_ITEMS.filter(item => !item.adminOnly || isAdminRole(userRole));
 
   const content: Record<MenuKey, React.ReactNode> = {
     inbox: <CampaignInbox />,
@@ -69,6 +87,7 @@ export default function DashboardPage() {
     earnings: <Earnings />,
     fans: <FanInsights />,
     settings: <Settings />,
+    admin: <AdminPanel />,
   };
 
   const activeLabel = MENU_ITEMS.find((m) => m.key === activeMenu);
@@ -113,7 +132,7 @@ export default function DashboardPage() {
       {/* ── 모바일 드롭다운 메뉴 ── */}
       {mobileMenuOpen && (
         <div className="md:hidden bg-white border-b border-gray-100 py-2">
-          {MENU_ITEMS.map((item) => {
+          {visibleMenuItems.map((item) => {
             const Icon = item.icon;
             const active = activeMenu === item.key;
             return (
@@ -168,7 +187,7 @@ export default function DashboardPage() {
 
         {/* Menu */}
         <nav className="flex flex-col gap-0.5 px-3 mt-3 flex-1">
-          {MENU_ITEMS.map((item) => {
+          {visibleMenuItems.map((item) => {
             const Icon = item.icon;
             const active = activeMenu === item.key;
             return (

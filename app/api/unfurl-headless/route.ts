@@ -1,28 +1,44 @@
 /**
- * Headless Chrome 기반 URL 메타 추출
+ * Headless Chrome 기반 URL 메타 추출 (v2: 사이트별 파서)
  *
- * JS 렌더링이 필요한 페이지(네이버 브랜드커넥트 등) 대응.
- * Vercel Serverless + @sparticuz/chromium-min + puppeteer-core.
+ * 흐름:
+ *   1) URL 정규화 → in-memory 캐시 조회
+ *   2) 캐시 MISS → puppeteer로 페이지 로드 (리다이렉트 자동 추적)
+ *   3) 최종 URL의 도메인 → 사이트별 파서 선택
+ *      - smartstore.naver.com → 전용 파서 (JSON-LD + 본문 셀렉터 + OG)
+ *      - aliexpress.com / s.click.aliexpress.com → 전용 파서
+ *      - 그 외 (쿠팡 포함) → 기본 OG/JSON-LD 파서
+ *   4) 이미지 후보 다중 수집 → placeholder/1px gif/logo 필터링
+ *   5) 캐시 저장 (정규화 URL 키 · 24h TTL)
  *
- * 사용:
- *   GET /api/unfurl-headless?url=https://naver.me/52aMLu6j
- *
- * 참고: cold start 3~5초, 실제 페이지 렌더 1~3초. 반드시 캐싱.
+ * 어필리에이트 URL 보존:
+ *   응답의 `url` 필드는 최종 리다이렉트 후 URL (디버그용). 클라이언트는
+ *   사용자 입력 원본을 그대로 `external_url`에 저장해야 어필리에이트 수익이
+ *   안 깨짐. 이 라우트는 메타 추출 전용.
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import chromium from "@sparticuz/chromium-min";
-import puppeteer, { Browser } from "puppeteer-core";
+import puppeteer, { Browser, Page } from "puppeteer-core";
 
-// Vercel 함수 timeout (30초 권장, max 60초 on Pro)
 export const maxDuration = 30;
 
-// @sparticuz/chromium-min은 외부 호스팅된 chromium 바이너리 사용
 const CHROMIUM_PACK =
   "https://github.com/Sparticuz/chromium/releases/download/v147.0.2/chromium-v147.0.2-pack.x64.tar";
 
-// In-memory 캐시 (URL별 24시간)
-type CacheEntry = { data: unknown; expiresAt: number };
+interface UnfurlResult {
+  url: string;            // 최종 리다이렉트 후 URL (사용자 입력 원본과 다를 수 있음 — 어필리에이트 보존을 위해 클라는 무시)
+  title: string;
+  image: string;          // 가장 유력한 메인 이미지
+  imageCandidates: string[]; // 유효 검증 통과한 후보들 (사용자가 다른 이미지 고르고 싶을 때 활용 가능)
+  description: string;
+  price: number;
+  siteName: string;
+  currency: string;
+  via: string;            // 어떤 파서가 사용됐는지 (debug)
+}
+
+type CacheEntry = { data: UnfurlResult; expiresAt: number };
 const cache = new Map<string, CacheEntry>();
 const TTL_MS = 24 * 60 * 60 * 1000;
 
@@ -30,11 +46,8 @@ let _browser: Browser | null = null;
 
 async function getBrowser(): Promise<Browser> {
   if (_browser && _browser.connected) return _browser;
-
   const isLocal = process.env.VERCEL !== "1" && !process.env.AWS_EXECUTION_ENV;
-
   if (isLocal) {
-    // 로컬 개발: 시스템에 설치된 Chrome/Edge 사용
     _browser = await puppeteer.launch({
       headless: true,
       args: ["--no-sandbox", "--disable-setuid-sandbox"],
@@ -46,7 +59,6 @@ async function getBrowser(): Promise<Browser> {
           : "/usr/bin/google-chrome",
     });
   } else {
-    // Vercel/서버리스: @sparticuz/chromium-min
     _browser = await puppeteer.launch({
       args: chromium.args,
       executablePath: await chromium.executablePath(CHROMIUM_PACK),
@@ -56,37 +68,312 @@ async function getBrowser(): Promise<Browser> {
   return _browser!;
 }
 
+// URL 정규화 — 캐시 적중률 향상용 추적 파라미터 제거
+function normalizeUrl(input: string): string {
+  try {
+    const u = new URL(input);
+    const STRIP = [
+      "utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content",
+      "aff_id", "aff_trace_key", "aff_platform", "aff_request_id", "aff_short_key",
+      "source", "ref", "from", "tt_from", "_track_t",
+      "gclid", "fbclid", "msclkid",
+    ];
+    for (const k of STRIP) u.searchParams.delete(k);
+    return u.toString();
+  } catch {
+    return input;
+  }
+}
+
+// 이미지 URL이 placeholder/로고/1px이 아닌지 휴리스틱 판정
+function isLikelyValidImage(url: string): boolean {
+  if (!url || typeof url !== "string") return false;
+  if (!/^https?:\/\//i.test(url)) return false;
+  // 흔한 placeholder 파일명 패턴
+  if (/\b(blank|spacer|placeholder|loading|logo|no[-_]?image|empty|transparent|favicon)\.(gif|png|jpg|jpeg|webp|svg|ico)\b/i.test(url)) return false;
+  // 1x1 tracking pixel
+  if (/\b1x1\.(gif|png)\b/i.test(url)) return false;
+  if (/pixel\.(gif|png)/i.test(url)) return false;
+  if (/[?&](w|width|size)=1(&|$)/i.test(url)) return false;
+  // data URL은 자동 추출에서 제외 (큰 인라인이면 그대로 통과시켜도 되지만 의도치 않은 경우 많음)
+  if (/^data:/i.test(url)) return false;
+  return true;
+}
+
+// 도메인 → 파서 이름
+function pickParserName(url: string): "smartstore" | "aliexpress" | "generic" {
+  try {
+    const host = new URL(url).hostname.toLowerCase();
+    if (host.endsWith("smartstore.naver.com")) return "smartstore";
+    if (
+      host === "aliexpress.com" ||
+      host.endsWith(".aliexpress.com") ||
+      host.endsWith("s.click.aliexpress.com")
+    ) return "aliexpress";
+    return "generic";
+  } catch {
+    return "generic";
+  }
+}
+
+// ───────────────────────────────────────────────────
+// 파서들 — 모두 page.evaluate 안에서 실행되어 candidates 배열을 반환
+// ───────────────────────────────────────────────────
+
+interface ParseRaw {
+  title: string;
+  candidates: string[];
+  price: number;
+  currency: string;
+  description: string;
+  siteName: string;
+}
+
+async function parseSmartStore(page: Page): Promise<ParseRaw> {
+  return page.evaluate(() => {
+    let title = "";
+    const candidates: string[] = [];
+    let price = 0;
+    let currency = "KRW";
+    let description = "";
+
+    const og = (prop: string) =>
+      document.querySelector(`meta[property="${prop}"], meta[name="${prop}"]`)?.getAttribute("content") || "";
+
+    // 1) JSON-LD Product 우선
+    const ldScripts = document.querySelectorAll('script[type="application/ld+json"]');
+    ldScripts.forEach((ld) => {
+      try {
+        const data = JSON.parse(ld.textContent || "");
+        const items = Array.isArray(data) ? data : [data];
+        for (const item of items) {
+          const t = item["@type"];
+          const types = Array.isArray(t) ? t : [t];
+          if (types.includes("Product")) {
+            if (item.name && !title) title = String(item.name);
+            if (item.description && !description) description = String(item.description);
+            if (item.image) {
+              const imgs = Array.isArray(item.image) ? item.image : [item.image];
+              for (const img of imgs) if (typeof img === "string") candidates.push(img);
+            }
+            const offers = Array.isArray(item.offers) ? item.offers[0] : item.offers;
+            if (offers) {
+              const p = Number(offers.price ?? offers.lowPrice);
+              if (!isNaN(p) && p > 0) price = p;
+              if (offers.priceCurrency) currency = String(offers.priceCurrency);
+            }
+          }
+        }
+      } catch { /* ignore */ }
+    });
+
+    // 2) 본문 셀렉터 (스마트스토어 메인 이미지)
+    const selectors = [
+      ".product_image_thumb img",
+      ".bd_thumb img",
+      "[class*='ThumbnailList'] img",
+      "[class*='product'][class*='thumb'] img",
+      "[class*='product'][class*='image'] img",
+      "[class*='ProductImage'] img",
+    ];
+    selectors.forEach((sel) => {
+      document.querySelectorAll(sel).forEach((el) => {
+        const src = (el as HTMLImageElement).src;
+        if (src) candidates.push(src);
+      });
+    });
+
+    // 3) OG/Twitter 메타 (최후 fallback)
+    const ogImage = og("og:image:secure_url") || og("og:image");
+    if (ogImage) candidates.push(ogImage);
+
+    if (!title) title = og("og:title") || document.title;
+    if (!description) description = og("og:description");
+
+    return {
+      title,
+      candidates,
+      price,
+      currency,
+      description,
+      siteName: "네이버 스마트스토어",
+    };
+  });
+}
+
+async function parseAliExpress(page: Page): Promise<ParseRaw> {
+  return page.evaluate(() => {
+    let title = "";
+    const candidates: string[] = [];
+    let price = 0;
+    let currency = "USD";
+    let description = "";
+
+    const og = (prop: string) =>
+      document.querySelector(`meta[property="${prop}"], meta[name="${prop}"]`)?.getAttribute("content") || "";
+
+    // JSON-LD
+    const ldScripts = document.querySelectorAll('script[type="application/ld+json"]');
+    ldScripts.forEach((ld) => {
+      try {
+        const data = JSON.parse(ld.textContent || "");
+        const items = Array.isArray(data) ? data : [data];
+        for (const item of items) {
+          const t = item["@type"];
+          const types = Array.isArray(t) ? t : [t];
+          if (types.includes("Product")) {
+            if (item.name && !title) title = String(item.name);
+            if (item.description && !description) description = String(item.description);
+            if (item.image) {
+              const imgs = Array.isArray(item.image) ? item.image : [item.image];
+              for (const img of imgs) if (typeof img === "string") candidates.push(img);
+            }
+            const offers = Array.isArray(item.offers) ? item.offers[0] : item.offers;
+            if (offers) {
+              const p = Number(offers.price ?? offers.lowPrice);
+              if (!isNaN(p) && p > 0) price = p;
+              if (offers.priceCurrency) currency = String(offers.priceCurrency);
+            }
+          }
+        }
+      } catch { /* ignore */ }
+    });
+
+    // 본문 셀렉터 (Ali 페이지 메인 이미지)
+    const selectors = [
+      ".image-view img",
+      ".product-image-main img",
+      "[class*='MainBigPic'] img",
+      "[class*='image-thumb'] img",
+      "[class*='magnifier'] img",
+      "img[data-role='img']",
+    ];
+    selectors.forEach((sel) => {
+      document.querySelectorAll(sel).forEach((el) => {
+        const src = (el as HTMLImageElement).src;
+        if (src) candidates.push(src);
+      });
+    });
+
+    // OG 메타
+    const ogImage = og("og:image:secure_url") || og("og:image");
+    if (ogImage) candidates.push(ogImage);
+
+    if (!title) title = og("og:title") || document.title;
+    if (!description) description = og("og:description");
+
+    // 가격 fallback: og:price:amount
+    if (!price) {
+      const p = Number(og("product:price:amount") || og("og:price:amount"));
+      if (!isNaN(p) && p > 0) price = p;
+    }
+
+    return {
+      title,
+      candidates,
+      price,
+      currency,
+      description,
+      siteName: "AliExpress",
+    };
+  });
+}
+
+async function parseGenericOG(page: Page): Promise<ParseRaw> {
+  return page.evaluate(() => {
+    let title = "";
+    const candidates: string[] = [];
+    let price = 0;
+    let currency = "KRW";
+    let description = "";
+
+    const og = (prop: string) =>
+      document.querySelector(`meta[property="${prop}"], meta[name="${prop}"]`)?.getAttribute("content") || "";
+
+    // JSON-LD Product (있으면 우선)
+    const ldScripts = document.querySelectorAll('script[type="application/ld+json"]');
+    ldScripts.forEach((ld) => {
+      try {
+        const data = JSON.parse(ld.textContent || "");
+        const items = Array.isArray(data) ? data : [data];
+        for (const item of items) {
+          const t = item["@type"];
+          const types = Array.isArray(t) ? t : [t];
+          if (types.includes("Product")) {
+            if (item.name && !title) title = String(item.name);
+            if (item.description && !description) description = String(item.description);
+            if (item.image) {
+              const imgs = Array.isArray(item.image) ? item.image : [item.image];
+              for (const img of imgs) if (typeof img === "string") candidates.push(img);
+            }
+            const offers = Array.isArray(item.offers) ? item.offers[0] : item.offers;
+            if (offers) {
+              const p = Number(offers.price ?? offers.lowPrice);
+              if (!isNaN(p) && p > 0) price = p;
+              if (offers.priceCurrency) currency = String(offers.priceCurrency);
+            }
+          }
+        }
+      } catch { /* ignore */ }
+    });
+
+    // OG/Twitter
+    const ogImage = og("og:image:secure_url") || og("og:image");
+    if (ogImage) candidates.push(ogImage);
+    const twImage = og("twitter:image") || og("twitter:image:src");
+    if (twImage) candidates.push(twImage);
+
+    // 본문에서 큰 이미지 한두 개 (300px 이상)
+    Array.from(document.querySelectorAll("img"))
+      .slice(0, 30) // 첫 30개만 확인 (성능)
+      .forEach((img) => {
+        const el = img as HTMLImageElement;
+        const w = el.naturalWidth || el.width || 0;
+        if (w >= 300 && el.src) candidates.push(el.src);
+      });
+
+    if (!title) title = og("og:title") || document.title;
+    description = description || og("og:description");
+
+    // 가격 fallback
+    if (!price) {
+      const p = Number(og("product:price:amount") || og("og:price:amount") || og("twitter:data1"));
+      if (!isNaN(p) && p > 0) price = p;
+    }
+
+    const siteName = og("og:site_name") || window.location.hostname;
+    return { title, candidates, price, currency, description, siteName };
+  });
+}
+
+// ───────────────────────────────────────────────────
+// 핸들러
+// ───────────────────────────────────────────────────
+
 export async function GET(request: NextRequest) {
   const url = request.nextUrl.searchParams.get("url");
   if (!url) {
     return NextResponse.json({ error: "url 파라미터 필요" }, { status: 400 });
   }
-
-  // URL 기본 검증
   try {
     const u = new URL(url);
-    if (u.protocol !== "http:" && u.protocol !== "https:") {
-      throw new Error("bad protocol");
-    }
+    if (u.protocol !== "http:" && u.protocol !== "https:") throw new Error("bad protocol");
   } catch {
     return NextResponse.json({ error: "유효하지 않은 URL" }, { status: 400 });
   }
 
-  // 캐시 히트
-  const cached = cache.get(url);
+  const cacheKey = normalizeUrl(url);
+  const cached = cache.get(cacheKey);
   if (cached && cached.expiresAt > Date.now()) {
     return NextResponse.json(cached.data, {
-      headers: {
-        "X-Cache": "HIT",
-        "Cache-Control": "public, s-maxage=86400, stale-while-revalidate=604800",
-      },
+      headers: { "X-Cache": "HIT", "Cache-Control": "public, s-maxage=86400, stale-while-revalidate=604800" },
     });
   }
 
-  let browser: Browser | null = null;
+  let page: Page | null = null;
   try {
-    browser = await getBrowser();
-    const page = await browser.newPage();
+    const browser = await getBrowser();
+    page = await browser.newPage();
 
     // 봇 감지 우회
     await page.setUserAgent(
@@ -94,88 +381,82 @@ export async function GET(request: NextRequest) {
     );
     await page.setExtraHTTPHeaders({
       "Accept-Language": "ko-KR,ko;q=0.9,en;q=0.8",
+      "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
     });
 
-    // 페이지 이동 (리다이렉트 자동 추적)
-    await page.goto(url, {
-      waitUntil: "domcontentloaded",
-      timeout: 15000,
-    });
+    // 페이지 로드 (리다이렉트 자동 추적)
+    await page.goto(url, { waitUntil: "domcontentloaded", timeout: 15000 });
 
-    // JS 렌더링 대기 (네이버 브랜드커넥트 같은 SPA 대응)
-    // og:title/og:image가 dynamic하게 주입될 수 있어 최대 5초 대기
+    // JS 렌더 대기 (SPA 대응): title/og:image/JSON-LD 중 하나라도 있으면 진행
     await page
       .waitForFunction(
         () => {
-          const title =
+          const t =
             document.querySelector('meta[property="og:title"]')?.getAttribute("content") ||
             document.title;
-          const image = document.querySelector('meta[property="og:image"]')?.getAttribute("content");
-          // 최소 title 있거나 이미지 있거나 1초 지났으면 OK
-          return (title && !/네이버\s*브랜드\s*커넥트/i.test(title)) || !!image;
+          const i = document.querySelector('meta[property="og:image"]')?.getAttribute("content");
+          const hasLD = !!document.querySelector('script[type="application/ld+json"]');
+          return (t && !/네이버\s*브랜드\s*커넥트/i.test(t)) || !!i || hasLD;
         },
         { timeout: 5000 }
       )
       .catch(() => { /* 타임아웃 — 있는 정보만이라도 */ });
 
-    // OG 메타 및 JSON-LD 추출
-    const meta = await page.evaluate(() => {
-      const getMeta = (prop: string) => {
-        const el = document.querySelector(`meta[property="${prop}"], meta[name="${prop}"]`);
-        return el?.getAttribute("content") || "";
-      };
+    // 최종 URL → 파서 선택
+    const finalUrl = page.url();
+    const parserName = pickParserName(finalUrl);
+    const parser =
+      parserName === "smartstore" ? parseSmartStore :
+      parserName === "aliexpress" ? parseAliExpress :
+      parseGenericOG;
 
-      // JSON-LD Product offers.price
-      let jsonLdPrice = 0;
-      const ldEl = document.querySelector('script[type="application/ld+json"]');
-      if (ldEl?.textContent) {
-        try {
-          const ld = JSON.parse(ldEl.textContent);
-          const offers = ld.offers || (Array.isArray(ld) ? ld[0]?.offers : null);
-          const p = offers && (Array.isArray(offers) ? offers[0]?.price : offers.price);
-          const n = Number(p);
-          if (!isNaN(n)) jsonLdPrice = n;
-        } catch { /* ignore */ }
-      }
+    let raw = await parser(page);
 
-      const priceStr =
-        getMeta("product:price:amount") ||
-        getMeta("og:price:amount") ||
-        getMeta("twitter:data1") ||
-        "";
-      const parsedPrice = priceStr ? Number(priceStr.replace(/[^0-9.]/g, "")) : NaN;
-      const price = !isNaN(parsedPrice) && parsedPrice > 0 ? parsedPrice : jsonLdPrice;
+    // 사이트별 파서가 후보 0개를 줬으면 generic으로 한 번 더 시도
+    if (parserName !== "generic" && raw.candidates.length === 0) {
+      raw = await parseGenericOG(page);
+    }
 
-      return {
-        url: window.location.href,
-        title: getMeta("og:title") || document.title,
-        image: getMeta("og:image") || getMeta("twitter:image") || "",
-        description: getMeta("og:description") || "",
-        price,
-        siteName: getMeta("og:site_name") || window.location.hostname,
-        currency: getMeta("og:price:currency") || "KRW",
-      };
-    });
+    // 이미지 후보 필터링 (placeholder/1px 제외) + 중복 제거
+    const seen = new Set<string>();
+    const validImages: string[] = [];
+    for (const c of raw.candidates) {
+      if (!isLikelyValidImage(c)) continue;
+      if (seen.has(c)) continue;
+      seen.add(c);
+      validImages.push(c);
+    }
 
-    await page.close();
+    const result: UnfurlResult = {
+      url: finalUrl,
+      title: raw.title || "",
+      image: validImages[0] || "",
+      imageCandidates: validImages,
+      description: raw.description || "",
+      price: raw.price || 0,
+      siteName: raw.siteName || "",
+      currency: raw.currency || "KRW",
+      via: parserName,
+    };
 
-    // 캐시 저장
-    cache.set(url, { data: meta, expiresAt: Date.now() + TTL_MS });
+    // 캐시 저장 (정규화 키)
+    cache.set(cacheKey, { data: result, expiresAt: Date.now() + TTL_MS });
     if (cache.size > 200) {
       const oldest = cache.keys().next().value;
       if (oldest) cache.delete(oldest);
     }
 
-    return NextResponse.json(meta, {
-      headers: {
-        "X-Cache": "MISS",
-        "Cache-Control": "public, s-maxage=86400, stale-while-revalidate=604800",
-      },
+    return NextResponse.json(result, {
+      headers: { "X-Cache": "MISS", "Cache-Control": "public, s-maxage=86400, stale-while-revalidate=604800" },
     });
   } catch (e) {
     return NextResponse.json(
       { error: "페이지 분석 실패", detail: e instanceof Error ? e.message : "" },
       { status: 500 }
     );
+  } finally {
+    if (page) {
+      try { await page.close(); } catch { /* ignore */ }
+    }
   }
 }

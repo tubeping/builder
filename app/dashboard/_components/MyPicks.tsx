@@ -1480,8 +1480,7 @@ function NaverTab({
 
       // 사이트가 자동 접근을 차단 (네이버 등 봇 감지)
       if (data.blocked) {
-        setFetchMsg("🚫 이 사이트는 자동 추출을 차단해요 — 아래에서 제목·이미지를 직접 입력/업로드해주세요");
-        // 차단된 경우 어떤 필드도 자동 채우지 않음 (에러 페이지 제목이 들어가는 것 방지)
+        setFetchMsg("🚫 이 사이트는 자동 추출이 어려워요 — 아래 카드 영역에 이미지를 직접 넣어주세요");
         return;
       }
 
@@ -1553,15 +1552,8 @@ function NaverTab({
     return false;
   };
 
-  // URL 붙여넣으면 즉시 자동 추출 트리거
-  const handlePasteUrl = (pasted: string) => {
-    const trimmed = pasted.trim();
-    setUrl(trimmed);
-    if (/^https?:\/\//i.test(trimmed)) {
-      // 비동기 자동 fetch (사용자가 클릭 안 해도)
-      void handleAutoFetch(trimmed);
-    }
-  };
+  // URL 붙여넣기 — 자동 추출 트리거는 제거 (한국 IP 차단 사이트 많아서 매번 실패 메시지 보는 게 답답함)
+  // 사용자가 명시적으로 "자동 추출 시도" 버튼 누를 때만 동작.
 
   const naverPicks = picks.filter((p) => p.source_type === "naver");
 
@@ -1618,11 +1610,10 @@ function NaverTab({
               아무 링크나 <span className="text-[#03C75A]">카드로</span> 등록
             </p>
             <p className="mt-1 text-xs text-gray-600 leading-relaxed">
-              URL을 붙여넣으면 자동 추출을 시도합니다.
-              자동이 안 되는 사이트(네이버 등)는 카드의 이미지 영역을 <b>클릭·드래그·Ctrl+V</b>로 직접 채우세요.
+              <b className="text-gray-900">3단계로 끝</b> — ① URL 붙여넣기 ② 카드 이미지 영역에 <b>클릭/드래그/Ctrl+V</b>로 이미지 ③ 제목 입력 → 담기
             </p>
             <p className="mt-1.5 text-[11px] text-gray-500">
-              💡 빠른 방법: 상품 페이지에서 이미지 <b>우클릭 → 이미지 복사</b> → 빌더로 돌아와 <b>Ctrl+V</b>
+              💡 상품 페이지에서 이미지 <b>우클릭 → 이미지 복사</b> 후 빌더로 돌아와 <b>Ctrl+V</b> 한 번이면 끝
             </p>
           </div>
         </div>
@@ -1651,57 +1642,42 @@ function NaverTab({
         }}
       >
 
-        {/* 링크 입력 + 자동 가져오기 */}
+        {/* 링크 입력 */}
         <div className="rounded-xl border border-gray-200 bg-white p-5">
           <label className="mb-1.5 block text-sm font-semibold text-gray-900">
             연결할 주소 <span className="text-[#C41E1E]">*</span>
           </label>
           <p className="mb-2.5 text-[11px] text-gray-500">상품·상세페이지 URL을 그대로 붙여넣으세요</p>
-          <div className="flex gap-2">
-            <input
-              type="url"
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
-              onPaste={(e) => {
-                const text = e.clipboardData.getData("text");
-                if (text && /^https?:\/\//i.test(text.trim())) {
-                  e.preventDefault();
-                  handlePasteUrl(text);
-                }
-              }}
-              onBlur={() => {
-                if (url.trim() && !imageUrl && !name && !fetching) {
-                  void handleAutoFetch();
-                }
-              }}
-              placeholder="https://..."
-              className="flex-1 rounded-lg border border-gray-300 px-4 py-2.5 text-sm outline-none focus:border-[#03C75A]"
-            />
+          <input
+            type="url"
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            placeholder="https://..."
+            className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm outline-none focus:border-[#03C75A]"
+          />
+          <div className="mt-2.5 flex items-center justify-between gap-2">
             <button
               onClick={() => handleAutoFetch()}
               disabled={fetching || !url.trim()}
-              className="cursor-pointer rounded-lg bg-[#111111] px-4 py-2.5 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-40 disabled:cursor-default whitespace-nowrap"
-              title="Headless Chrome으로 페이지를 실제 로드해 이미지/제목/가격을 추출합니다"
+              className="cursor-pointer text-[11px] text-gray-600 underline decoration-dotted underline-offset-2 hover:text-gray-900 disabled:opacity-40 disabled:cursor-default"
+              title="페이지를 실제로 열어 이미지·제목·가격 추출 시도 (한국 IP 차단 사이트는 실패할 수 있어요)"
             >
               {fetching ? (
-                <span className="flex items-center gap-1.5">
-                  <span className="h-3 w-3 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-                  가져오는 중
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="h-2.5 w-2.5 animate-spin rounded-full border-2 border-gray-300 border-t-gray-700" />
+                  추출 시도 중…
                 </span>
-              ) : "자동으로 채우기"}
+              ) : "🔄 URL에서 자동 추출 시도"}
             </button>
+            {fetchMsg && (
+              <span className={`text-[11px] ${
+                fetchMsg.startsWith("✅") ? "text-green-600" :
+                fetchMsg.startsWith("⚠️") ? "text-amber-600" :
+                fetchMsg.startsWith("🚫") ? "text-gray-500" :
+                "text-gray-500"
+              }`}>{fetchMsg}</span>
+            )}
           </div>
-          {fetchMsg && (
-            <p className={`mt-2 text-xs ${
-              fetchMsg.startsWith("✅") ? "text-green-600" :
-              fetchMsg.startsWith("⚠️") ? "text-amber-600" :
-              fetchMsg.startsWith("🚫") ? "text-orange-600 font-medium" :
-              "text-red-500"
-            }`}>{fetchMsg}</p>
-          )}
-          <p className="mt-1.5 text-[10px] text-gray-400">
-            ⏱️ 자동 가져오기는 3~10초 걸려요. 안 되면 아래에서 직접 입력하거나 이미지를 업로드하세요.
-          </p>
         </div>
 
         {/* 큰 카드 미리보기 (링크 블록 스타일) — 드래그앤드롭 + 클릭으로 이미지 변경 */}

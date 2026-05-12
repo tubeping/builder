@@ -1419,22 +1419,33 @@ function NaverTab({
   const [name, setName] = useState("");
   const [price, setPrice] = useState("");
   const [imageUrl, setImageUrl] = useState("");
+  const [siteName, setSiteName] = useState("");
   const [category, setCategory] = useState("");
   const [comment, setComment] = useState("");
   const [toastMessage, setToastMessage] = useState("");
   const [fetching, setFetching] = useState(false);
   const [fetchMsg, setFetchMsg] = useState("");
+  const [imageError, setImageError] = useState(false);
 
   const CATEGORIES = ["식품", "생활/건강", "뷰티/화장품", "패션/의류", "디지털/가전", "주방용품", "가구/인테리어", "유아동", "반려동물", "스포츠/레저", "기타"];
 
-  // Headless Chrome으로 자동 가져오기
-  const handleAutoFetch = async () => {
-    const u = url.trim();
+  // URL에서 도메인 추출 (미리보기 카드 표시용)
+  const displayDomain = (() => {
+    try {
+      if (!url.trim()) return "";
+      const u = new URL(url.trim());
+      return u.hostname.replace(/^www\./, "");
+    } catch { return ""; }
+  })();
+
+  // OG 메타 자동 추출 (Headless Chrome)
+  const handleAutoFetch = useCallback(async (targetUrl?: string) => {
+    const u = (targetUrl ?? url).trim();
     if (!u) { setFetchMsg("판매 링크를 먼저 입력해주세요"); return; }
-    setFetching(true); setFetchMsg("");
+    setFetching(true); setFetchMsg(""); setImageError(false);
     try {
       const res = await fetch(`/api/unfurl-headless?url=${encodeURIComponent(u)}`);
-      if (!res.ok) { setFetchMsg("자동 추출에 실패했어요. 수동으로 입력해주세요"); return; }
+      if (!res.ok) { setFetchMsg("자동 추출에 실패했어요. 아래에 직접 입력해주세요"); return; }
       const data = await res.json();
 
       const isGeneric = !data.title || /네이버\s*브랜드\s*커넥트/i.test(data.title);
@@ -1443,23 +1454,39 @@ function NaverTab({
       if (!isGeneric && data.title) setName(data.title);
       if (hasImage) setImageUrl(data.image);
       if (data.price > 0) setPrice(String(Math.round(data.price)));
+      if (data.siteName) setSiteName(String(data.siteName));
 
       if (!isGeneric && hasImage) {
-        setFetchMsg("✅ 자동 추출 성공!");
+        setFetchMsg("✅ 가져왔어요!");
       } else if (hasImage || !isGeneric) {
-        setFetchMsg("⚠️ 일부만 가져왔어요. 나머지는 수동으로 채워주세요");
+        setFetchMsg("⚠️ 일부만 가져왔어요. 빈 칸은 직접 채워주세요");
       } else {
-        setFetchMsg("자동 추출에 실패했어요. 수동으로 입력해주세요");
+        setFetchMsg("자동 추출 실패. 아래에 직접 입력해주세요");
       }
     } catch {
-      setFetchMsg("네트워크 오류. 수동으로 입력해주세요");
+      setFetchMsg("네트워크 오류. 직접 입력해주세요");
     } finally {
       setFetching(false);
       setTimeout(() => setFetchMsg(""), 5000);
     }
+  }, [url]);
+
+  // URL 붙여넣으면 즉시 자동 추출 트리거
+  const handlePasteUrl = (pasted: string) => {
+    const trimmed = pasted.trim();
+    setUrl(trimmed);
+    if (/^https?:\/\//i.test(trimmed)) {
+      // 비동기 자동 fetch (사용자가 클릭 안 해도)
+      void handleAutoFetch(trimmed);
+    }
   };
 
   const naverPicks = picks.filter((p) => p.source_type === "naver");
+
+  const resetForm = () => {
+    setUrl(""); setName(""); setPrice(""); setImageUrl(""); setSiteName("");
+    setCategory(""); setComment(""); setImageError(false); setFetchMsg("");
+  };
 
   const handleSubmit = () => {
     if (!url.trim()) { setToastMessage("⚠️ 판매 링크를 입력해주세요"); setTimeout(() => setToastMessage(""), 2500); return; }
@@ -1481,15 +1508,17 @@ function NaverTab({
         image: imageUrl.trim() || null,
         category,
         source_url: url.trim(),
-        site_name: "네이버",
+        site_name: siteName || "네이버",
       },
     });
 
-    // 리셋
-    setUrl(""); setName(""); setPrice(""); setImageUrl(""); setCategory(""); setComment("");
+    resetForm();
     setToastMessage("내 몰에 담았습니다!");
     setTimeout(() => setToastMessage(""), 3000);
   };
+
+  const hasPreview = !!(url.trim() && (name || imageUrl));
+  const canSubmit = !!(url.trim() && name.trim() && category);
 
   return (
     <div className="space-y-6">
@@ -1499,7 +1528,7 @@ function NaverTab({
         </div>
       )}
 
-      {/* 상단 가이드 */}
+      {/* 상단 가이드 (간결화) */}
       <div className="rounded-xl border border-[#03C75A]/30 bg-gradient-to-br from-[#03C75A]/5 to-white p-4">
         <div className="flex items-start gap-3">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#03C75A] text-base font-bold text-white">N</div>
@@ -1508,9 +1537,8 @@ function NaverTab({
               네이버 쇼핑커넥트/공동구매 <span className="text-[#03C75A]">본인 발급 링크</span>만 등록
             </p>
             <p className="mt-1 text-xs text-gray-600 leading-relaxed">
-              판매는 네이버에서 진행 · 수수료는 <b className="text-[#03C75A]">본인 계좌로 자동 입금</b> (네이버가 직접)
-              <br />
-              이미지/제목/가격은 <b>네이버 쇼핑 상품 페이지에서 복사해 붙여넣으시면</b> 됩니다.
+              링크만 붙여넣으면 <b className="text-[#03C75A]">이미지·상품명·가격</b>이 자동으로 채워져요.
+              판매는 네이버에서 진행 · 수수료는 본인 계좌로 자동 입금.
             </p>
             <div className="mt-3 flex flex-wrap gap-2">
               <a href="https://partner.naver.com" target="_blank" rel="noopener noreferrer"
@@ -1526,134 +1554,185 @@ function NaverTab({
         </div>
       </div>
 
-      {/* 2컬럼 레이아웃: 좌측 입력 폼 / 우측 내 몰 미리보기 */}
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
 
-      {/* 좌측: 입력 폼 */}
-      <div className="lg:col-span-3 rounded-xl border border-gray-200 p-5 space-y-4">
-        <div>
-          <label className="mb-1.5 block text-sm font-medium text-gray-700">
-            판매 링크 <span className="text-[#C41E1E]">*</span>
-            <span className="ml-2 text-[10px] font-normal text-gray-400">네이버 발급 링크 그대로 붙여넣기</span>
+      {/* 좌측: 링크 블록 만들기 */}
+      <div className="lg:col-span-3 space-y-5">
+
+        {/* 링크 입력 + 자동 가져오기 */}
+        <div className="rounded-xl border border-gray-200 bg-white p-5">
+          <label className="mb-1.5 block text-sm font-semibold text-gray-900">
+            연결할 주소 <span className="text-[#C41E1E]">*</span>
           </label>
+          <p className="mb-2.5 text-[11px] text-gray-500">네이버 발급 링크(naver.me / smartstore / brandconnect) 를 붙여넣으세요</p>
           <div className="flex gap-2">
             <input
               type="url"
               value={url}
               onChange={(e) => setUrl(e.target.value)}
-              placeholder="https://naver.me/... 또는 brandconnect.naver.com/..."
+              onPaste={(e) => {
+                const text = e.clipboardData.getData("text");
+                if (text && /^https?:\/\//i.test(text.trim())) {
+                  e.preventDefault();
+                  handlePasteUrl(text);
+                }
+              }}
+              onBlur={() => {
+                if (url.trim() && !imageUrl && !name && !fetching) {
+                  void handleAutoFetch();
+                }
+              }}
+              placeholder="https://naver.me/... 또는 smartstore.naver.com/..."
               className="flex-1 rounded-lg border border-gray-300 px-4 py-2.5 text-sm outline-none focus:border-[#03C75A]"
             />
             <button
-              onClick={handleAutoFetch}
+              onClick={() => handleAutoFetch()}
               disabled={fetching || !url.trim()}
               className="cursor-pointer rounded-lg bg-[#111111] px-4 py-2.5 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-40 disabled:cursor-default whitespace-nowrap"
-              title="Headless Chrome이 실제 브라우저처럼 페이지를 열어 이미지/제목/가격을 자동으로 가져옵니다"
+              title="Headless Chrome으로 페이지를 실제 로드해 이미지/제목/가격을 추출합니다"
             >
               {fetching ? (
                 <span className="flex items-center gap-1.5">
                   <span className="h-3 w-3 animate-spin rounded-full border-2 border-white/30 border-t-white" />
                   가져오는 중
                 </span>
-              ) : "🤖 자동으로 채우기"}
+              ) : "자동으로 채우기"}
             </button>
           </div>
           {fetchMsg && (
-            <p className={`mt-1.5 text-xs ${
+            <p className={`mt-2 text-xs ${
               fetchMsg.startsWith("✅") ? "text-green-600" :
               fetchMsg.startsWith("⚠️") ? "text-amber-600" :
               "text-red-500"
             }`}>{fetchMsg}</p>
           )}
-          <p className="mt-1 text-[10px] text-gray-400">
-            ⏱️ 자동 가져오기는 3~10초 걸려요 (실제 브라우저로 로드해서 느려요). 안 되면 아래에 직접 입력.
+          <p className="mt-1.5 text-[10px] text-gray-400">
+            ⏱️ 자동 가져오기는 3~10초 걸려요 (실제 브라우저로 로드해서 느려요). 안 되면 아래에서 직접 입력.
           </p>
         </div>
 
-        <div>
-          <label className="mb-1.5 block text-sm font-medium text-gray-700">
-            상품명 <span className="text-[#C41E1E]">*</span>
-          </label>
-          <input
-            type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="예) 오설록 제주 녹차 선물세트"
-            className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm outline-none focus:border-[#03C75A]"
-          />
-        </div>
-
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="mb-1.5 block text-sm font-medium text-gray-700">가격 (원)</label>
-            <input
-              type="number"
-              value={price}
-              onChange={(e) => setPrice(e.target.value)}
-              placeholder="35000"
-              className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm outline-none focus:border-[#03C75A]"
-            />
-          </div>
-          <div>
-            <label className="mb-1.5 block text-sm font-medium text-gray-700">
-              카테고리 <span className="text-[#C41E1E]">*</span>
-            </label>
-            <select
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm outline-none focus:border-[#03C75A] bg-white"
-            >
-              <option value="">선택하세요</option>
-              {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
-            </select>
-          </div>
-        </div>
-
-        {/* 라이브 미리보기 */}
-        {(name || imageUrl) && (
-          <div className="rounded-xl border-2 border-dashed border-[#03C75A]/30 bg-[#03C75A]/5 p-3">
-            <p className="text-[10px] font-bold text-[#03C75A] mb-2">✨ 내 몰에 이렇게 표시됩니다</p>
-            <div className="flex gap-3">
-              <div className="h-20 w-20 shrink-0 overflow-hidden rounded-lg bg-white">
-                {imageUrl ? (
-                  <img src={imageUrl} alt="" className="h-full w-full object-cover"
-                    onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+        {/* 큰 카드 미리보기 (네이버 링크 블록 스타일) */}
+        {hasPreview && (
+          <div className="rounded-xl border border-gray-200 bg-white p-5">
+            <p className="mb-3 text-xs font-semibold text-gray-500">내 몰에 이렇게 노출됩니다</p>
+            <div className="mx-auto max-w-md overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+              <div className="relative aspect-[4/3] bg-gray-50">
+                {imageUrl && !imageError ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={imageUrl}
+                    alt={name}
+                    className="absolute inset-0 h-full w-full object-cover"
+                    onError={() => setImageError(true)}
+                  />
                 ) : (
-                  <div className="flex h-full items-center justify-center text-gray-300">
-                    <svg className="h-6 w-6" fill="currentColor" viewBox="0 0 24 24">
+                  <div className="flex h-full flex-col items-center justify-center gap-1.5 text-gray-300">
+                    <svg className="h-10 w-10" fill="currentColor" viewBox="0 0 24 24">
                       <path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                     </svg>
+                    <span className="text-[10px] text-gray-400">이미지 없음</span>
                   </div>
                 )}
+                <span className="absolute left-3 top-3 rounded-full bg-[#03C75A] px-2 py-0.5 text-[10px] font-bold text-white shadow">
+                  N 네이버
+                </span>
               </div>
-              <div className="min-w-0 flex-1">
-                <span className="inline-block rounded-full bg-[#03C75A] px-2 py-0.5 text-[9px] font-medium text-white">네이버</span>
-                <p className="mt-1 line-clamp-2 text-sm font-medium text-gray-900 leading-snug">{name || "상품명 입력 필요"}</p>
-                {parseInt(price) > 0 && <p className="text-base font-bold text-[#03C75A]">{formatPrice(parseInt(price))}</p>}
+              <div className="p-4">
+                <p className="line-clamp-2 text-[15px] font-semibold text-gray-900 leading-snug">
+                  {name || "상품명을 입력해주세요"}
+                </p>
+                <div className="mt-2 flex items-center justify-between gap-2">
+                  {parseInt(price) > 0 ? (
+                    <p className="text-base font-bold text-[#03C75A]">{formatPrice(parseInt(price))}</p>
+                  ) : <span />}
+                  {displayDomain && (
+                    <span className="text-[11px] text-gray-400">{displayDomain}</span>
+                  )}
+                </div>
               </div>
             </div>
           </div>
         )}
 
-        <div>
-          <label className="mb-1.5 block text-sm font-medium text-gray-700">큐레이션 코멘트</label>
-          <input
-            type="text"
-            value={comment}
-            onChange={(e) => setComment(e.target.value)}
-            placeholder="이 상품을 추천하는 이유를 한 줄로"
-            className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm outline-none focus:border-[#03C75A]"
-          />
-        </div>
+        {/* 세부 입력 (자동 추출 후 수정용) */}
+        <div className="rounded-xl border border-gray-200 bg-white p-5 space-y-4">
+          <p className="text-xs font-semibold text-gray-500">자동 추출 결과를 확인·수정하세요</p>
 
-        <div className="flex justify-end pt-1">
-          <button
-            onClick={handleSubmit}
-            disabled={!url.trim() || !name.trim() || !category}
-            className="cursor-pointer rounded-lg bg-[#03C75A] px-6 py-2.5 text-sm font-medium text-white hover:bg-[#02b051] disabled:opacity-40 disabled:cursor-default"
-          >
-            내 몰에 담기
-          </button>
+          <div>
+            <label className="mb-1.5 block text-xs font-medium text-gray-700">
+              상품명 <span className="text-[#C41E1E]">*</span>
+            </label>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="예) 오설록 제주 녹차 선물세트"
+              className="w-full rounded-lg border border-gray-300 px-3.5 py-2 text-sm outline-none focus:border-[#03C75A]"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1.5 block text-xs font-medium text-gray-700">가격 (원)</label>
+              <input
+                type="number"
+                value={price}
+                onChange={(e) => setPrice(e.target.value)}
+                placeholder="35000"
+                className="w-full rounded-lg border border-gray-300 px-3.5 py-2 text-sm outline-none focus:border-[#03C75A]"
+              />
+            </div>
+            <div>
+              <label className="mb-1.5 block text-xs font-medium text-gray-700">
+                카테고리 <span className="text-[#C41E1E]">*</span>
+              </label>
+              <select
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+                className="w-full rounded-lg border border-gray-300 px-3.5 py-2 text-sm outline-none focus:border-[#03C75A] bg-white"
+              >
+                <option value="">선택하세요</option>
+                {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label className="mb-1.5 block text-xs font-medium text-gray-700">
+              이미지 URL <span className="text-[10px] text-gray-400 font-normal">(자동 추출 안 되면 직접 입력)</span>
+            </label>
+            <input
+              type="url"
+              value={imageUrl}
+              onChange={(e) => { setImageUrl(e.target.value); setImageError(false); }}
+              placeholder="https://shop-phinf.pstatic.net/..."
+              className="w-full rounded-lg border border-gray-300 px-3.5 py-2 text-sm outline-none focus:border-[#03C75A]"
+            />
+            {imageError && imageUrl && (
+              <p className="mt-1 text-[10px] text-red-500">이미지를 불러올 수 없어요. 다른 URL을 사용해주세요.</p>
+            )}
+          </div>
+
+          <div>
+            <label className="mb-1.5 block text-xs font-medium text-gray-700">큐레이션 코멘트</label>
+            <input
+              type="text"
+              value={comment}
+              onChange={(e) => setComment(e.target.value)}
+              placeholder="이 상품을 추천하는 이유를 한 줄로"
+              className="w-full rounded-lg border border-gray-300 px-3.5 py-2 text-sm outline-none focus:border-[#03C75A]"
+            />
+          </div>
+
+          <div className="flex justify-end pt-1">
+            <button
+              onClick={handleSubmit}
+              disabled={!canSubmit}
+              className="cursor-pointer rounded-lg bg-[#03C75A] px-6 py-2.5 text-sm font-semibold text-white hover:bg-[#02b051] disabled:opacity-40 disabled:cursor-default"
+            >
+              내 몰에 담기
+            </button>
+          </div>
         </div>
       </div>
 

@@ -395,9 +395,12 @@ export default function ProductRecommendIntake({ onSubmit }: ProductRecommendInt
 
             {/* 연령 분포 — 플랫폼 원본 구간 */}
             <div>
-              <label className="mb-2 block text-xs font-semibold text-gray-700">
-                시청자 연령 분포 (%)
-              </label>
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <label className="block text-xs font-semibold text-gray-700">
+                  시청자 연령 분포 (%)
+                </label>
+                <span className="text-[10px] text-amber-600">⚠️ 자동 인식 결과는 부정확할 수 있어요 — 직접 확인 후 수정해주세요</span>
+              </div>
               <div className="grid grid-cols-4 sm:grid-cols-7 gap-2">
                 {(input.platform === "tiktok" ? [...AGE_RANGES_TT] : [...AGE_RANGES_YT_IG]).map((range) => (
                   <div key={range}>

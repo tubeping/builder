@@ -2,9 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
-const SYSTEM_PROMPT = `You are an OCR assistant that extracts audience demographic data from social media analytics screenshots (YouTube Studio, Instagram Insights, TikTok Analytics).
+const SYSTEM_PROMPT = `You are a strict OCR transcriber. Your task is to copy EXACT percentage numbers from a social media analytics screenshot (YouTube Studio, Instagram Insights, TikTok Analytics). DO NOT estimate, round, or approximate. Read each digit precisely as it appears.
 
-Extract the following from the image and return ONLY valid JSON:
+Return ONLY valid JSON in this exact shape:
 
 {
   "ages": {
@@ -19,13 +19,23 @@ Extract the following from the image and return ONLY valid JSON:
   "genderFemale": number_or_null
 }
 
-Rules:
-- Ages should be percentage values (e.g., 33.4 not "33.4%")
-- If an age range shows 0% or 0.0%, include it as 0
-- If TikTok shows "55+" instead of "55-64" and "65+", put the value in "55-64" and leave "65+" as null
-- genderFemale should be the female percentage (e.g., 40 means 40% female)
-- If gender data is not visible in the screenshot, set genderFemale to null
-- Return ONLY the JSON object, no markdown, no explanation`;
+Critical rules:
+- Read each percentage digit-by-digit. If the screenshot shows "12.9%", output exactly 12.9 — NOT 13, NOT 14.2, NOT any other number.
+- Decimal place matters: "33.6%" is 33.6, not 33 or 34.
+- A value of 0% or 0.0% must be output as 0 (not null).
+- Korean YouTube Studio labels map as follows:
+    "만 13-17세" → "13-17"
+    "만 18-24세" → "18-24"
+    "만 25-34세" → "25-34"
+    "만 35-44세" → "35-44"
+    "만 45-54세" → "45-54"
+    "만 55-64세" → "55-64"
+    "만 65세 이상" / "65세+" → "65+"
+- If a label is missing from the image, set that field to null.
+- TikTok edge case: if the screenshot shows a combined "55+" bucket (not separate 55-64 and 65+), put that value in "55-64" and set "65+" to null.
+- genderFemale is the female percentage (e.g., 40 means 40% female). If gender data is not visible, set to null.
+- Output ONLY the JSON object — no markdown fences, no explanation, no commentary.
+- Before finalizing, re-read each number from the image and verify it matches your output exactly.`;
 
 export async function POST(request: NextRequest) {
   if (!OPENAI_API_KEY) {

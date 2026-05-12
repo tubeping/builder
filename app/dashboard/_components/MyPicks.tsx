@@ -1509,9 +1509,7 @@ function NaverTab({
   }, [url]);
 
   // 이미지 파일 직접 업로드 (클라이언트에서 압축 → base64 data URL)
-  const handleImageFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const handleImageFile = async (file: File) => {
     if (!file.type.startsWith("image/")) { setUploadError("이미지 파일만 업로드할 수 있어요"); return; }
     if (file.size > 10 * 1024 * 1024) { setUploadError("이미지 파일이 너무 커요 (최대 10MB)"); return; }
     setUploadingImage(true); setUploadError(""); setImageError(false);
@@ -1522,9 +1520,37 @@ function NaverTab({
       setUploadError(err instanceof Error ? err.message : "이미지 처리 실패");
     } finally {
       setUploadingImage(false);
-      // 같은 파일 다시 선택해도 onChange 트리거되도록 reset
-      e.target.value = "";
     }
+  };
+
+  const handleImageFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    await handleImageFile(file);
+    // 같은 파일 다시 선택해도 onChange 트리거되도록 reset
+    e.target.value = "";
+  };
+
+  // 클립보드/드래그앤드롭에서 이미지 받기
+  const handleImagePasteOrDrop = (items: DataTransferItemList | FileList | null) => {
+    if (!items) return false;
+    const itemsArr: (File | null)[] = [];
+    if ("length" in items) {
+      for (let i = 0; i < items.length; i++) {
+        const it = items[i] as DataTransferItem | File;
+        if (it instanceof File) {
+          itemsArr.push(it);
+        } else if ("getAsFile" in it && it.kind === "file") {
+          itemsArr.push(it.getAsFile());
+        }
+      }
+    }
+    const imgFile = itemsArr.find((f) => f && f.type.startsWith("image/"));
+    if (imgFile) {
+      void handleImageFile(imgFile);
+      return true;
+    }
+    return false;
   };
 
   // URL 붙여넣으면 즉시 자동 추출 트리거
@@ -1572,7 +1598,7 @@ function NaverTab({
     setTimeout(() => setToastMessage(""), 3000);
   };
 
-  const hasPreview = !!(url.trim() && (name || imageUrl));
+  const hasPreview = !!url.trim(); // URL 있으면 카드 영역 항상 표시 (드롭/클립보드 zone 활성화 위해)
   const canSubmit = !!(url.trim() && name.trim());
 
   return (
@@ -1592,8 +1618,11 @@ function NaverTab({
               아무 링크나 <span className="text-[#03C75A]">카드로</span> 등록
             </p>
             <p className="mt-1 text-xs text-gray-600 leading-relaxed">
-              URL을 붙여넣으면 <b>이미지·제목·가격</b>이 자동으로 채워져요.
-              이미지는 <b>직접 업로드</b>도 가능합니다.
+              URL을 붙여넣으면 자동 추출을 시도합니다.
+              자동이 안 되는 사이트(네이버 등)는 카드의 이미지 영역을 <b>클릭·드래그·Ctrl+V</b>로 직접 채우세요.
+            </p>
+            <p className="mt-1.5 text-[11px] text-gray-500">
+              💡 빠른 방법: 상품 페이지에서 이미지 <b>우클릭 → 이미지 복사</b> → 빌더로 돌아와 <b>Ctrl+V</b>
             </p>
           </div>
         </div>
@@ -1601,8 +1630,26 @@ function NaverTab({
 
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
 
-      {/* 좌측: 링크 블록 만들기 */}
-      <div className="lg:col-span-3 space-y-5">
+      {/* 좌측: 링크 블록 만들기 (영역 전체에 클립보드 paste 리스닝) */}
+      <div
+        className="lg:col-span-3 space-y-5"
+        onPaste={(e) => {
+          // URL이 아니라 이미지가 들어왔을 때만 처리. URL paste는 input 자체 onPaste가 처리.
+          const items = e.clipboardData?.items;
+          if (!items) return;
+          let hasImage = false;
+          for (let i = 0; i < items.length; i++) {
+            if (items[i].kind === "file" && items[i].type.startsWith("image/")) {
+              hasImage = true;
+              break;
+            }
+          }
+          if (hasImage) {
+            e.preventDefault();
+            handleImagePasteOrDrop(items);
+          }
+        }}
+      >
 
         {/* 링크 입력 + 자동 가져오기 */}
         <div className="rounded-xl border border-gray-200 bg-white p-5">
@@ -1657,32 +1704,62 @@ function NaverTab({
           </p>
         </div>
 
-        {/* 큰 카드 미리보기 (링크 블록 스타일) */}
+        {/* 큰 카드 미리보기 (링크 블록 스타일) — 드래그앤드롭 + 클릭으로 이미지 변경 */}
         {hasPreview && (
           <div className="rounded-xl border border-gray-200 bg-white p-5">
             <p className="mb-3 text-xs font-semibold text-gray-500">내 몰에 이렇게 노출됩니다</p>
             <div className="mx-auto max-w-md overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
-              <div className="relative aspect-[4/3] bg-gray-50">
+              <label
+                className="relative block aspect-[4/3] cursor-pointer bg-gray-50 group"
+                onDragOver={(e) => { e.preventDefault(); }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  handleImagePasteOrDrop(e.dataTransfer.files);
+                }}
+              >
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  disabled={uploadingImage}
+                  onChange={handleImageFileChange}
+                />
                 {imageUrl && !imageError ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={imageUrl}
-                    alt={name}
-                    className="absolute inset-0 h-full w-full object-cover"
-                    onError={() => setImageError(true)}
-                  />
+                  <>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={imageUrl}
+                      alt={name}
+                      className="absolute inset-0 h-full w-full object-cover"
+                      onError={() => setImageError(true)}
+                    />
+                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
+                      <span className="rounded-full bg-white/95 px-3 py-1.5 text-[11px] font-medium text-gray-700 shadow">
+                        📷 클릭·드래그·Ctrl+V로 교체
+                      </span>
+                    </div>
+                  </>
                 ) : (
-                  <div className="flex h-full flex-col items-center justify-center gap-1.5 text-gray-300">
+                  <div className="flex h-full flex-col items-center justify-center gap-2 text-gray-400">
                     <svg className="h-10 w-10" fill="currentColor" viewBox="0 0 24 24">
                       <path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                     </svg>
-                    <span className="text-[10px] text-gray-400">이미지 없음 · 직접 업로드해보세요</span>
+                    <span className="text-[11px] font-medium">클릭해서 업로드 · 드래그 · Ctrl+V 붙여넣기</span>
+                    <span className="text-[10px] text-gray-300">웹페이지에서 이미지 우클릭→복사 후 Ctrl+V</span>
                   </div>
                 )}
-                <span className="absolute left-3 top-3 rounded-full bg-[#111111] px-2 py-0.5 text-[10px] font-bold text-white shadow">
+                <span className="absolute left-3 top-3 rounded-full bg-[#111111] px-2 py-0.5 text-[10px] font-bold text-white shadow z-10 pointer-events-none">
                   🔗 링크
                 </span>
-              </div>
+                {uploadingImage && (
+                  <div className="absolute inset-0 bg-white/80 flex items-center justify-center">
+                    <span className="text-xs text-gray-700 flex items-center gap-2">
+                      <span className="h-3 w-3 animate-spin rounded-full border-2 border-gray-300 border-t-gray-700" />
+                      처리 중…
+                    </span>
+                  </div>
+                )}
+              </label>
               <div className="p-4">
                 <p className="line-clamp-2 text-[15px] font-semibold text-gray-900 leading-snug">
                   {name || "제목을 입력해주세요"}

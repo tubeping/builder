@@ -258,7 +258,7 @@ function formatPrice(n: number) {
 
 function sourceLabel(source: SourceType) {
   const map: Record<SourceType, string> = {
-    tubeping_campaign: "공구", coupang: "쿠팡", naver: "네이버", own: "직접", other: "기타",
+    tubeping_campaign: "공구", coupang: "쿠팡", naver: "링크", own: "직접", other: "기타",
   };
   return map[source];
 }
@@ -1405,8 +1405,36 @@ interface NaverShopItem {
   category: string;
 }
 
-// 네이버 쇼핑커넥트/공동구매 — 본인 발급 링크 붙여넣기 전용 (심플)
+// 링크 블록 — 모든 외부 URL을 카드로 등록 (이미지·제목 자동 추출 + 직접 업로드)
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+// 클라이언트 이미지 리사이즈/압축 (max 1200px wide, JPEG q=0.85)
+async function compressImage(file: File, maxWidth = 1200, quality = 0.85): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("파일을 읽을 수 없어요"));
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = () => reject(new Error("이미지를 디코드할 수 없어요"));
+      img.onload = () => {
+        const scale = Math.min(1, maxWidth / img.width);
+        const w = Math.round(img.width * scale);
+        const h = Math.round(img.height * scale);
+        const canvas = document.createElement("canvas");
+        canvas.width = w; canvas.height = h;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) { reject(new Error("Canvas 컨텍스트 생성 실패")); return; }
+        ctx.drawImage(img, 0, 0, w, h);
+        // PNG의 투명도가 필요한 경우 아니면 JPEG가 훨씬 작음
+        const mime = file.type === "image/png" ? "image/png" : "image/jpeg";
+        resolve(canvas.toDataURL(mime, quality));
+      };
+      img.src = reader.result as string;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
 function NaverTab({
   picks, onAddPick, onRemovePick, onToggleVisible,
 }: {
@@ -1420,14 +1448,13 @@ function NaverTab({
   const [price, setPrice] = useState("");
   const [imageUrl, setImageUrl] = useState("");
   const [siteName, setSiteName] = useState("");
-  const [category, setCategory] = useState("");
   const [comment, setComment] = useState("");
   const [toastMessage, setToastMessage] = useState("");
   const [fetching, setFetching] = useState(false);
   const [fetchMsg, setFetchMsg] = useState("");
   const [imageError, setImageError] = useState(false);
-
-  const CATEGORIES = ["식품", "생활/건강", "뷰티/화장품", "패션/의류", "디지털/가전", "주방용품", "가구/인테리어", "유아동", "반려동물", "스포츠/레저", "기타"];
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [uploadError, setUploadError] = useState("");
 
   // URL에서 도메인 추출 (미리보기 카드 표시용)
   const displayDomain = (() => {
@@ -1441,7 +1468,7 @@ function NaverTab({
   // OG 메타 자동 추출 (Headless Chrome)
   const handleAutoFetch = useCallback(async (targetUrl?: string) => {
     const u = (targetUrl ?? url).trim();
-    if (!u) { setFetchMsg("판매 링크를 먼저 입력해주세요"); return; }
+    if (!u) { setFetchMsg("링크를 먼저 입력해주세요"); return; }
     setFetching(true); setFetchMsg(""); setImageError(false);
     try {
       const res = await fetch(`/api/unfurl-headless?url=${encodeURIComponent(u)}`);
@@ -1471,6 +1498,25 @@ function NaverTab({
     }
   }, [url]);
 
+  // 이미지 파일 직접 업로드 (클라이언트에서 압축 → base64 data URL)
+  const handleImageFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) { setUploadError("이미지 파일만 업로드할 수 있어요"); return; }
+    if (file.size > 10 * 1024 * 1024) { setUploadError("이미지 파일이 너무 커요 (최대 10MB)"); return; }
+    setUploadingImage(true); setUploadError(""); setImageError(false);
+    try {
+      const dataUrl = await compressImage(file);
+      setImageUrl(dataUrl);
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : "이미지 처리 실패");
+    } finally {
+      setUploadingImage(false);
+      // 같은 파일 다시 선택해도 onChange 트리거되도록 reset
+      e.target.value = "";
+    }
+  };
+
   // URL 붙여넣으면 즉시 자동 추출 트리거
   const handlePasteUrl = (pasted: string) => {
     const trimmed = pasted.trim();
@@ -1485,19 +1531,18 @@ function NaverTab({
 
   const resetForm = () => {
     setUrl(""); setName(""); setPrice(""); setImageUrl(""); setSiteName("");
-    setCategory(""); setComment(""); setImageError(false); setFetchMsg("");
+    setComment(""); setImageError(false); setFetchMsg(""); setUploadError("");
   };
 
   const handleSubmit = () => {
-    if (!url.trim()) { setToastMessage("⚠️ 판매 링크를 입력해주세요"); setTimeout(() => setToastMessage(""), 2500); return; }
-    if (!name.trim()) { setToastMessage("⚠️ 상품명을 입력해주세요"); setTimeout(() => setToastMessage(""), 2500); return; }
-    if (!category) { setToastMessage("⚠️ 카테고리를 선택해주세요"); setTimeout(() => setToastMessage(""), 2500); return; }
+    if (!url.trim()) { setToastMessage("⚠️ 링크를 입력해주세요"); setTimeout(() => setToastMessage(""), 2500); return; }
+    if (!name.trim()) { setToastMessage("⚠️ 제목을 입력해주세요"); setTimeout(() => setToastMessage(""), 2500); return; }
 
     onAddPick({
       source_type: "naver",
       name: name.trim(),
       price: parseInt(price) || 0,
-      category,
+      category: "",
       image: imageUrl.trim() || null,
       external_url: url.trim(),
       affiliate_code: null,
@@ -1506,9 +1551,8 @@ function NaverTab({
         name: name.trim(),
         price: parseInt(price) || 0,
         image: imageUrl.trim() || null,
-        category,
         source_url: url.trim(),
-        site_name: siteName || "네이버",
+        site_name: siteName || displayDomain || "링크",
       },
     });
 
@@ -1518,7 +1562,7 @@ function NaverTab({
   };
 
   const hasPreview = !!(url.trim() && (name || imageUrl));
-  const canSubmit = !!(url.trim() && name.trim() && category);
+  const canSubmit = !!(url.trim() && name.trim());
 
   return (
     <div className="space-y-6">
@@ -1528,28 +1572,18 @@ function NaverTab({
         </div>
       )}
 
-      {/* 상단 가이드 (간결화) */}
-      <div className="rounded-xl border border-[#03C75A]/30 bg-gradient-to-br from-[#03C75A]/5 to-white p-4">
+      {/* 상단 가이드 */}
+      <div className="rounded-xl border border-gray-200 bg-gradient-to-br from-gray-50 to-white p-4">
         <div className="flex items-start gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#03C75A] text-base font-bold text-white">N</div>
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#111111] text-base font-bold text-white">🔗</div>
           <div className="flex-1">
             <p className="text-sm font-bold text-gray-900">
-              네이버 쇼핑커넥트/공동구매 <span className="text-[#03C75A]">본인 발급 링크</span>만 등록
+              아무 링크나 <span className="text-[#03C75A]">카드로</span> 등록
             </p>
             <p className="mt-1 text-xs text-gray-600 leading-relaxed">
-              링크만 붙여넣으면 <b className="text-[#03C75A]">이미지·상품명·가격</b>이 자동으로 채워져요.
-              판매는 네이버에서 진행 · 수수료는 본인 계좌로 자동 입금.
+              URL을 붙여넣으면 <b>이미지·제목·가격</b>이 자동으로 채워져요.
+              이미지는 <b>직접 업로드</b>도 가능합니다.
             </p>
-            <div className="mt-3 flex flex-wrap gap-2">
-              <a href="https://partner.naver.com" target="_blank" rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 rounded-md bg-[#03C75A] px-3 py-1.5 text-[11px] font-bold text-white hover:bg-[#02b051]">
-                쇼핑커넥트 가입 →
-              </a>
-              <a href="https://brandconnect.naver.com" target="_blank" rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 rounded-md border border-[#03C75A] bg-white px-3 py-1.5 text-[11px] font-bold text-[#03C75A] hover:bg-[#03C75A]/5">
-                브랜드커넥트 →
-              </a>
-            </div>
           </div>
         </div>
       </div>
@@ -1564,7 +1598,7 @@ function NaverTab({
           <label className="mb-1.5 block text-sm font-semibold text-gray-900">
             연결할 주소 <span className="text-[#C41E1E]">*</span>
           </label>
-          <p className="mb-2.5 text-[11px] text-gray-500">네이버 발급 링크(naver.me / smartstore / brandconnect) 를 붙여넣으세요</p>
+          <p className="mb-2.5 text-[11px] text-gray-500">상품·상세페이지 URL을 그대로 붙여넣으세요</p>
           <div className="flex gap-2">
             <input
               type="url"
@@ -1582,7 +1616,7 @@ function NaverTab({
                   void handleAutoFetch();
                 }
               }}
-              placeholder="https://naver.me/... 또는 smartstore.naver.com/..."
+              placeholder="https://..."
               className="flex-1 rounded-lg border border-gray-300 px-4 py-2.5 text-sm outline-none focus:border-[#03C75A]"
             />
             <button
@@ -1607,11 +1641,11 @@ function NaverTab({
             }`}>{fetchMsg}</p>
           )}
           <p className="mt-1.5 text-[10px] text-gray-400">
-            ⏱️ 자동 가져오기는 3~10초 걸려요 (실제 브라우저로 로드해서 느려요). 안 되면 아래에서 직접 입력.
+            ⏱️ 자동 가져오기는 3~10초 걸려요. 안 되면 아래에서 직접 입력하거나 이미지를 업로드하세요.
           </p>
         </div>
 
-        {/* 큰 카드 미리보기 (네이버 링크 블록 스타일) */}
+        {/* 큰 카드 미리보기 (링크 블록 스타일) */}
         {hasPreview && (
           <div className="rounded-xl border border-gray-200 bg-white p-5">
             <p className="mb-3 text-xs font-semibold text-gray-500">내 몰에 이렇게 노출됩니다</p>
@@ -1630,16 +1664,16 @@ function NaverTab({
                     <svg className="h-10 w-10" fill="currentColor" viewBox="0 0 24 24">
                       <path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                     </svg>
-                    <span className="text-[10px] text-gray-400">이미지 없음</span>
+                    <span className="text-[10px] text-gray-400">이미지 없음 · 직접 업로드해보세요</span>
                   </div>
                 )}
-                <span className="absolute left-3 top-3 rounded-full bg-[#03C75A] px-2 py-0.5 text-[10px] font-bold text-white shadow">
-                  N 네이버
+                <span className="absolute left-3 top-3 rounded-full bg-[#111111] px-2 py-0.5 text-[10px] font-bold text-white shadow">
+                  🔗 링크
                 </span>
               </div>
               <div className="p-4">
                 <p className="line-clamp-2 text-[15px] font-semibold text-gray-900 leading-snug">
-                  {name || "상품명을 입력해주세요"}
+                  {name || "제목을 입력해주세요"}
                 </p>
                 <div className="mt-2 flex items-center justify-between gap-2">
                   {parseInt(price) > 0 ? (
@@ -1660,66 +1694,89 @@ function NaverTab({
 
           <div>
             <label className="mb-1.5 block text-xs font-medium text-gray-700">
-              상품명 <span className="text-[#C41E1E]">*</span>
+              제목 <span className="text-[#C41E1E]">*</span>
             </label>
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="예) 오설록 제주 녹차 선물세트"
+              placeholder="카드에 표시될 제목"
               className="w-full rounded-lg border border-gray-300 px-3.5 py-2 text-sm outline-none focus:border-[#03C75A]"
             />
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="mb-1.5 block text-xs font-medium text-gray-700">가격 (원)</label>
-              <input
-                type="number"
-                value={price}
-                onChange={(e) => setPrice(e.target.value)}
-                placeholder="35000"
-                className="w-full rounded-lg border border-gray-300 px-3.5 py-2 text-sm outline-none focus:border-[#03C75A]"
-              />
-            </div>
-            <div>
-              <label className="mb-1.5 block text-xs font-medium text-gray-700">
-                카테고리 <span className="text-[#C41E1E]">*</span>
-              </label>
-              <select
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                className="w-full rounded-lg border border-gray-300 px-3.5 py-2 text-sm outline-none focus:border-[#03C75A] bg-white"
-              >
-                <option value="">선택하세요</option>
-                {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
-              </select>
-            </div>
           </div>
 
           <div>
-            <label className="mb-1.5 block text-xs font-medium text-gray-700">
-              이미지 URL <span className="text-[10px] text-gray-400 font-normal">(자동 추출 안 되면 직접 입력)</span>
-            </label>
+            <label className="mb-1.5 block text-xs font-medium text-gray-700">가격 (원) <span className="text-[10px] text-gray-400 font-normal">선택</span></label>
             <input
-              type="url"
-              value={imageUrl}
-              onChange={(e) => { setImageUrl(e.target.value); setImageError(false); }}
-              placeholder="https://shop-phinf.pstatic.net/..."
+              type="number"
+              value={price}
+              onChange={(e) => setPrice(e.target.value)}
+              placeholder="35000"
               className="w-full rounded-lg border border-gray-300 px-3.5 py-2 text-sm outline-none focus:border-[#03C75A]"
             />
-            {imageError && imageUrl && (
-              <p className="mt-1 text-[10px] text-red-500">이미지를 불러올 수 없어요. 다른 URL을 사용해주세요.</p>
+          </div>
+
+          {/* 이미지: 파일 업로드 + URL 입력 */}
+          <div>
+            <label className="mb-1.5 block text-xs font-medium text-gray-700">이미지</label>
+            <div className="flex flex-wrap items-center gap-2">
+              <label className="cursor-pointer rounded-lg border border-gray-300 bg-white px-3.5 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50">
+                <span className="flex items-center gap-1.5">
+                  {uploadingImage ? (
+                    <>
+                      <span className="h-3 w-3 animate-spin rounded-full border-2 border-gray-300 border-t-gray-700" />
+                      처리 중…
+                    </>
+                  ) : (
+                    <>
+                      📷 파일 업로드
+                    </>
+                  )}
+                </span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  disabled={uploadingImage}
+                  onChange={handleImageFileChange}
+                />
+              </label>
+              {imageUrl && (
+                <button
+                  type="button"
+                  onClick={() => { setImageUrl(""); setImageError(false); setUploadError(""); }}
+                  className="cursor-pointer rounded-lg border border-gray-200 px-3 py-2 text-[11px] text-gray-500 hover:bg-gray-50"
+                >
+                  비우기
+                </button>
+              )}
+              <span className="text-[10px] text-gray-400">자동 추출 안 되면 직접 업로드하세요 (최대 10MB · 자동 압축)</span>
+            </div>
+            <input
+              type="url"
+              value={imageUrl.startsWith("data:") ? "" : imageUrl}
+              onChange={(e) => { setImageUrl(e.target.value); setImageError(false); }}
+              placeholder="또는 이미지 URL 직접 입력 (https://...)"
+              className="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3.5 py-2 text-[11px] outline-none focus:border-[#03C75A] focus:bg-white"
+            />
+            {imageUrl.startsWith("data:") && (
+              <p className="mt-1 text-[10px] text-green-600">✓ 업로드된 이미지 사용 중 (URL 입력 칸은 비어 보입니다)</p>
+            )}
+            {imageError && imageUrl && !imageUrl.startsWith("data:") && (
+              <p className="mt-1 text-[10px] text-red-500">이미지를 불러올 수 없어요. 다른 URL을 쓰거나 파일을 업로드해주세요.</p>
+            )}
+            {uploadError && (
+              <p className="mt-1 text-[10px] text-red-500">{uploadError}</p>
             )}
           </div>
 
           <div>
-            <label className="mb-1.5 block text-xs font-medium text-gray-700">큐레이션 코멘트</label>
+            <label className="mb-1.5 block text-xs font-medium text-gray-700">큐레이션 코멘트 <span className="text-[10px] text-gray-400 font-normal">선택</span></label>
             <input
               type="text"
               value={comment}
               onChange={(e) => setComment(e.target.value)}
-              placeholder="이 상품을 추천하는 이유를 한 줄로"
+              placeholder="추천 이유를 한 줄로"
               className="w-full rounded-lg border border-gray-300 px-3.5 py-2 text-sm outline-none focus:border-[#03C75A]"
             />
           </div>
@@ -1743,7 +1800,7 @@ function NaverTab({
           <div className="flex items-center justify-between border-b border-gray-100 bg-gray-50 px-4 py-3">
             <div className="flex items-center gap-2">
               <span className="h-2 w-2 rounded-full bg-[#03C75A] animate-pulse" />
-              <h3 className="text-sm font-bold text-gray-900">내 네이버 PICK</h3>
+              <h3 className="text-sm font-bold text-gray-900">내 링크 PICK</h3>
               <span className="rounded-full bg-[#03C75A] px-2 py-0.5 text-[10px] font-bold text-white">{naverPicks.length}</span>
             </div>
             <a
@@ -1787,7 +1844,7 @@ function NaverTab({
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1">
-                      <span className="rounded bg-[#03C75A]/10 px-1.5 py-0.5 text-[9px] font-medium text-[#03C75A]">네이버</span>
+                      <span className="rounded bg-[#03C75A]/10 px-1.5 py-0.5 text-[9px] font-medium text-[#03C75A]">링크</span>
                       {pick.category && (
                         <span className="rounded bg-gray-100 px-1.5 py-0.5 text-[9px] text-gray-500">{pick.category}</span>
                       )}
@@ -2253,7 +2310,7 @@ export default function MyPicks() {
     { key: "all", label: "전체", count: picks.length },
     { key: "tubeping_campaign", label: "공구", count: picks.filter((p) => p.source_type === "tubeping_campaign").length },
     { key: "coupang", label: "쿠팡", count: picks.filter((p) => p.source_type === "coupang").length },
-    { key: "naver", label: "네이버", count: picks.filter((p) => p.source_type === "naver").length },
+    { key: "naver", label: "링크", count: picks.filter((p) => p.source_type === "naver").length },
   ];
 
   return (

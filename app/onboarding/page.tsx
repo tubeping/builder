@@ -6,10 +6,11 @@
  * 흐름:
  *   1. 인증 확인 (미인증 → /login)
  *   2. shop_slug 있으면 → /dashboard로 즉시 (이미 온보딩 완료)
- *   3. shop_slug 없으면 → 채널 정보 입력 폼 표시
+ *   3. shop_slug 없으면 → 계정 기본 정보 입력 폼 표시
  *   4. 저장 후 → /dashboard
  *
- * 입력 필드: 이름, 활동 플랫폼, 채널 URL, 카테고리, shop_slug
+ * 입력 필드: 이름, 활동 플랫폼, 카테고리, shop_slug
+ *  - 채널 URL은 페르소나 도출 탭에서 등록 (유튜브 API 자동 추출과 연결되므로)
  */
 
 import { useEffect, useState } from "react";
@@ -29,10 +30,9 @@ export default function OnboardingPage() {
   const router = useRouter();
   const [phase, setPhase] = useState<"checking" | "form" | "saving" | "done">("checking");
 
-  // 폼 상태
+  // 폼 상태 (채널 URL은 페르소나 탭에서 받음)
   const [name, setName] = useState("");
   const [platform, setPlatform] = useState("youtube");
-  const [channelUrl, setChannelUrl] = useState("");
   const [category, setCategory] = useState("");
   const [shopSlug, setShopSlug] = useState("");
   const [error, setError] = useState("");
@@ -88,7 +88,6 @@ export default function OnboardingPage() {
           // 자동 생성된 임시 slug거나 슬러그 없으면 폼 표시
           setName(me.name || user.user_metadata?.name || user.email?.split("@")[0] || "");
           setPlatform(me.platform || "youtube");
-          setChannelUrl(me.channel_url || "");
           setCategory(me.category || "");
           // 임시 slug면 비워두고 사용자가 새로 정하게
           if (me.shop_slug && me.shop_slug.match(/^[a-z0-9]+_[a-f0-9]{4}$/)) {
@@ -151,7 +150,6 @@ export default function OnboardingPage() {
         body: JSON.stringify({
           name: name.trim(),
           platform,
-          channel_url: channelUrl.trim(),
           category,
           shop_slug: shopSlug.toLowerCase(),
         }),
@@ -203,7 +201,7 @@ export default function OnboardingPage() {
             <span className="text-[#C41E1E]">Tube</span>
             <span className="text-gray-900">Ping</span>
           </span>
-          <p className="mt-2 text-sm text-gray-500">시작 전 채널 정보를 알려주세요</p>
+          <p className="mt-2 text-sm text-gray-500">계정 기본 정보만 알려주세요. 채널 연결은 다음 단계에서.</p>
         </div>
 
         <form onSubmit={handleSubmit} className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm space-y-4">
@@ -229,16 +227,6 @@ export default function OnboardingPage() {
                 </button>
               ))}
             </div>
-          </div>
-
-          {/* 채널 URL */}
-          <div>
-            <label className="mb-1 block text-xs font-bold text-gray-700">
-              채널 URL <span className="text-gray-400 font-normal text-[10px]">(선택)</span>
-            </label>
-            <input type="url" value={channelUrl} onChange={(e) => setChannelUrl(e.target.value)}
-              placeholder="https://youtube.com/@..."
-              className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm outline-none focus:border-[#C41E1E]" />
           </div>
 
           {/* 카테고리 */}

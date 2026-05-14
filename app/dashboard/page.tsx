@@ -27,8 +27,7 @@ import ShopCustomize from "./_components/ShopCustomize";
 import ContentAnalytics from "./_components/ContentAnalytics";
 import AutoDM from "./_components/AutoDM";
 import Earnings from "./_components/Earnings";
-import FanInsights from "./_components/FanInsights";
-import ReelAnalyzer from "./_components/ReelAnalyzer";
+import Persona from "./_components/Persona";
 import Settings from "./_components/Settings";
 import Stats from "./_components/Stats";
 import AdminPanel from "./_components/AdminPanel";
@@ -112,12 +111,7 @@ export default function DashboardPage() {
     .filter(section => section.items.length > 0);
 
   const content: Record<MenuKey, React.ReactNode> = {
-    persona: (
-      <div className="space-y-8 p-4 md:p-8">
-        <FanInsights />
-        <ReelAnalyzer />
-      </div>
-    ),
+    persona: <Persona />,
     profile: <ShopCustomize />,
     picks: <MyPicks />,
     recommend: <ProductRecommend />,

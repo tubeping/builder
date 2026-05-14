@@ -2395,9 +2395,9 @@ export default function MyPicks() {
     <PickStatsContext.Provider value={pickStats}>
     <div className="p-6">
       <div className="mb-5">
-        <h2 className="text-xl font-bold text-gray-900">내 PICK</h2>
+        <h2 className="text-xl font-bold text-gray-900">내 상품 관리</h2>
         <p className="mt-1 text-sm text-gray-500">
-          여러 소스에서 모은 추천 상품의 큐레이션 아카이브
+          내 PICK — 여러 소스에서 모은 추천 상품의 큐레이션 아카이브
           {!isDbConnected && <span className="ml-2 rounded bg-yellow-100 px-1.5 py-0.5 text-[10px] font-medium text-yellow-700">더미 데이터</span>}
         </p>
       </div>

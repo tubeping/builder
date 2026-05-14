@@ -142,14 +142,15 @@ export async function GET(request: NextRequest) {
   if (topIds.length > 0) {
     const { data: pickRows } = await supabase
       .from("creator_picks")
-      .select("id, product_name, image, source_meta")
+      .select("id, source_meta, products(product_name, image_url)")
       .in("id", topIds.map(([id]) => id));
     const info = new Map<string, { name: string; image: string | null }>();
     for (const p of pickRows || []) {
-      const m = p.source_meta as { name?: string; image?: string } | null;
+      const m = (p.source_meta as { name?: string; image?: string; custom_image?: string } | null) || {};
+      const prod = p.products as unknown as { product_name?: string; image_url?: string } | null;
       info.set(p.id, {
-        name: (m?.name as string) || (p.product_name as string) || "상품",
-        image: (m?.image as string) || (p.image as string) || null,
+        name: prod?.product_name || m.name || "상품",
+        image: prod?.image_url || m.image || m.custom_image || null,
       });
     }
     top_picks = topIds.map(([pick_id, c]) => ({

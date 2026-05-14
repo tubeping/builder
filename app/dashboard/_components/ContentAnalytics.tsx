@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { generateScriptLocal } from "@/lib/scriptTemplates";
+import ReelAnalyzer from "./ReelAnalyzer";
 
 // ─── 타입 ───
 type ScriptStatus = "draft" | "ready" | "published";
@@ -66,6 +67,9 @@ interface GongguScript {
   experience: string;
   target: string;
   tone: string;
+
+  // 레퍼런스 릴스 (분석 탭에서 "이 톤으로 만들기"로 첨부)
+  referenceReelId?: string;
 }
 
 const FORMAT_META: Record<ScriptFormat, { label: string; desc: string; icon: string }> = {
@@ -178,6 +182,8 @@ function today() {
 
 // ─── 메인 컴포넌트 ───
 export default function ContentAnalytics() {
+  const [mode, setMode] = useState<"script" | "reel">("script");
+  const [pendingReelRef, setPendingReelRef] = useState<string | null>(null);
   const [scripts, setScripts] = useState<GongguScript[]>([]);
   const [filterStatus, setFilterStatus] = useState<"all" | ScriptStatus>("all");
   const [filterFormat, setFilterFormat] = useState<"all" | ScriptFormat>("all");
@@ -284,6 +290,7 @@ export default function ContentAnalytics() {
       experience: "",
       target: "",
       tone: "친근",
+      referenceReelId: pendingReelRef ?? undefined,
     };
 
     setScripts(prev => {
@@ -293,6 +300,7 @@ export default function ContentAnalytics() {
     });
     setShowProductPicker(false);
     setPendingProduct(null);
+    setPendingReelRef(null); // 사용 후 해제
     setExpandedId(newScript.id);
     setEditingId(newScript.id);
   }
@@ -370,7 +378,7 @@ export default function ContentAnalytics() {
     });
   }
 
-  function handleGenerateAI(script: GongguScript) {
+  async function handleGenerateAI(script: GongguScript) {
     if (!script.experience?.trim()) {
       setGenerateError("체험 포인트를 먼저 입력해주세요. 입력한 경험을 녹여서 초안을 만들어드려요.");
       return;
@@ -380,21 +388,51 @@ export default function ContentAnalytics() {
     setGeneratingId(script.id);
 
     try {
-      const s = generateScriptLocal(
-        {
-          productName: script.productName,
-          originalPrice: script.originalPrice,
-          gongguPrice: script.gongguPrice,
-          gongguStart: script.gongguStart,
-          gongguEnd: script.gongguEnd,
-        },
-        {
-          experience: script.experience,
-          target: script.target,
-          tone: script.tone,
-        },
-        script.format
-      ) as unknown as Record<string, string>;
+      let s: Record<string, string>;
+
+      if (script.referenceReelId) {
+        // 분석된 릴스 기반 → Claude API로 생성
+        const r = await fetch("/api/scripts/generate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            product: {
+              productName: script.productName,
+              originalPrice: script.originalPrice,
+              gongguPrice: script.gongguPrice,
+              gongguStart: script.gongguStart,
+              gongguEnd: script.gongguEnd,
+            },
+            context: {
+              experience: script.experience,
+              target: script.target,
+              tone: script.tone,
+            },
+            format: script.format,
+            referenceReelId: script.referenceReelId,
+          }),
+        });
+        const data = await r.json();
+        if (!r.ok) throw new Error(data.error || "AI 생성 실패");
+        s = data.script as Record<string, string>;
+      } else {
+        // 기존: 로컬 템플릿 (즉시·무료)
+        s = generateScriptLocal(
+          {
+            productName: script.productName,
+            originalPrice: script.originalPrice,
+            gongguPrice: script.gongguPrice,
+            gongguStart: script.gongguStart,
+            gongguEnd: script.gongguEnd,
+          },
+          {
+            experience: script.experience,
+            target: script.target,
+            tone: script.tone,
+          },
+          script.format
+        ) as unknown as Record<string, string>;
+      }
 
       setScripts(prev => {
         const next = prev.map(x => {
@@ -424,14 +462,68 @@ export default function ContentAnalytics() {
     }
   }
 
+  function handleUseReelAsReference(reelId: string) {
+    setPendingReelRef(reelId);
+    setMode("script");
+    setShowProductPicker(true);
+  }
+
+  // sub-tab 바
+  const tabBar = (
+    <div className="mb-5 flex border-b border-gray-200">
+      <button
+        onClick={() => setMode("script")}
+        className={`cursor-pointer border-b-2 px-4 py-2 text-sm font-medium transition-colors ${
+          mode === "script"
+            ? "border-[#C41E1E] text-[#C41E1E]"
+            : "border-transparent text-gray-500 hover:text-gray-700"
+        }`}
+      >
+        스크립트
+      </button>
+      <button
+        onClick={() => setMode("reel")}
+        className={`cursor-pointer border-b-2 px-4 py-2 text-sm font-medium transition-colors ${
+          mode === "reel"
+            ? "border-[#C41E1E] text-[#C41E1E]"
+            : "border-transparent text-gray-500 hover:text-gray-700"
+        }`}
+      >
+        릴스 분석
+      </button>
+    </div>
+  );
+
+  if (mode === "reel") {
+    return (
+      <div className="p-4 sm:p-6">
+        {tabBar}
+        <ReelAnalyzer onUseAsReference={handleUseReelAsReference} />
+      </div>
+    );
+  }
+
   return (
     <div className="p-4 sm:p-6">
+      {tabBar}
       {/* 헤더 */}
       <div className="mb-5 flex items-start justify-between">
         <div>
           <h2 className="text-xl font-bold text-gray-900">공구 스크립트</h2>
           <p className="mt-1 text-sm text-gray-500">
             카페24 상품을 선택하면 공구 대본 초안을 만들어드려요
+            {pendingReelRef && (
+              <span className="ml-2 inline-flex items-center gap-1 rounded bg-yellow-50 px-2 py-0.5 text-xs text-yellow-800">
+                📌 다음 스크립트에 분석된 릴스 톤 적용 예정
+                <button
+                  onClick={() => setPendingReelRef(null)}
+                  className="ml-1 cursor-pointer text-yellow-600 hover:text-yellow-900"
+                  title="해제"
+                >
+                  ×
+                </button>
+              </span>
+            )}
           </p>
         </div>
         <button

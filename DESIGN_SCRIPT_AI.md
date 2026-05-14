@@ -1,9 +1,12 @@
-# 공구 스크립트 AI — 설계 정의 v0.1 (초안)
+# 공구 스크립트 AI — 설계 정의 v0.3
 
-**작성**: 2026-04-22
-**기반**: 리서치 3라운드 (카피라이팅 7대 프레임워크 · 판매심리 10원칙 · 훅 6유형 · 홈쇼핑 5멘트 · 치알디니 6원칙 · TikTok Shop 공식 · 한국 공구 실제 사례)
-**위치**: `app/dashboard/_components/ContentAnalytics.tsx` (기존 수동 입력 UI)에 AI 생성 레이어 추가
-**상태**: 개발 착수 전 정의 단계
+**최초 작성**: 2026-04-22
+**최종 수정**: 2026-05-12 (v0.3 — 릴스 분석 탭 추가)
+**기반**: 리서치 3라운드 (카피라이팅 7대 프레임워크 · 판매심리 10원칙 · 훅 6유형 · 홈쇼핑 5멘트 · 치알디니 6원칙 · TikTok Shop 공식 · 한국 공구 실제 사례) + 이상한마케팅 벤치마킹
+**위치**:
+- `app/dashboard/_components/ContentAnalytics.tsx` (스크립트 생성 — 구현 완료)
+- `app/dashboard/_components/ReelAnalyzer.tsx` (릴스 분석 — v0.3 신설)
+**상태**: Phase 1 완료 (생성 API), Phase 6 진행 중 (릴스 분석)
 
 ---
 
@@ -313,6 +316,63 @@ CTA       : 댓글/링크 안내 + 마감 강조
 분량      : 800~1,500자
 ```
 
+### 7-4. 릴스 분석 출력 포맷 `[v0.3 신설]`
+
+벤치마킹 릴스 URL 입력 → 다음 구조의 JSON 반환:
+
+```yaml
+reel_analysis:
+  meta:
+    url: "https://www.instagram.com/reel/..."
+    duration_sec: 38
+    thumbnail: "..."
+
+  transcript:                    # Whisper 시간코드 전사
+    - { start: 0.0,  end: 2.8,  text: "10년차 다이어터가 절대 추천하는..." }
+    - { start: 2.8,  end: 8.5,  text: "..." }
+
+  scenes:                        # Claude Vision 장면 묘사 (3초 간격)
+    - { time: 0,  desc: "여성이 카메라 정면, 거실 배경, 손에 제품" }
+    - { time: 3,  desc: "제품 클로즈업, 라벨 강조" }
+
+  gframe:                        # G-FRAME 자동 분류
+    hook:
+      type: "negative"           # 6유형 중
+      duration_sec: 2.8
+      text: "10년차 다이어터가 절대 추천하는..."
+      score: 8.5                 # Hook 강도 (0-10)
+    structure:
+      frame: "PAS"               # PAS/BAB/FAB/PASTOR/QUEST 등
+      sections:
+        - { name: "PROBLEM",  range: "[0:03-0:12]", text: "..." }
+        - { name: "SOLUTION", range: "[0:12-0:28]", text: "..." }
+        - { name: "DEAL",     range: "[0:28-0:35]", text: "..." }
+    cta:
+      pattern: "scarcity"        # 5패턴 중
+      range: "[0:35-0:38]"
+      text: "오늘 자정 마감입니다"
+      strength: 7.5
+
+  persuasion_tags:               # 다중 부여
+    - "social_proof"
+    - "scarcity"
+    - "loss_aversion"
+
+  category: "다이어트"             # 자동 분류
+  recommended_for:               # 어떤 제품군에 어울리는 톤인지
+    - "건강식품"
+    - "기능성 식품"
+
+  notes: ""                      # 사용자 메모 (수동)
+```
+
+**활용**:
+- 사용자 본인 라이브러리에 저장 → 평소 모아두기
+- 스크립트 생성 시 1~3개 선택 → few-shot으로 Claude 프롬프트에 주입
+- Hook/CTA 패턴 통계화 → 카테고리별 승자 패턴 자동 발견
+
+---
+
 ### 7-3. 게시글 (인스타 피드 · 블로그)
 
 ```
@@ -465,6 +525,24 @@ Opening → Body (HOOK + EMPATHY + SOLUTION + DEAL 통합)
 - [ ] 월 단위 스타일 벡터 업데이트
 - [ ] 승자 훅 패턴 집계 → 가중치 재조정
 
+### Phase 6 — 릴스 분석 탭 `[v0.3 신설]`
+- [ ] Supabase `analyzed_reels` 테이블 (사용자별 분석 이력)
+- [ ] Python 분석기 (`tubeping-sourcing/analyze_reel.py`)
+  - yt-dlp + 인스타 쿠키풀로 영상 다운로드
+  - ffmpeg 오디오 추출
+  - Whisper 시간코드 전사
+  - Claude Vision 프레임 장면 묘사
+  - Claude로 G-FRAME 자동 분류 (Hook/프레임/CTA/심리태그)
+- [ ] `app/api/reels/analyze/route.ts` (Python subprocess 호출)
+- [ ] `lib/prompts/reelAnalysis.ts` (분석 프롬프트 모듈)
+- [ ] `app/dashboard/_components/ReelAnalyzer.tsx` (URL 입력 / 결과 / 저장 목록)
+- [ ] `ContentAnalytics.tsx` 상단 sub-tab 추가 (스크립트 ↔ 릴스 분석)
+- [ ] "이 톤으로 대본 만들기" 버튼 → `/api/scripts/generate`에 분석 결과 주입
+
+**의존성 노트**:
+- 현 Vercel 환경에서는 yt-dlp/ffmpeg/Whisper 무거워 작동 어려움 — 로컬 dev 우선 동작
+- 프로덕션은 Vultr 마이그레이션 후 백그라운드 워커로 분리 운영
+
 ---
 
 ## 📎 참고 자료 (리서치 출처)
@@ -496,9 +574,176 @@ Opening → Body (HOOK + EMPATHY + SOLUTION + DEAL 통합)
 
 ---
 
+## 12. v0.4 재설계 — 두 모듈 완전 분리 (2026-05-14)
+
+### 배경
+사용자 요구를 두 갈래로 압축:
+
+> 1) **영상 분석** — 영상 넣으면 G-FRAME으로 해체해서 보여줘
+> 2) **릴스 스크립트 작성** — 내용 넣으면 릴스 스크립트 적어줘
+
+기존 v0.3은 "공구 상품 카드"를 입력 단위로 가정해 `ProductInput`(상품명/정가/공구가/기간)을 강제했음 → 사용자의 실제 사용 흐름과 어긋남. 자유로운 메모·아이디어 한 덩어리를 던지면 릴스 대본이 떨어지는 게 자연스러움.
+
+### 모듈 경계
+
+```
+┌──────────────────────────┐     ┌──────────────────────────┐
+│  Module A — 영상 분석     │     │  Module B — 릴스 작성     │
+│  (Reel/Video Analyzer)   │     │  (Reel Writer)            │
+├──────────────────────────┤     ├──────────────────────────┤
+│ 입력:                     │     │ 입력:                     │
+│  · 인스타 릴스 URL        │     │  · brief (자유 텍스트)    │
+│  · 유튜브 쇼츠/롱폼 URL   │     │  · format (shorts 기본)   │
+│  · 로컬 mp4 업로드        │     │  · referenceReelId? (옵션)│
+│                          │     │  · structured? (옵션)     │
+│ 출력:                     │     │                          │
+│  · G-FRAME 분해          │     │ 출력:                     │
+│  · 훅/프레임/CTA 태그    │     │  · hook + core + cta      │
+│  · 심리 태그              │     │  · 변형 안 3개 (옵션)     │
+│  · 전사 + 장면 묘사       │     │                          │
+│                          │     │                          │
+│ 저장: analyzed_reels     │     │ 저장: generated_scripts  │
+└──────────────────────────┘     └──────────────────────────┘
+            │                                ▲
+            └─── referenceReelId로 톤 주입 ──┘
+              (분석 결과를 few-shot으로 활용)
+```
+
+**원칙**: 두 모듈은 서로 없어도 독립 동작. 연결선은 옵션.
+
+---
+
+### 12-1. Module A — 영상 분석 (변경 사항)
+
+**입력 확장**:
+| 입력 타입 | 처리 흐름 |
+|---|---|
+| 인스타 릴스 URL | yt-dlp + 쿠키풀 → mp4 다운로드 (기존) |
+| 유튜브 쇼츠/롱폼 URL | yt-dlp (쿠키 불필요) — 신규 |
+| 로컬 mp4 업로드 | 직접 multipart 업로드 → 다운로드 단계 스킵 — 신규 |
+
+**API 변경**:
+- `POST /api/reels/analyze` — `{ url: string }` OR `multipart/form-data (file=...)`
+- analyze_reel.py에 `--local-path <mp4>` 플래그 추가 (yt-dlp 스킵 모드)
+
+**유스케이스**:
+- 인스타 공구 릴스 분석 → 패턴 추출 (기존)
+- 이상한마케팅 AI솔루션 같은 **화면녹화 mp4** 분석 → 경쟁 서비스 카피 패턴 학습 (신규)
+- 본인 과거 영상 mp4 → 스타일 벡터 추출 (Phase 2 연동)
+
+---
+
+### 12-2. Module B — 릴스 작성 (재설계 핵심)
+
+**입력 단순화**:
+```typescript
+interface ReelWriteRequest {
+  brief: string;                    // 자유 텍스트 (필수, 50~2000자)
+  format?: "shorts" | "longform" | "post";  // 기본값: "shorts"
+  referenceReelId?: string;         // 옵션 — 분석된 릴스를 톤 레퍼런스로
+  variations?: number;              // 옵션 — 1(기본) / 3 (A·B·C 3안)
+
+  // 옵션 — brief에서 추출 안 되거나 정확도가 필요할 때만 사용
+  structured?: {
+    productName?: string;
+    originalPrice?: number;
+    gongguPrice?: number;
+    gongguPeriod?: string;
+    target?: string;
+    tone?: string;
+  };
+}
+```
+
+**핵심 차이 (v0.3 → v0.4)**:
+| 항목 | v0.3 | v0.4 |
+|---|---|---|
+| 주 입력 | `ProductInput` (4필드 필수) | `brief` 한 필드 |
+| 가격·기간 | 필수 | brief에 자연어로 적거나 옵션 필드 |
+| `experience` | 별도 필드 | brief 안에 자유 기술 |
+| 기본 포맷 | 사용자 선택 | **shorts (릴스)** 기본값 |
+| 출력 | 단일 | 1안 또는 3안 |
+
+**프롬프트 변경**:
+- 시스템 프롬프트의 G-FRAME 가이드라인은 **유지** (재사용·캐싱)
+- 유저 프롬프트는 brief를 그대로 던지고, "이 내용에서 상품·체험·타겟·톤을 추출해서 릴스 대본으로 구성하라"는 지시 추가
+- structured 필드가 있으면 "정확한 숫자는 아래 구조 데이터를 사용하라"는 보조 지시
+
+**API**:
+- 기존 `POST /api/scripts/generate` 유지하되 입력 스키마 변경
+- 또는 신규 엔드포인트 `POST /api/scripts/write` 신설 후 기존 `/generate`는 deprecate
+
+→ **결정: 기존 라우트 입력 스키마를 변경(브레이킹). 호출하는 클라이언트는 ContentAnalytics.tsx 1곳뿐이라 동시 변경 가능.**
+
+---
+
+### 12-3. UI 흐름
+
+ContentAnalytics.tsx 상단 sub-tab은 그대로 유지 (이미 구현됨):
+
+```
+┌────────────────────────────────────┐
+│ [ 릴스 작성 ] [ 영상 분석 ]         │  ← 기본 탭: 릴스 작성
+├────────────────────────────────────┤
+│                                    │
+│  (릴스 작성 탭)                     │
+│  ┌──────────────────────────────┐  │
+│  │ 어떤 영상을 만들고 싶나요?     │  │
+│  │ ┌──────────────────────────┐ │  │
+│  │ │ [큰 textarea, brief]      │ │  │
+│  │ │                          │ │  │
+│  │ │                          │ │  │
+│  │ └──────────────────────────┘ │  │
+│  │                              │  │
+│  │ ▸ 옵션 (펼치기)               │  │
+│  │   포맷: ◉ 릴스 ○ 롱폼 ○ 게시글│  │
+│  │   레퍼런스: [분석한 릴스 선택]  │  │
+│  │   변형: ◉ 1안만 ○ 3안 비교    │  │
+│  │                              │  │
+│  │   [ 대본 생성 ]               │  │
+│  └──────────────────────────────┘  │
+│                                    │
+│  생성 결과 ↓                       │
+│  ┌──────────────────────────────┐  │
+│  │ HOOK: ...                    │  │
+│  │ CORE: ...                    │  │
+│  │ CTA:  ...                    │  │
+│  │  [복사] [✨ 다시] [톤 바꾸기]  │  │
+│  └──────────────────────────────┘  │
+└────────────────────────────────────┘
+```
+
+**디자인 원칙 (메모리: AI 티 금지)**:
+- cream 톤·serif·purple 그라데이션 X
+- "✨ AI" 표시 최소화. "생성" 버튼만
+- placeholder 예시도 진짜처럼: "구찌 향수 50% 공구. 친구한테 추천하는 느낌으로. 30대 직장인 타겟."
+
+---
+
+### 12-4. 구현 단계 (Phase 7)
+
+- [ ] **Phase 7-1**: `lib/prompts/scriptGeneration.ts` 재구성
+  - `ProductInput` 타입을 `brief: string` 중심으로 교체
+  - 시스템 프롬프트는 유지, 유저 프롬프트만 변경
+- [ ] **Phase 7-2**: `/api/scripts/generate` 입력 스키마 변경 + 응답에 `variations` 배열 옵션 추가
+- [ ] **Phase 7-3**: ContentAnalytics.tsx "릴스 작성" 탭 UI 단순화 (큰 textarea + 옵션 collapsible)
+- [ ] **Phase 7-4**: analyze_reel.py에 `--local-path` 모드 추가
+- [ ] **Phase 7-5**: `/api/reels/analyze` 라우트에 multipart/form-data 업로드 지원
+- [ ] **Phase 7-6**: ReelAnalyzer.tsx에 "파일 업로드" 버튼 추가 (URL 입력과 토글)
+- [ ] **Phase 7-7**: 이상한마케팅 mp4로 end-to-end 분석 → 결과를 referenceReelId로 받아 릴스 작성까지 시연
+
+**의존성 노트** (Vultr 마이그레이션 전제):
+- 로컬 mp4 업로드는 Vercel serverless 한도(4.5MB 기본, 25MB 제한) 때문에 큰 파일은 불가
+- 21MB 이상한마케팅 mp4는 로컬 dev에서만 검증 가능
+- 프로덕션은 Vultr 이전 후 백그라운드 워커 + S3 호환 업로드로 전환
+
+---
+
 ## 🔖 변경 이력
 
 | 날짜 | 버전 | 변경 |
 |---|---|---|
 | 2026-04-22 | v0.1 | 초안 작성 (리서치 3라운드 기반) |
 | 2026-04-22 | v0.2 | 시리즈 → 게시글로 포맷 교체, Phase 1 구현 착수 (프롬프트 모듈·API 라우트·UI AI 생성 버튼) |
+| 2026-05-12 | v0.3 | 릴스 분석 탭 추가 — 7-4절 출력 포맷 정의 + Phase 6 구현 항목. 이상한마케팅 벤치마킹 결과 반영 |
+| 2026-05-14 | v0.4 | **두 모듈 완전 분리 재설계** — Module A(영상 분석, URL+mp4 업로드) / Module B(릴스 작성, brief 한 덩어리). `ProductInput` 강제 입력 폐기. Phase 7 구현 항목 정의 |

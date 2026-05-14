@@ -132,9 +132,9 @@ export default function ReelAnalyzer({ onUseAsReference }: Props) {
     <div className="p-4 sm:p-6">
       {/* 헤더 */}
       <div className="mb-5">
-        <h2 className="text-xl font-bold text-gray-900">릴스 분석</h2>
+        <h2 className="text-xl font-bold text-gray-900">영상 분석</h2>
         <p className="mt-1 text-sm text-gray-500">
-          벤치마킹할 릴스 링크를 붙여넣으면 훅·구조·CTA를 자동 분석해서 모아둡니다.
+          벤치마킹할 인스타 릴스 / 유튜브 쇼츠 링크를 붙여넣으면 훅·구조·CTA를 자동 분석해서 모아둡니다.
           나중에 대본 만들 때 이 톤을 그대로 적용할 수 있어요.
         </p>
       </div>
@@ -149,7 +149,7 @@ export default function ReelAnalyzer({ onUseAsReference }: Props) {
             onKeyDown={(e) => {
               if (e.key === "Enter" && !analyzing) handleAnalyze();
             }}
-            placeholder="https://www.instagram.com/reel/..."
+            placeholder="릴스 또는 쇼츠 URL (instagram.com/reel/... 또는 youtube.com/shorts/...)"
             disabled={analyzing}
             className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-[#C41E1E] focus:outline-none focus:ring-1 focus:ring-[#C41E1E] disabled:bg-gray-50"
           />

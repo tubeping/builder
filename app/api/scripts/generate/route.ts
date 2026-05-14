@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
+import { createServerClient } from "@supabase/ssr";
+import { cookies } from "next/headers";
 import {
   FORMAT_CONFIG,
   buildUserPrompt,
@@ -8,6 +10,10 @@ import {
   type GenerationContext,
   type ScriptOutput,
 } from "@/lib/prompts/scriptGeneration";
+import {
+  reelToFewShotExample,
+  type ReelAnalysisResult,
+} from "@/lib/prompts/reelAnalysis";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -18,6 +24,44 @@ interface GenerateRequest {
   product: ProductInput;
   context: GenerationContext;
   format: ScriptFormat;
+  referenceReelId?: string;
+}
+
+async function fetchReelAsExample(reelId: string): Promise<string | null> {
+  const cookieStore = await cookies();
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll: () => cookieStore.getAll(),
+        setAll: (cs) =>
+          cs.forEach(({ name, value, options }) =>
+            cookieStore.set(name, value, options)
+          ),
+      },
+    }
+  );
+  const { data } = await supabase
+    .from("analyzed_reels")
+    .select("url, duration_sec, gframe, persuasion_tags, category, recommended_for, hook_score, cta_strength, transcript, scenes")
+    .eq("id", reelId)
+    .single();
+
+  if (!data || !data.gframe) return null;
+
+  const reel: ReelAnalysisResult = {
+    meta: { url: data.url, duration_sec: data.duration_sec },
+    transcript: data.transcript ?? [],
+    scenes: data.scenes ?? [],
+    gframe: data.gframe,
+    persuasion_tags: data.persuasion_tags ?? [],
+    category: data.category ?? "",
+    recommended_for: data.recommended_for ?? [],
+    hook_score: data.hook_score ?? 0,
+    cta_strength: data.cta_strength ?? 0,
+  };
+  return reelToFewShotExample(reel);
 }
 
 function validateBody(body: unknown): body is GenerateRequest {
@@ -54,8 +98,17 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const { product, context, format } = body;
+  const { product, context, format, referenceReelId } = body;
   const config = FORMAT_CONFIG[format];
+
+  // 레퍼런스 릴스가 지정된 경우 fetch해서 few-shot으로 컨텍스트에 주입
+  let enrichedContext: GenerationContext = context;
+  if (referenceReelId) {
+    const example = await fetchReelAsExample(referenceReelId);
+    if (example) {
+      enrichedContext = { ...context, referenceReelExample: example };
+    }
+  }
 
   const client = new Anthropic({ apiKey });
 
@@ -73,7 +126,7 @@ export async function POST(req: NextRequest) {
       messages: [
         {
           role: "user",
-          content: buildUserPrompt(product, context, format),
+          content: buildUserPrompt(product, enrichedContext, format),
         },
       ],
       output_config: {

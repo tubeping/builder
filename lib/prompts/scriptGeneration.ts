@@ -13,6 +13,7 @@ export interface GenerationContext {
   target?: string;
   tone?: string;
   referenceUrl?: string;
+  referenceReelExample?: string; // 분석된 릴스를 few-shot으로 주입 (reelToFewShotExample 결과)
 }
 
 export interface LongformOutput {
@@ -302,6 +303,11 @@ ${context.tone || "친근 (자연스러운 구어체)"}
 ${
   context.referenceUrl
     ? `## 말투 참조\n크리에이터가 평소 쓰는 말투: ${context.referenceUrl}\n`
+    : ""
+}
+${
+  context.referenceReelExample
+    ? `## 레퍼런스 릴스 (이 톤·구조를 참고하되 그대로 베끼지 말 것)\n${context.referenceReelExample}\n\n위 릴스의 훅 유형·프레임·CTA 패턴을 참고해서 우리 상품에 맞게 새로 구성해주세요.\n`
     : ""
 }
 

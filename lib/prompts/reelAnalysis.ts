@@ -40,7 +40,8 @@ export interface TranscriptSegment {
 
 export interface SceneDescription {
   time: number;
-  desc: string;
+  caption: string;  // 영상 내 노출된 자막 텍스트 원문 (없으면 "")
+  scene: string;   // 시각 묘사 (구도·인물·제품·배경)
 }
 
 export interface GFrameHook {
@@ -77,6 +78,7 @@ export interface GFrame {
 export interface ReelAnalysisMeta {
   url: string;
   duration_sec: number;
+  source?: "instagram" | "youtube";
   source_username?: string;
 }
 

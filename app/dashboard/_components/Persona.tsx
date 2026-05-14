@@ -1,15 +1,24 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Loader2, RefreshCw, Tv, Camera, Eye, ThumbsUp, MessageCircle } from "lucide-react";
+import { Loader2, RefreshCw, Save, Eye, ThumbsUp, MessageCircle } from "lucide-react";
 import ReelAnalyzer from "./ReelAnalyzer";
 
+const PLATFORMS = [
+  { value: "youtube",   label: "YouTube",   icon: "🎬", placeholder: "https://youtube.com/@채널핸들", autoExtract: true  },
+  { value: "instagram", label: "Instagram", icon: "📷", placeholder: "https://instagram.com/핸들",     autoExtract: false },
+  { value: "tiktok",    label: "TikTok",    icon: "🎵", placeholder: "https://tiktok.com/@핸들",       autoExtract: false },
+  { value: "blog",      label: "블로그",     icon: "📝", placeholder: "https://blog.naver.com/...",     autoExtract: false },
+  { value: "etc",       label: "기타",       icon: "🔗", placeholder: "https://...",                    autoExtract: false },
+] as const;
+type PlatformValue = typeof PLATFORMS[number]["value"];
+
 const AGE_BUCKETS = [
-  { key: "10s", label: "10대" },
-  { key: "20s", label: "20대" },
-  { key: "30s", label: "30대" },
-  { key: "40s", label: "40대" },
-  { key: "50plus", label: "50+" },
+  { key: "10s",     label: "10대" },
+  { key: "20s",     label: "20대" },
+  { key: "30s",     label: "30대" },
+  { key: "40s",     label: "40대" },
+  { key: "50plus",  label: "50+" },
 ] as const;
 type AgeKey = typeof AGE_BUCKETS[number]["key"];
 
@@ -67,6 +76,9 @@ function relativeDate(iso: string): string {
   if (day < 365) return `${Math.floor(day / 30)}달 전`;
   return `${Math.floor(day / 365)}년 전`;
 }
+function platformMeta(value: string | null | undefined) {
+  return PLATFORMS.find(p => p.value === value) ?? PLATFORMS[0];
+}
 
 function VideoGrid({ videos, emptyHint }: { videos: VideoMeta[]; emptyHint: string }) {
   if (!videos.length) {
@@ -109,16 +121,18 @@ function VideoGrid({ videos, emptyHint }: { videos: VideoMeta[]; emptyHint: stri
 export default function Persona() {
   const [me, setMe] = useState<CreatorMe | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // 메인 채널 입력
+  const [platform, setPlatform] = useState<PlatformValue>("youtube");
   const [channelUrl, setChannelUrl] = useState("");
-  const [extracting, setExtracting] = useState(false);
-  const [extractError, setExtractError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState("");
 
   // 수기 입력 상태
   const [audienceAge, setAudienceAge] = useState<Record<AgeKey, number>>({
     "10s": 0, "20s": 0, "30s": 0, "40s": 0, "50plus": 0,
   });
   const [genderMale, setGenderMale] = useState<number>(50);
-  const [instagramHandle, setInstagramHandle] = useState("");
   const [savingManual, setSavingManual] = useState(false);
   const [savedFlash, setSavedFlash] = useState(false);
 
@@ -133,20 +147,21 @@ export default function Persona() {
         if (!alive) return;
         setMe(data);
         setChannelUrl(data.channel_url ?? "");
+        const p = PLATFORMS.find(x => x.value === data.platform);
+        if (p) setPlatform(p.value);
         const m = data.persona?.manualInput;
         if (m?.audienceAge) {
           setAudienceAge({
-            "10s": m.audienceAge["10s"] ?? 0,
-            "20s": m.audienceAge["20s"] ?? 0,
-            "30s": m.audienceAge["30s"] ?? 0,
-            "40s": m.audienceAge["40s"] ?? 0,
+            "10s":    m.audienceAge["10s"]    ?? 0,
+            "20s":    m.audienceAge["20s"]    ?? 0,
+            "30s":    m.audienceAge["30s"]    ?? 0,
+            "40s":    m.audienceAge["40s"]    ?? 0,
             "50plus": m.audienceAge["50plus"] ?? 0,
           });
         }
         if (m?.audienceGender?.male !== undefined) {
           setGenderMale(m.audienceGender.male);
         }
-        if (m?.instagramHandle) setInstagramHandle(m.instagramHandle);
       } finally {
         if (alive) setLoading(false);
       }
@@ -158,32 +173,40 @@ export default function Persona() {
   const channel = persona.channel;
   const latest = persona.latestVideos ?? [];
   const top = persona.topVideos ?? [];
+  const activePlatform = platformMeta(platform);
+  const mePlatform = platformMeta(me?.platform);
+  const isYouTubeMain = me?.platform === "youtube";
 
-  const handleExtract = useCallback(async () => {
+  const handleSubmit = useCallback(async () => {
     if (!channelUrl.trim()) {
-      setExtractError("채널 URL을 입력해주세요");
+      setSubmitError("채널 URL을 입력해주세요");
       return;
     }
-    setExtracting(true);
-    setExtractError("");
+    setSubmitting(true);
+    setSubmitError("");
     try {
       const res = await fetch("/api/persona/extract", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ channelUrl: channelUrl.trim() }),
+        body: JSON.stringify({ channelUrl: channelUrl.trim(), platform }),
       });
       const data = await res.json();
       if (!res.ok) {
-        setExtractError(data.error ?? "추출 실패");
+        setSubmitError(data.error ?? "저장 실패");
         return;
       }
-      setMe(prev => ({ ...(prev ?? {}), channel_url: channelUrl.trim(), platform: "youtube", persona: data.persona }));
+      setMe(prev => ({
+        ...(prev ?? {}),
+        channel_url: channelUrl.trim(),
+        platform,
+        persona: data.persona ?? prev?.persona,
+      }));
     } catch (e) {
-      setExtractError(e instanceof Error ? e.message : "네트워크 오류");
+      setSubmitError(e instanceof Error ? e.message : "네트워크 오류");
     } finally {
-      setExtracting(false);
+      setSubmitting(false);
     }
-  }, [channelUrl]);
+  }, [channelUrl, platform]);
 
   const ageSum = useMemo(() => Object.values(audienceAge).reduce((a, b) => a + b, 0), [audienceAge]);
 
@@ -194,7 +217,6 @@ export default function Persona() {
         ...(persona.manualInput ?? {}),
         audienceAge,
         audienceGender: { male: genderMale, female: 100 - genderMale },
-        instagramHandle: instagramHandle.trim() || undefined,
       };
       const nextPersona = { ...persona, manualInput: nextManual };
       const res = await fetch("/api/me", {
@@ -210,7 +232,7 @@ export default function Persona() {
     } finally {
       setSavingManual(false);
     }
-  }, [persona, audienceAge, genderMale, instagramHandle]);
+  }, [persona, audienceAge, genderMale]);
 
   if (loading) {
     return (
@@ -220,82 +242,115 @@ export default function Persona() {
     );
   }
 
+  const submitLabel = channel && me?.platform === platform ? "재추출" : (activePlatform.autoExtract ? "추출" : "저장");
+  const SubmitIcon = activePlatform.autoExtract ? RefreshCw : Save;
+
   return (
     <div className="p-4 md:p-8 space-y-8 max-w-6xl">
       {/* 헤더 */}
       <div>
         <h1 className="text-xl md:text-2xl font-bold text-gray-900">페르소나 도출</h1>
         <p className="mt-1 text-sm text-gray-500">
-          채널을 등록하면 최신 영상·인기 영상을 자동으로 추출합니다. 구독자 정보는 직접 입력해주세요.
+          채널을 등록하면 최신 영상·인기 영상을 자동으로 추출합니다(YouTube). 구독자 정보는 직접 입력해주세요.
         </p>
       </div>
 
-      {/* 1) 채널 등록 (자동 추출 트리거) */}
+      {/* 1) 메인 채널 등록 — 플랫폼 선택 + URL 통합 */}
       <section className="rounded-2xl border border-gray-200 bg-white p-5 md:p-6">
-        <h2 className="text-sm font-bold text-gray-900 mb-3 flex items-center gap-2">
-          <Tv className="h-4 w-4 text-[#C41E1E]" />
-          유튜브 채널
-        </h2>
+        <h2 className="text-sm font-bold text-gray-900 mb-3">메인 채널</h2>
+
+        {/* 플랫폼 선택 */}
+        <div className="mb-3 grid grid-cols-2 sm:grid-cols-5 gap-1.5">
+          {PLATFORMS.map((p) => {
+            const active = platform === p.value;
+            return (
+              <button
+                key={p.value}
+                type="button"
+                onClick={() => { setPlatform(p.value); setSubmitError(""); }}
+                className={`cursor-pointer rounded-lg border py-2 text-xs font-medium transition-colors flex flex-col items-center gap-0.5 ${
+                  active ? "border-[#C41E1E] bg-[#FFF0F0] text-[#C41E1E]" : "border-gray-200 text-gray-600 hover:border-gray-300"
+                }`}
+              >
+                <span className="text-base">{p.icon}</span>
+                <span>{p.label}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* URL 입력 + 액션 */}
         <div className="flex flex-col sm:flex-row gap-2">
           <input
             type="text"
             value={channelUrl}
-            onChange={(e) => { setChannelUrl(e.target.value); setExtractError(""); }}
-            placeholder="https://youtube.com/@채널핸들"
+            onChange={(e) => { setChannelUrl(e.target.value); setSubmitError(""); }}
+            placeholder={activePlatform.placeholder}
             className="flex-1 rounded-lg border border-gray-300 px-3 py-2.5 text-sm outline-none focus:border-[#C41E1E]"
-            onKeyDown={(e) => { if (e.key === "Enter") handleExtract(); }}
+            onKeyDown={(e) => { if (e.key === "Enter") handleSubmit(); }}
           />
           <button
-            onClick={handleExtract}
-            disabled={extracting}
+            onClick={handleSubmit}
+            disabled={submitting}
             className="cursor-pointer rounded-lg bg-[#C41E1E] px-4 py-2.5 text-sm font-bold text-white hover:bg-[#A01818] disabled:opacity-50 flex items-center gap-1.5 justify-center"
           >
-            {extracting ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-            {channel ? "재추출" : "추출"}
+            {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <SubmitIcon className="h-4 w-4" />}
+            {submitLabel}
           </button>
         </div>
-        {extractError && <p className="mt-2 text-xs text-red-500">{extractError}</p>}
 
-        {/* 채널 카드 */}
-        {channel && (
-          <div className="mt-4 flex items-center gap-4 rounded-xl bg-gray-50 p-4 border border-gray-100">
-            {channel.thumbnail && (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={channel.thumbnail} alt={channel.title} className="w-14 h-14 rounded-full object-cover" />
-            )}
-            <div className="flex-1 min-w-0">
-              <p className="font-semibold text-gray-900 truncate">{channel.title}</p>
-              <div className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-gray-500">
-                <span>구독자 <b className="text-gray-900">{compact(channel.subscriberCount)}</b></span>
-                <span>영상 <b className="text-gray-900">{compact(channel.videoCount)}</b></span>
-                <span>총 조회 <b className="text-gray-900">{compact(channel.viewCount)}</b></span>
+        <p className="mt-2 text-[11px] text-gray-400">
+          {activePlatform.autoExtract
+            ? "YouTube Data API로 채널 메타·최신 영상 10개·조회수 TOP 10을 자동으로 가져옵니다."
+            : `${activePlatform.label} 자동 추출은 준비 중입니다. 지금은 URL만 저장됩니다.`}
+        </p>
+        {submitError && <p className="mt-2 text-xs text-red-500">{submitError}</p>}
+
+        {/* 등록된 채널 표시 */}
+        {me?.channel_url && (
+          <div className="mt-4 rounded-xl bg-gray-50 p-4 border border-gray-100">
+            {channel && isYouTubeMain ? (
+              <div className="flex items-center gap-4">
+                {channel.thumbnail && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={channel.thumbnail} alt={channel.title} className="w-14 h-14 rounded-full object-cover" />
+                )}
+                <div className="flex-1 min-w-0">
+                  <p className="text-[10px] uppercase tracking-wider text-[#C41E1E] font-bold">{mePlatform.label}</p>
+                  <p className="font-semibold text-gray-900 truncate">{channel.title}</p>
+                  <div className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-gray-500">
+                    <span>구독자 <b className="text-gray-900">{compact(channel.subscriberCount)}</b></span>
+                    <span>영상 <b className="text-gray-900">{compact(channel.videoCount)}</b></span>
+                    <span>총 조회 <b className="text-gray-900">{compact(channel.viewCount)}</b></span>
+                  </div>
+                </div>
+                {persona.source === "dummy" && (
+                  <span className="rounded-full bg-amber-100 px-2.5 py-1 text-[10px] font-bold text-amber-700">
+                    샘플 데이터 (API 키 필요)
+                  </span>
+                )}
               </div>
-            </div>
-            {persona.source === "dummy" && (
-              <span className="rounded-full bg-amber-100 px-2.5 py-1 text-[10px] font-bold text-amber-700">
-                샘플 데이터 (API 키 필요)
-              </span>
+            ) : (
+              <div className="flex items-center gap-3">
+                <span className="text-2xl">{mePlatform.icon}</span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-[10px] uppercase tracking-wider text-[#C41E1E] font-bold">{mePlatform.label}</p>
+                  <a href={me.channel_url} target="_blank" rel="noopener noreferrer" className="text-sm font-medium text-gray-900 truncate hover:underline block">
+                    {me.channel_url}
+                  </a>
+                </div>
+                {!isYouTubeMain && (
+                  <span className="rounded-full bg-amber-100 px-2.5 py-1 text-[10px] font-bold text-amber-700">
+                    자동 추출 준비 중
+                  </span>
+                )}
+              </div>
             )}
           </div>
         )}
       </section>
 
-      {/* 2) 인스타그램 (1차: 핸들 입력만) */}
-      <section className="rounded-2xl border border-gray-200 bg-white p-5 md:p-6">
-        <h2 className="text-sm font-bold text-gray-900 mb-3 flex items-center gap-2">
-          <Camera className="h-4 w-4 text-[#C41E1E]" />
-          인스타그램 <span className="text-[10px] font-medium text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">자동 추출 준비 중</span>
-        </h2>
-        <input
-          type="text"
-          value={instagramHandle}
-          onChange={(e) => setInstagramHandle(e.target.value.replace(/^@/, ""))}
-          placeholder="instagram_handle (@ 없이)"
-          className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm outline-none focus:border-[#C41E1E]"
-        />
-      </section>
-
-      {/* 3) 구독자 수기 입력 */}
+      {/* 2) 구독자 수기 입력 */}
       <section className="rounded-2xl border border-gray-200 bg-white p-5 md:p-6">
         <h2 className="text-sm font-bold text-gray-900 mb-1">구독자 정보 (수기 입력)</h2>
         <p className="text-xs text-gray-500 mb-4">
@@ -371,8 +426,8 @@ export default function Persona() {
         </div>
       </section>
 
-      {/* 4) 자동 추출 결과 */}
-      {channel && (
+      {/* 3) 자동 추출 결과 (메인이 유튜브일 때만) */}
+      {isYouTubeMain && channel && (
         <>
           <section>
             <div className="flex items-baseline justify-between mb-3">
@@ -391,11 +446,13 @@ export default function Persona() {
         </>
       )}
 
-      {/* 5) ReelAnalyzer (영상별 상세 분석 — 기존 컴포넌트) */}
-      <section>
-        <h2 className="text-sm font-bold text-gray-900 mb-3">영상별 상세 분석</h2>
-        <ReelAnalyzer />
-      </section>
+      {/* 4) ReelAnalyzer (영상별 상세 분석 — 기존 컴포넌트) */}
+      {isYouTubeMain && (
+        <section>
+          <h2 className="text-sm font-bold text-gray-900 mb-3">영상별 상세 분석</h2>
+          <ReelAnalyzer />
+        </section>
+      )}
     </div>
   );
 }

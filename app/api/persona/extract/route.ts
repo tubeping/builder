@@ -191,6 +191,9 @@ function dummyPayload(handle: string): PersonaPayload {
   };
 }
 
+const SUPPORTED_PLATFORMS = ["youtube", "instagram", "tiktok", "blog", "etc"] as const;
+type Platform = typeof SUPPORTED_PLATFORMS[number];
+
 export async function POST(request: NextRequest) {
   const supabase = await getSupabase();
   const { data: { user } } = await supabase.auth.getUser();
@@ -198,12 +201,41 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const body = await request.json().catch(() => ({} as { channelUrl?: string }));
+  const body = await request.json().catch(() => ({} as { channelUrl?: string; platform?: string }));
   const channelUrl = (body.channelUrl ?? "").trim();
+  const rawPlatform = (body.platform ?? "youtube").toLowerCase();
+  const platform: Platform = (SUPPORTED_PLATFORMS as readonly string[]).includes(rawPlatform)
+    ? (rawPlatform as Platform)
+    : "youtube";
+
   if (!channelUrl) {
     return NextResponse.json({ error: "channelUrl 필요" }, { status: 400 });
   }
 
+  // 메인 채널이 유튜브가 아니면 URL만 저장
+  if (platform !== "youtube") {
+    const { data: existing } = await supabase
+      .from("creators")
+      .select("persona")
+      .eq("email", user.email)
+      .single();
+
+    // 유튜브에서 다른 플랫폼으로 바꾼 경우, 유튜브 추출 결과는 보존하되 메인은 새 플랫폼
+    const merged = { ...(existing?.persona ?? {}) };
+
+    await supabase
+      .from("creators")
+      .update({
+        persona: merged,
+        channel_url: channelUrl,
+        platform,
+      })
+      .eq("email", user.email);
+
+    return NextResponse.json({ ok: true, persona: merged, platform });
+  }
+
+  // 유튜브: 자동 추출
   const parsed = extractHandle(channelUrl);
   if (!parsed.handle && !parsed.channelId) {
     return NextResponse.json({ error: "유효한 채널 URL이 아닙니다" }, { status: 400 });
@@ -275,5 +307,5 @@ export async function POST(request: NextRequest) {
     })
     .eq("email", user.email);
 
-  return NextResponse.json({ ok: true, persona: merged });
+  return NextResponse.json({ ok: true, persona: merged, platform: "youtube" });
 }

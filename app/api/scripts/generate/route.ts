@@ -211,11 +211,9 @@ export async function POST(req: NextRequest) {
         responseSchema: toGeminiSchema(config.schema),
         // 입력 상품·체험을 정확히 따르도록 낮춤 (창의성 < instruction following)
         temperature: 0.5,
-        // Gemini 2.5 Flash는 thinking이 기본 활성 → maxOutputTokens를 잡아먹어 응답이 잘림.
-        // 대본 생성은 reasoning이 깊지 않아도 되므로 thinking 비활성화.
-        thinkingConfig: { thinkingBudget: 0 },
-        // 잘림 방지를 위해 schema-defined 출력보다 넉넉히 부여
-        maxOutputTokens: Math.max(config.maxTokens, 2500),
+        // Pro는 thinking 강제(비활성화 불가). thinkingBudget 미설정 = model default.
+        // thinking 토큰도 maxOutputTokens 한도에 포함되므로 넉넉히.
+        maxOutputTokens: Math.max(config.maxTokens, 6000),
       },
     });
 

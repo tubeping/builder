@@ -145,7 +145,11 @@ export async function POST(req: NextRequest) {
         responseMimeType: "application/json",
         responseSchema: toGeminiSchema(config.schema),
         temperature: 0.85,
-        maxOutputTokens: config.maxTokens,
+        // Gemini 2.5 Flash는 thinking이 기본 활성 → maxOutputTokens를 잡아먹어 응답이 잘림.
+        // 대본 생성은 reasoning이 깊지 않아도 되므로 thinking 비활성화.
+        thinkingConfig: { thinkingBudget: 0 },
+        // 잘림 방지를 위해 schema-defined 출력보다 넉넉히 부여
+        maxOutputTokens: Math.max(config.maxTokens, 2500),
       },
     });
 

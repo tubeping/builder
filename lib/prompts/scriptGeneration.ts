@@ -1,61 +1,82 @@
 export type ScriptFormat = "longform" | "shorts" | "post";
 
-// ── 카피 분류 시스템 (G-FRAME 매핑 → 사용자 친화 한국어 라벨) ──
+// ── 카피 분류 시스템 ──
+// enum은 영어 코드로 (Gemini 토큰 경계에서 한국어 깨짐 회피)
+// 사용자 표시는 MAIN_CATEGORY_LABEL_KO / PSYCH_TAG_LABEL_KO 로 한국어 매핑
 export type MainCategory =
-  | "문제해결형"      // PAS · negative hook · 기능성 제품
-  | "권위전문형"      // Authority · curiosity hook · 의료·전문 도구
-  | "공감스토리형"    // Storytelling · similarity · 식품·라이프·반려동물
-  | "변화체험형"      // BAB · mehrabian · 뷰티·다이어트
-  | "비교증명형"      // FAB · comparison · 가전·리빙·기능성
-  | "시한촉박형"      // Urgency · scarcity · CTA 강조
-  | "밈시각형";       // visual_meme · 숏폼·트렌드
+  | "problem_solving"     // 문제해결형 — PAS · negative hook · 기능성
+  | "authority"           // 권위전문형 — Authority · 의료·전문
+  | "story_empathy"       // 공감스토리형 — Storytelling · 식품·라이프
+  | "transformation"      // 변화체험형 — BAB · 뷰티·다이어트
+  | "comparison_proof"    // 비교증명형 — FAB · 가전·리빙
+  | "urgency_focused"     // 시한촉박형 — Urgency · scarcity · CTA
+  | "meme_visual";        // 밈시각형 — visual_meme · 숏폼·트렌드
 
 export const MAIN_CATEGORY_LIST: MainCategory[] = [
-  "문제해결형",
-  "권위전문형",
-  "공감스토리형",
-  "변화체험형",
-  "비교증명형",
-  "시한촉박형",
-  "밈시각형",
+  "problem_solving",
+  "authority",
+  "story_empathy",
+  "transformation",
+  "comparison_proof",
+  "urgency_focused",
+  "meme_visual",
 ];
 
-// 보조 심리 태그 (치알디니 6 + 핵심 심리 — 한국어)
+export const MAIN_CATEGORY_LABEL_KO: Record<MainCategory, string> = {
+  problem_solving: "문제해결형",
+  authority: "권위전문형",
+  story_empathy: "공감스토리형",
+  transformation: "변화체험형",
+  comparison_proof: "비교증명형",
+  urgency_focused: "시한촉박형",
+  meme_visual: "밈시각형",
+};
+
 export type PsychTag =
-  | "권위"
-  | "사회증거"
-  | "희소성"
-  | "손실회피"
-  | "호혜"
-  | "앵커링"
-  | "유사성"
-  | "긴급성";
+  | "authority_psych"   // 권위
+  | "social_proof"      // 사회증거
+  | "scarcity"          // 희소성
+  | "loss_aversion"     // 손실회피
+  | "reciprocity"       // 호혜
+  | "anchoring"         // 앵커링
+  | "similarity"        // 유사성
+  | "urgency_psych";    // 긴급성
 
 export const PSYCH_TAG_LIST: PsychTag[] = [
-  "권위",
-  "사회증거",
-  "희소성",
-  "손실회피",
-  "호혜",
-  "앵커링",
-  "유사성",
-  "긴급성",
+  "authority_psych",
+  "social_proof",
+  "scarcity",
+  "loss_aversion",
+  "reciprocity",
+  "anchoring",
+  "similarity",
+  "urgency_psych",
 ];
+
+export const PSYCH_TAG_LABEL_KO: Record<PsychTag, string> = {
+  authority_psych: "권위",
+  social_proof: "사회증거",
+  scarcity: "희소성",
+  loss_aversion: "손실회피",
+  reciprocity: "호혜",
+  anchoring: "앵커링",
+  similarity: "유사성",
+  urgency_psych: "긴급성",
+};
 
 export interface ScriptCategories {
   main: MainCategory;
-  tags: PsychTag[];   // 최대 2개, Gemini가 실제 적용한 심리 원칙
+  tags: PsychTag[];   // 최대 2개
 }
 
-// 메인 카테고리 → UI 표시 색상 (Tailwind class)
 export const MAIN_CATEGORY_BADGE: Record<MainCategory, string> = {
-  "문제해결형": "bg-blue-100 text-blue-700",
-  "권위전문형": "bg-indigo-100 text-indigo-700",
-  "공감스토리형": "bg-pink-100 text-pink-700",
-  "변화체험형": "bg-emerald-100 text-emerald-700",
-  "비교증명형": "bg-amber-100 text-amber-700",
-  "시한촉박형": "bg-red-100 text-red-700",
-  "밈시각형": "bg-purple-100 text-purple-700",
+  problem_solving: "bg-blue-100 text-blue-700",
+  authority: "bg-indigo-100 text-indigo-700",
+  story_empathy: "bg-pink-100 text-pink-700",
+  transformation: "bg-emerald-100 text-emerald-700",
+  comparison_proof: "bg-amber-100 text-amber-700",
+  urgency_focused: "bg-red-100 text-red-700",
+  meme_visual: "bg-purple-100 text-purple-700",
 };
 
 export interface ProductInput {
@@ -159,24 +180,35 @@ AI가 쓴 티 나지 않도록 — "입니다/합니다" 반복 회피, 문장 �
 
 ## 📛 카피 분류 라벨 (출력 시 반드시 1개 선택)
 
-대본 작성 후 사용한 카피라이팅 패턴을 다음 7개 중 **1개**로 분류해서 categories.main 필드에 기재하세요.
+대본 작성 후 사용한 카피라이팅 패턴을 다음 7개 enum 중 **1개**로 분류해서 categories.main 필드에 기재.
+값은 **반드시 영어 enum 그대로**(괄호 안 한국어 설명은 참고용).
 
-| 라벨 | 핵심 매커니즘 | 어울리는 상품 |
-|---|---|---|
-| **문제해결형** | 문제→확대→해결 (PAS). "이거 잘못 고르면..." 식 부정 훅 | 다이어트·건강·청결·기능성 |
-| **권위전문형** | 전문 자격·경력·임상 강조. "10년차 ○○가 추천하는" | 의료·전문 도구·교육·고관여 |
-| **공감스토리형** | "저도 그랬어요" 개인 경험 중심 | 식품·라이프·반려동물·육아 |
-| **변화체험형** | Before / After 시각 변화 강조 | 뷰티·다이어트·인테리어 |
-| **비교증명형** | A vs B 직접 비교·기능 우위 | 가전·리빙·기능성 제품 |
-| **시한촉박형** | 한정·긴급·완판 CTA가 본론보다 강한 경우 | 모든 카테고리 (CTA 위주) |
-| **밈시각형** | 짧고 강한 시각 훅·트렌드 밈 | 숏폼·재미·트렌드 제품 |
+| enum | 한국어 | 매커니즘 | 어울리는 상품 |
+|---|---|---|---|
+| problem_solving | 문제해결형 | PAS · negative hook | 다이어트·건강·청결 |
+| authority | 권위전문형 | 전문 자격·임상 강조 | 의료·전문 도구·교육 |
+| story_empathy | 공감스토리형 | "저도 그랬어요" 개인 경험 | 식품·라이프·반려동물 |
+| transformation | 변화체험형 | Before/After 시각 변화 | 뷰티·다이어트·인테리어 |
+| comparison_proof | 비교증명형 | A vs B 비교·기능 우위 | 가전·리빙·기능성 |
+| urgency_focused | 시한촉박형 | 한정·긴급·완판 CTA 강함 | 모든 카테고리 |
+| meme_visual | 밈시각형 | 강한 시각 훅·트렌드 밈 | 숏폼·재미 |
 
 ## 🏷️ 보조 심리 태그 (출력 시 0~2개 선택)
 
-실제 본론에 활용한 심리 원칙을 다음 중 0~2개 골라 categories.tags 필드에 기재.
-선택지: **권위 · 사회증거 · 희소성 · 손실회피 · 호혜 · 앵커링 · 유사성 · 긴급성**
+실제 본론에 활용한 심리 원칙을 다음 영어 enum 중 0~2개 골라 categories.tags 필드에 기재.
 
-(예: 변화체험형 + ["손실회피", "사회증거"])
+| enum | 한국어 |
+|---|---|
+| authority_psych | 권위 |
+| social_proof | 사회증거 |
+| scarcity | 희소성 |
+| loss_aversion | 손실회피 |
+| reciprocity | 호혜 |
+| anchoring | 앵커링 |
+| similarity | 유사성 |
+| urgency_psych | 긴급성 |
+
+(예: { "main": "transformation", "tags": ["loss_aversion", "social_proof"] })
 
 ---
 

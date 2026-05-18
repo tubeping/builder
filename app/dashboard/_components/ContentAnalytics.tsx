@@ -4,6 +4,8 @@ import { useState, useEffect, useCallback } from "react";
 import { generateScriptLocal } from "@/lib/scriptTemplates";
 import {
   MAIN_CATEGORY_BADGE,
+  MAIN_CATEGORY_LABEL_KO,
+  PSYCH_TAG_LABEL_KO,
   type ScriptCategories,
 } from "@/lib/prompts/scriptGeneration";
 import ReelAnalyzer from "./ReelAnalyzer";
@@ -796,14 +798,14 @@ export default function ContentAnalytics() {
                             MAIN_CATEGORY_BADGE[script.categories.main] ?? "bg-gray-100 text-gray-700"
                           }`}
                         >
-                          {script.categories.main}
+                          {MAIN_CATEGORY_LABEL_KO[script.categories.main] ?? script.categories.main}
                         </span>
                         {script.categories.tags?.slice(0, 2).map((t) => (
                           <span
                             key={t}
                             className="rounded-md bg-gray-100 px-1.5 py-0.5 text-[10px] text-gray-600"
                           >
-                            #{t}
+                            #{PSYCH_TAG_LABEL_KO[t] ?? t}
                           </span>
                         ))}
                       </div>

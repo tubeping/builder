@@ -473,7 +473,7 @@ export default function ContentAnalytics() {
   function handleUseReelAsReference(reelId: string) {
     setPendingReelRef(reelId);
     setMode("script");
-    setShowProductPicker(true);
+    // 인라인 폼이 항상 보이므로 따로 열 게 없음 — pendingReelRef만 설정
   }
 
   async function handleQuickGenerate() {
@@ -595,10 +595,10 @@ export default function ContentAnalytics() {
         <div>
           <h2 className="text-xl font-bold text-gray-900">공구 스크립트</h2>
           <p className="mt-1 text-sm text-gray-500">
-            카페24 상품을 선택하면 공구 대본 초안을 만들어드려요
+            상품명과 공구 내용을 적으면 훅·본론·CTA가 자동으로 만들어져요
             {pendingReelRef && (
               <span className="ml-2 inline-flex items-center gap-1 rounded bg-yellow-50 px-2 py-0.5 text-xs text-yellow-800">
-                📌 다음 스크립트에 분석된 릴스 톤 적용 예정
+                📌 분석된 릴스 톤이 다음 대본에 적용돼요
                 <button
                   onClick={() => setPendingReelRef(null)}
                   className="ml-1 cursor-pointer text-yellow-600 hover:text-yellow-900"
@@ -610,19 +610,81 @@ export default function ContentAnalytics() {
             )}
           </p>
         </div>
-        <div className="flex gap-2">
-          <button
-            onClick={() => setShowQuickModal(true)}
-            className="cursor-pointer rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
-          >
-            + 직접 입력
-          </button>
-          <button
-            onClick={() => setShowProductPicker(true)}
-            className="cursor-pointer rounded-lg bg-[#C41E1E] px-4 py-2 text-sm font-semibold text-white hover:bg-[#a51919] transition-colors"
-          >
-            + 상품 선택
-          </button>
+      </div>
+
+      {/* ── 공구 대본 생성 (인라인) ── */}
+      <div className="mb-6 rounded-2xl border border-gray-200 bg-white p-5">
+        <div className="space-y-4">
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1.5">
+              공구 상품명 <span className="text-[#C41E1E]">*</span>
+            </label>
+            <input
+              type="text"
+              value={quickName}
+              onChange={(e) => setQuickName(e.target.value)}
+              disabled={quickGenerating}
+              placeholder="예: 구찌 블룸 오 드 퍼퓸 50ml"
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-[#C41E1E] focus:outline-none focus:ring-1 focus:ring-[#C41E1E] disabled:bg-gray-50"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1.5">
+              공구 내용 <span className="text-[#C41E1E]">*</span>
+            </label>
+            <textarea
+              value={quickBrief}
+              onChange={(e) => setQuickBrief(e.target.value)}
+              disabled={quickGenerating}
+              rows={6}
+              placeholder={`정가·공구가·기간·체험 포인트·타겟·톤을 자유롭게 적어주세요.\n\n예시:\n정가 18만원 → 공구가 8만 9천원, 6월 1일~7일.\n출근길에 한 번 뿌리면 점심까지 향이 유지돼서 동료가 물어볼 정도.\n30대 직장인 여성 타겟, 친구한테 추천하는 느낌으로.`}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm leading-relaxed focus:border-[#C41E1E] focus:outline-none focus:ring-1 focus:ring-[#C41E1E] disabled:bg-gray-50"
+            />
+            <p className="mt-1 text-xs text-gray-400">
+              적은 내용을 바탕으로 훅·본론·CTA를 자동 작성합니다. 가격/기간이 있으면 그대로 반영돼요.
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1.5">포맷</label>
+            <div className="grid grid-cols-3 gap-2">
+              {(Object.keys(FORMAT_META) as ScriptFormat[]).map((fmt) => {
+                const meta = FORMAT_META[fmt];
+                const selected = quickFormat === fmt;
+                return (
+                  <button
+                    key={fmt}
+                    type="button"
+                    onClick={() => setQuickFormat(fmt)}
+                    disabled={quickGenerating}
+                    className={`cursor-pointer rounded-lg border-2 px-3 py-2 text-left text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
+                      selected ? "border-[#C41E1E] bg-red-50/30" : "border-gray-200 hover:border-gray-300"
+                    }`}
+                  >
+                    <p className={`font-semibold ${selected ? "text-[#C41E1E]" : "text-gray-900"}`}>
+                      {meta.icon} {meta.label}
+                    </p>
+                    <p className="mt-0.5 text-[11px] text-gray-500">{meta.desc}</p>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {quickError && (
+            <div className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-600">{quickError}</div>
+          )}
+
+          <div className="flex justify-end">
+            <button
+              onClick={handleQuickGenerate}
+              disabled={quickGenerating || !quickName.trim() || quickBrief.trim().length < 10}
+              className="cursor-pointer rounded-lg bg-[#C41E1E] px-6 py-2.5 text-sm font-semibold text-white hover:bg-[#a51919] disabled:cursor-not-allowed disabled:bg-gray-300"
+            >
+              {quickGenerating ? "생성중... (5~15초)" : "대본 생성"}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -641,316 +703,6 @@ export default function ContentAnalytics() {
           <p className="mt-1 text-2xl font-bold text-[#C41E1E]">{counts.published}개</p>
         </div>
       </div>
-
-      {/* ── 상품 선택 + 포맷 선택 모달 ── */}
-      {showProductPicker && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="w-full max-w-2xl max-h-[85vh] rounded-2xl bg-white shadow-xl flex flex-col mx-4">
-            <div className="flex items-center justify-between border-b border-gray-200 px-5 py-4">
-              <h3 className="text-base font-bold text-gray-900">
-                {pendingProduct ? "포맷 선택" : "카페24 상품 선택"}
-              </h3>
-              <button
-                onClick={() => { setShowProductPicker(false); setPendingProduct(null); }}
-                className="cursor-pointer text-gray-400 hover:text-gray-600"
-              >
-                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-
-            {!pendingProduct ? (
-              <>
-                {/* 검색 */}
-                <div className="px-5 py-3 border-b border-gray-100">
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={searchKeyword}
-                      onChange={e => setSearchKeyword(e.target.value)}
-                      onKeyDown={e => { if (e.key === "Enter") fetchProducts(searchKeyword); }}
-                      placeholder="상품명으로 검색..."
-                      className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-[#C41E1E] focus:outline-none focus:ring-1 focus:ring-[#C41E1E]"
-                    />
-                    <button
-                      onClick={() => fetchProducts(searchKeyword)}
-                      className="cursor-pointer rounded-lg bg-[#C41E1E] px-4 py-2 text-sm font-medium text-white hover:bg-[#a51919]"
-                    >
-                      검색
-                    </button>
-                  </div>
-                </div>
-
-                {/* 상품 리스트 */}
-                <div className="flex-1 overflow-y-auto px-5 py-3">
-                  {productsLoading && (
-                    <div className="flex items-center justify-center py-12">
-                      <div className="h-6 w-6 animate-spin rounded-full border-2 border-gray-300 border-t-[#C41E1E]" />
-                      <span className="ml-3 text-sm text-gray-500">상품 불러오는 중...</span>
-                    </div>
-                  )}
-
-                  {productsError && (
-                    <div className="rounded-lg bg-red-50 p-4 text-center">
-                      <p className="text-sm text-red-600">{productsError}</p>
-                      <button
-                        onClick={() => fetchProducts()}
-                        className="mt-2 cursor-pointer text-sm font-medium text-[#C41E1E] hover:underline"
-                      >
-                        다시 시도
-                      </button>
-                    </div>
-                  )}
-
-                  {!productsLoading && !productsError && cafe24Products.length === 0 && (
-                    <div className="py-12 text-center text-sm text-gray-400">상품이 없습니다</div>
-                  )}
-
-                  <div className="space-y-2">
-                    {cafe24Products.map(product => {
-                      const name = product.product_name.replace(/<[^>]*>/g, "").trim();
-                      const price = parseFloat(product.price) || 0;
-                      const imgSrc = product.list_image || product.small_image || product.detail_image || "";
-
-                      return (
-                        <button
-                          key={product.product_no}
-                          onClick={() => handlePickProduct(product)}
-                          className="cursor-pointer w-full flex items-center gap-3 rounded-xl border border-gray-200 p-3 text-left transition-colors hover:border-gray-300 hover:bg-gray-50"
-                        >
-                          {imgSrc ? (
-                            <img
-                              src={imgSrc}
-                              alt={name}
-                              className="h-14 w-14 rounded-lg object-cover shrink-0 border border-gray-100"
-                            />
-                          ) : (
-                            <div className="h-14 w-14 rounded-lg bg-gray-100 flex items-center justify-center shrink-0">
-                              <span className="text-lg text-gray-300">📦</span>
-                            </div>
-                          )}
-
-                          <div className="min-w-0 flex-1">
-                            <p className="text-sm font-medium text-gray-900 truncate">{name}</p>
-                            <p className="text-xs text-gray-500 mt-0.5">
-                              {formatPrice(price)}원
-                              {product.selling === "T" ? (
-                                <span className="ml-2 text-green-500">판매중</span>
-                              ) : (
-                                <span className="ml-2 text-gray-400">미판매</span>
-                              )}
-                            </p>
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              </>
-            ) : (
-              <>
-                {/* 포맷 선택 단계 */}
-                <div className="px-5 py-4 border-b border-gray-100">
-                  <div className="flex items-center gap-3">
-                    {pendingProduct.list_image && (
-                      <img
-                        src={pendingProduct.list_image}
-                        alt=""
-                        className="h-10 w-10 rounded-lg object-cover border border-gray-100"
-                      />
-                    )}
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium text-gray-900 truncate">
-                        {pendingProduct.product_name.replace(/<[^>]*>/g, "").trim()}
-                      </p>
-                      <p className="text-xs text-gray-500">어떤 포맷으로 대본을 만들까요?</p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex-1 overflow-y-auto px-5 py-4">
-                  <div className="grid gap-3">
-                    {(Object.keys(FORMAT_META) as ScriptFormat[]).map(fmt => {
-                      const meta = FORMAT_META[fmt];
-                      const selected = pendingFormat === fmt;
-                      return (
-                        <button
-                          key={fmt}
-                          onClick={() => setPendingFormat(fmt)}
-                          className={`cursor-pointer rounded-xl border-2 p-4 text-left transition-colors ${
-                            selected
-                              ? "border-[#C41E1E] bg-red-50/30"
-                              : "border-gray-200 hover:border-gray-300"
-                          }`}
-                        >
-                          <div className="flex items-start gap-3">
-                            <span className="text-2xl">{meta.icon}</span>
-                            <div className="flex-1">
-                              <p className={`text-sm font-semibold ${selected ? "text-[#C41E1E]" : "text-gray-900"}`}>
-                                {meta.label}
-                              </p>
-                              <p className="text-xs text-gray-500 mt-0.5">{meta.desc}</p>
-                            </div>
-                            {selected && (
-                              <svg className="h-5 w-5 text-[#C41E1E] shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                              </svg>
-                            )}
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                <div className="flex gap-2 border-t border-gray-200 px-5 py-3">
-                  <button
-                    onClick={() => setPendingProduct(null)}
-                    className="cursor-pointer rounded-lg border border-gray-200 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50"
-                  >
-                    ← 상품 다시 선택
-                  </button>
-                  <button
-                    onClick={handleConfirmPendingProduct}
-                    className="cursor-pointer flex-1 rounded-lg bg-[#C41E1E] px-4 py-2 text-sm font-semibold text-white hover:bg-[#a51919]"
-                  >
-                    {FORMAT_META[pendingFormat].label}로 시작하기
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* ── 직접 입력 모달 (카페24 없이 상품명+설명으로 즉시 생성) ── */}
-      {showQuickModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="w-full max-w-xl rounded-2xl bg-white shadow-xl flex flex-col mx-4">
-            <div className="flex items-center justify-between border-b border-gray-200 px-5 py-4">
-              <h3 className="text-base font-bold text-gray-900">직접 입력 — 공구 대본 생성</h3>
-              <button
-                onClick={() => {
-                  if (quickGenerating) return;
-                  setShowQuickModal(false);
-                  setQuickError(null);
-                }}
-                disabled={quickGenerating}
-                className="cursor-pointer text-gray-400 hover:text-gray-600 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-
-            <div className="px-5 py-4 space-y-4">
-              {/* 상품명 */}
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1.5">
-                  공구 상품명 <span className="text-[#C41E1E]">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={quickName}
-                  onChange={(e) => setQuickName(e.target.value)}
-                  disabled={quickGenerating}
-                  placeholder="예: 구찌 블룸 오 드 퍼퓸 50ml"
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-[#C41E1E] focus:outline-none focus:ring-1 focus:ring-[#C41E1E] disabled:bg-gray-50"
-                />
-              </div>
-
-              {/* 공구 내용 */}
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1.5">
-                  공구 내용 <span className="text-[#C41E1E]">*</span>
-                </label>
-                <textarea
-                  value={quickBrief}
-                  onChange={(e) => setQuickBrief(e.target.value)}
-                  disabled={quickGenerating}
-                  rows={7}
-                  placeholder={`정가·공구가·기간·체험 포인트·타겟·톤을 자유롭게 적어주세요.\n\n예시:\n정가 18만원 → 공구가 8만 9천원, 6월 1일~7일.\n출근길에 한 번 뿌리면 점심까지 향이 유지돼서 동료가 물어볼 정도.\n30대 직장인 여성 타겟, 친구한테 추천하는 느낌으로.`}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm leading-relaxed focus:border-[#C41E1E] focus:outline-none focus:ring-1 focus:ring-[#C41E1E] disabled:bg-gray-50"
-                />
-                <p className="mt-1 text-xs text-gray-400">
-                  적은 내용을 바탕으로 훅·본론·CTA를 자동 작성합니다. 가격/기간이 있으면 그대로 반영돼요.
-                </p>
-              </div>
-
-              {/* 포맷 선택 */}
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1.5">포맷</label>
-                <div className="grid grid-cols-3 gap-2">
-                  {(Object.keys(FORMAT_META) as ScriptFormat[]).map((fmt) => {
-                    const meta = FORMAT_META[fmt];
-                    const selected = quickFormat === fmt;
-                    return (
-                      <button
-                        key={fmt}
-                        type="button"
-                        onClick={() => setQuickFormat(fmt)}
-                        disabled={quickGenerating}
-                        className={`cursor-pointer rounded-lg border-2 px-3 py-2 text-left text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
-                          selected
-                            ? "border-[#C41E1E] bg-red-50/30"
-                            : "border-gray-200 hover:border-gray-300"
-                        }`}
-                      >
-                        <p className={`font-semibold ${selected ? "text-[#C41E1E]" : "text-gray-900"}`}>
-                          {meta.icon} {meta.label}
-                        </p>
-                        <p className="mt-0.5 text-[11px] text-gray-500">{meta.desc}</p>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {pendingReelRef && (
-                <div className="rounded-lg bg-yellow-50 px-3 py-2 text-xs text-yellow-800">
-                  📌 분석된 릴스 톤이 이 대본에 적용됩니다
-                  <button
-                    onClick={() => setPendingReelRef(null)}
-                    disabled={quickGenerating}
-                    className="ml-2 cursor-pointer text-yellow-600 hover:text-yellow-900"
-                  >
-                    해제
-                  </button>
-                </div>
-              )}
-
-              {quickError && (
-                <div className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-600">
-                  {quickError}
-                </div>
-              )}
-            </div>
-
-            <div className="flex gap-2 border-t border-gray-200 px-5 py-3">
-              <button
-                onClick={() => {
-                  if (quickGenerating) return;
-                  setShowQuickModal(false);
-                  setQuickError(null);
-                }}
-                disabled={quickGenerating}
-                className="cursor-pointer rounded-lg border border-gray-200 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                취소
-              </button>
-              <button
-                onClick={handleQuickGenerate}
-                disabled={quickGenerating || !quickName.trim() || quickBrief.trim().length < 10}
-                className="cursor-pointer flex-1 rounded-lg bg-[#C41E1E] px-4 py-2 text-sm font-semibold text-white hover:bg-[#a51919] disabled:cursor-not-allowed disabled:bg-gray-300"
-              >
-                {quickGenerating ? "생성중... (5~15초)" : "대본 생성"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* ── 필터 ── */}
       <div className="mb-4 flex flex-wrap gap-2 border-b border-gray-100 pb-4">
@@ -993,26 +745,9 @@ export default function ContentAnalytics() {
           <div className="rounded-xl border border-dashed border-gray-300 p-8 text-center">
             <p className="text-sm text-gray-400">
               {scripts.length === 0
-                ? "상품명과 공구 내용을 적으면 대본이 자동으로 만들어져요"
+                ? "위 입력 폼에서 상품명·공구 내용을 적고 '대본 생성'을 눌러주세요"
                 : "해당 조건의 스크립트가 없습니다"}
             </p>
-            {scripts.length === 0 && (
-              <div className="mt-3 flex justify-center gap-3 text-sm font-medium">
-                <button
-                  onClick={() => setShowQuickModal(true)}
-                  className="cursor-pointer text-[#C41E1E] hover:underline"
-                >
-                  + 직접 입력으로 시작
-                </button>
-                <span className="text-gray-300">·</span>
-                <button
-                  onClick={() => setShowProductPicker(true)}
-                  className="cursor-pointer text-gray-500 hover:underline"
-                >
-                  카페24 상품에서 선택
-                </button>
-              </div>
-            )}
           </div>
         )}
 

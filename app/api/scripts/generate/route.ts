@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import Anthropic from "@anthropic-ai/sdk";
+import { GoogleGenAI } from "@google/genai";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import {
@@ -18,7 +18,7 @@ import {
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-const MODEL = "claude-sonnet-4-6";
+const MODEL = "gemini-2.5-flash";
 
 interface GenerateRequest {
   product: ProductInput;
@@ -75,11 +75,34 @@ function validateBody(body: unknown): body is GenerateRequest {
   return true;
 }
 
+// JSON Schema (Anthropic 형식) → Gemini responseSchema 형식 변환
+// Gemini는 additionalProperties 미지원, 그 외 type/properties/required/description 동일
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function toGeminiSchema(schema: any): any {
+  if (!schema || typeof schema !== "object") return schema;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const out: any = {};
+  for (const [k, v] of Object.entries(schema)) {
+    if (k === "additionalProperties") continue;
+    if (k === "properties" && v && typeof v === "object") {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const props: any = {};
+      for (const [pk, pv] of Object.entries(v as Record<string, unknown>)) {
+        props[pk] = toGeminiSchema(pv);
+      }
+      out[k] = props;
+    } else {
+      out[k] = v;
+    }
+  }
+  return out;
+}
+
 export async function POST(req: NextRequest) {
-  const apiKey = process.env.ANTHROPIC_API_KEY?.trim();
+  const apiKey = process.env.GEMINI_API_KEY?.trim();
   if (!apiKey) {
     return NextResponse.json(
-      { error: "ANTHROPIC_API_KEY 환경변수가 설정되지 않았습니다." },
+      { error: "GEMINI_API_KEY 환경변수가 설정되지 않았습니다." },
       { status: 500 }
     );
   }
@@ -110,52 +133,38 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const client = new Anthropic({ apiKey });
+  const ai = new GoogleGenAI({ apiKey });
+  const userPrompt = buildUserPrompt(product, enrichedContext, format);
 
   try {
-    const createParams = {
+    const response = await ai.models.generateContent({
       model: MODEL,
-      max_tokens: config.maxTokens,
-      system: [
-        {
-          type: "text",
-          text: config.systemPrompt,
-          cache_control: { type: "ephemeral" },
-        },
-      ],
-      messages: [
-        {
-          role: "user",
-          content: buildUserPrompt(product, enrichedContext, format),
-        },
-      ],
-      output_config: {
-        format: {
-          type: "json_schema",
-          schema: config.schema,
-        },
+      contents: userPrompt,
+      config: {
+        systemInstruction: config.systemPrompt,
+        responseMimeType: "application/json",
+        responseSchema: toGeminiSchema(config.schema),
+        temperature: 0.85,
+        maxOutputTokens: config.maxTokens,
       },
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } as any;
+    });
 
-    const response = (await client.messages.create(createParams)) as Anthropic.Message;
-
-    const textBlock = response.content.find((b) => b.type === "text");
-    if (!textBlock || textBlock.type !== "text") {
+    const text = response.text;
+    if (!text) {
       return NextResponse.json(
-        { error: "모델이 텍스트 블록을 반환하지 않았습니다.", stopReason: response.stop_reason },
+        { error: "모델이 빈 응답을 반환했습니다." },
         { status: 502 }
       );
     }
 
     let parsed: ScriptOutput;
     try {
-      parsed = JSON.parse(textBlock.text) as ScriptOutput;
+      parsed = JSON.parse(text) as ScriptOutput;
     } catch (err) {
       return NextResponse.json(
         {
           error: "응답 JSON 파싱 실패",
-          rawText: textBlock.text,
+          rawText: text,
           parseError: err instanceof Error ? err.message : String(err),
         },
         { status: 502 }
@@ -166,22 +175,14 @@ export async function POST(req: NextRequest) {
       format,
       script: parsed,
       usage: {
-        inputTokens: response.usage.input_tokens,
-        outputTokens: response.usage.output_tokens,
-        cacheReadTokens: response.usage.cache_read_input_tokens ?? 0,
-        cacheCreationTokens: response.usage.cache_creation_input_tokens ?? 0,
+        inputTokens: response.usageMetadata?.promptTokenCount ?? 0,
+        outputTokens: response.usageMetadata?.candidatesTokenCount ?? 0,
+        cacheReadTokens: response.usageMetadata?.cachedContentTokenCount ?? 0,
       },
+      model: MODEL,
     });
   } catch (err) {
-    console.error("[/api/scripts/generate] Anthropic API error:", err);
-
-    if (err instanceof Anthropic.APIError) {
-      return NextResponse.json(
-        { error: `Claude API 오류: ${err.message}`, status: err.status },
-        { status: err.status || 500 }
-      );
-    }
-
+    console.error("[/api/scripts/generate] Gemini API error:", err);
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "알 수 없는 오류" },
       { status: 500 }

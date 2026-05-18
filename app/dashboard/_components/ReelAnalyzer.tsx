@@ -139,6 +139,16 @@ export default function ReelAnalyzer({ onUseAsReference }: Props) {
         </p>
       </div>
 
+      {/* 사이트(Vercel) 미지원 안내 */}
+      <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900">
+        <p className="font-semibold">⚠ 영상 분석은 현재 사이트에서 미지원입니다</p>
+        <p className="mt-1 leading-relaxed text-amber-800">
+          영상 다운로드·음성 전사·장면 분석에 Python·yt-dlp·ffmpeg·Whisper가 필요한데
+          Vercel 서버리스에는 없습니다. 로컬 개발 환경에서는 정상 동작하며,
+          서버(Vultr) 이전이 끝나면 사이트에서도 활성화됩니다.
+        </p>
+      </div>
+
       {/* URL 입력 */}
       <div className="mb-6 rounded-xl border border-gray-200 bg-white p-4">
         <div className="flex gap-2">

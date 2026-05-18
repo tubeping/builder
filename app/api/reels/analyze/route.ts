@@ -140,6 +140,21 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // Vercel serverless에는 Python·yt-dlp·ffmpeg가 없어 분석기 spawn 불가
+  // 로컬 dev 환경 또는 Vultr VPS 이전 후 활성화 예정
+  if (process.env.VERCEL && !process.env.REEL_ANALYZER_FORCE_ENABLE) {
+    return NextResponse.json(
+      {
+        error:
+          "영상 분석은 현재 사이트(Vercel)에서 미지원입니다. " +
+          "Python·yt-dlp·ffmpeg 의존성이 있어 로컬 개발 환경에서만 동작하며, " +
+          "Vultr 서버 이전이 완료되면 사이트에서도 활성화 예정입니다.",
+        environment: "vercel-unsupported",
+      },
+      { status: 503 }
+    );
+  }
+
   let result: ReelAnalysisResult;
   try {
     result = await spawnAnalyzer(url);

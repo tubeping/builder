@@ -144,7 +144,8 @@ export async function POST(req: NextRequest) {
         systemInstruction: config.systemPrompt,
         responseMimeType: "application/json",
         responseSchema: toGeminiSchema(config.schema),
-        temperature: 0.85,
+        // 입력 상품·체험을 정확히 따르도록 낮춤 (창의성 < instruction following)
+        temperature: 0.5,
         // Gemini 2.5 Flash는 thinking이 기본 활성 → maxOutputTokens를 잡아먹어 응답이 잘림.
         // 대본 생성은 reasoning이 깊지 않아도 되므로 thinking 비활성화.
         thinkingConfig: { thinkingBudget: 0 },

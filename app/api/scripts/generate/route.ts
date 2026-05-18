@@ -74,7 +74,9 @@ function pickFewShots(category: string, n: number): string {
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-const MODEL = "gemini-2.5-flash";
+// gemini-2.5-flash는 한국어 토큰 경계에서 일부 multi-byte가 깨지는 케이스 관찰됨.
+// gemini-2.5-pro로 한국어 출력 안정성·instruction following 확보 (비용 ~10x).
+const MODEL = "gemini-2.5-pro";
 
 interface GenerateRequest {
   product: ProductInput;

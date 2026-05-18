@@ -14,6 +14,55 @@ import {
   reelToFewShotExample,
   type ReelAnalysisResult,
 } from "@/lib/prompts/reelAnalysis";
+import fewShotPoolJson from "@/lib/prompts/fewShotPool.json";
+
+interface FewShotEntry {
+  uiCategory: string;
+  subcat: string;
+  url: string;
+  username: string;
+  caption: string;
+  likes: number;
+  hashtag: string;
+}
+
+interface FewShotPool {
+  generatedAt: string;
+  sourceFile: string;
+  totalSamples: number;
+  perCategoryCap: number;
+  pool: Record<string, FewShotEntry[]>;
+}
+
+const fewShotPool = fewShotPoolJson as FewShotPool;
+
+// 입력 상품명·체험에서 카테고리 추정 (키워드 매칭, 1줄 함수)
+function inferUiCategory(productName: string, brief: string): string {
+  const t = (productName + " " + brief).toLowerCase();
+  if (/(망고|딸기|복숭아|사과|배|포도|과일|샤인머스캣|수박|참외|멜론|체리|블루베리|쌀|곡물|간식|디저트|밀키트|반찬|김치|꿀|오일|올리브|김|젓갈|장|소스|음료|커피|차|와인|맥주|치즈|버터|요거트|빵|떡|꽈배기|만두|육포|육류|고기|닭|돼지|소고기|생선|해산물|굴|새우|연어|참치|식품)/.test(t)) return "food";
+  if (/(파우더|크림|토너|세럼|에센스|마스크팩|시트마스크|쿠션|파운데이션|립스틱|틴트|향수|샴푸|린스|컨디셔너|트리트먼트|클렌징|선크림|선블록|아이크림|뷰티|화장품|메이크업|스킨케어|네일|향수)/.test(t)) return "beauty";
+  if (/(강아지|고양이|반려|애견|애묘|사료|펫|독|캣|반려동물|동물병원)/.test(t)) return "pet";
+  if (/(다이어트|비타민|콜라겐|유산균|프로바이오틱스|효소|건강|영양제|단백질|프로틴|체중감량|보조제|홍삼|루테인|밀크씨슬|글루타치온)/.test(t)) return "health";
+  if (/(아기|유아|영아|이유식|기저귀|분유|장난감|키즈|어린이|아동|초등|학습지|동화책|유모차|카시트)/.test(t)) return "kids";
+  if (/(주방|냄비|프라이팬|식기|커트러리|쓰레기|청소|세제|이불|침구|매트|소파|가전|리빙|수납|정리|선풍기|공기청정기|로봇청소기|진공청소기|에어컨|히터)/.test(t)) return "kitchen";
+  return "other";
+}
+
+// 카테고리 풀에서 N개 무작위 샘플링 → 캡션 텍스트로 직렬화
+function pickFewShots(category: string, n: number): string {
+  const primary = fewShotPool.pool[category] ?? [];
+  const fallback = fewShotPool.pool.other ?? [];
+  const source = primary.length >= n ? primary : [...primary, ...fallback];
+  if (source.length === 0) return "";
+  const shuffled = [...source].sort(() => Math.random() - 0.5);
+  const picked = shuffled.slice(0, n);
+  return picked
+    .map(
+      (p, i) =>
+        `--- 예시 ${i + 1} (@${p.username}, 좋아요 ${p.likes.toLocaleString("ko-KR")}, 카테고리: ${p.subcat || p.uiCategory}) ---\n${p.caption}`
+    )
+    .join("\n\n");
+}
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -129,8 +178,15 @@ export async function POST(req: NextRequest) {
   if (referenceReelId) {
     const example = await fetchReelAsExample(referenceReelId);
     if (example) {
-      enrichedContext = { ...context, referenceReelExample: example };
+      enrichedContext = { ...enrichedContext, referenceReelExample: example };
     }
+  }
+
+  // 인스타 공구 캡션 풀에서 카테고리에 맞는 샘플 3개 동적 주입 (Few-shot 학습)
+  const inferredCat = inferUiCategory(product.productName, context.experience || "");
+  const fewShotCaptions = pickFewShots(inferredCat, 3);
+  if (fewShotCaptions) {
+    enrichedContext = { ...enrichedContext, fewShotCaptions };
   }
 
   const ai = new GoogleGenAI({ apiKey });
@@ -185,6 +241,11 @@ export async function POST(req: NextRequest) {
         cacheReadTokens: response.usageMetadata?.cachedContentTokenCount ?? 0,
       },
       model: MODEL,
+      meta: {
+        inferredCategory: inferredCat,
+        fewShotSamplesUsed: fewShotCaptions ? 3 : 0,
+        poolGeneratedAt: fewShotPool.generatedAt,
+      },
     });
   } catch (err) {
     console.error("[/api/scripts/generate] Gemini API error:", err);

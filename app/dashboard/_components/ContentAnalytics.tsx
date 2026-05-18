@@ -2,6 +2,10 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { generateScriptLocal } from "@/lib/scriptTemplates";
+import {
+  MAIN_CATEGORY_BADGE,
+  type ScriptCategories,
+} from "@/lib/prompts/scriptGeneration";
 import ReelAnalyzer from "./ReelAnalyzer";
 
 // ─── 타입 ───
@@ -70,6 +74,9 @@ interface GongguScript {
 
   // 레퍼런스 릴스 (분석 탭에서 "이 톤으로 만들기"로 첨부)
   referenceReelId?: string;
+
+  // 카피 분류 (Gemini가 사용한 메인 라벨 + 보조 심리 태그)
+  categories?: ScriptCategories;
 }
 
 const FORMAT_META: Record<ScriptFormat, { label: string; desc: string; icon: string }> = {
@@ -503,7 +510,8 @@ export default function ContentAnalytics() {
       });
       const data = await r.json();
       if (!r.ok) throw new Error(data.error || "AI 생성 실패");
-      const s = data.script as Record<string, string>;
+      const s = data.script as Record<string, unknown>;
+      const categories = (s.categories as ScriptCategories | undefined) ?? undefined;
 
       const newScript: GongguScript = {
         id: `q_${Date.now()}`,
@@ -515,16 +523,16 @@ export default function ContentAnalytics() {
         format: quickFormat,
         createdAt: today(),
         updatedAt: today(),
-        hook: s.hook ?? "",
-        intro: s.intro ?? "",
-        benefits: s.benefits ?? "",
-        dealInfo: s.dealInfo ?? "",
-        cta: s.cta ?? "",
+        hook: (s.hook as string) ?? "",
+        intro: (s.intro as string) ?? "",
+        benefits: (s.benefits as string) ?? "",
+        dealInfo: (s.dealInfo as string) ?? "",
+        cta: (s.cta as string) ?? "",
         memo: "",
-        core: s.core ?? "",
-        opening: s.opening ?? "",
-        body: s.body ?? "",
-        hashtags: s.hashtags ?? "",
+        core: (s.core as string) ?? "",
+        opening: (s.opening as string) ?? "",
+        body: (s.body as string) ?? "",
+        hashtags: (s.hashtags as string) ?? "",
         originalPrice: 0,
         gongguPrice: 0,
         gongguStart: "",
@@ -533,6 +541,7 @@ export default function ContentAnalytics() {
         target: "",
         tone: "친근",
         referenceReelId: pendingReelRef ?? undefined,
+        categories,
       };
 
       setScripts((prev) => {
@@ -779,6 +788,27 @@ export default function ContentAnalytics() {
                   )}
 
                   <div className="min-w-0 flex-1">
+                    {/* 카피 분류 배지 — Gemini가 사용한 카피라이팅 패턴 */}
+                    {script.categories?.main && (
+                      <div className="mb-1.5 flex items-center gap-1.5 flex-wrap">
+                        <span
+                          className={`rounded-md px-2 py-0.5 text-[11px] font-bold ${
+                            MAIN_CATEGORY_BADGE[script.categories.main] ?? "bg-gray-100 text-gray-700"
+                          }`}
+                        >
+                          {script.categories.main}
+                        </span>
+                        {script.categories.tags?.slice(0, 2).map((t) => (
+                          <span
+                            key={t}
+                            className="rounded-md bg-gray-100 px-1.5 py-0.5 text-[10px] text-gray-600"
+                          >
+                            #{t}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${badge.style}`}>
                         {badge.label}

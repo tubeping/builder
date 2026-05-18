@@ -1,5 +1,63 @@
 export type ScriptFormat = "longform" | "shorts" | "post";
 
+// ── 카피 분류 시스템 (G-FRAME 매핑 → 사용자 친화 한국어 라벨) ──
+export type MainCategory =
+  | "문제해결형"      // PAS · negative hook · 기능성 제품
+  | "권위전문형"      // Authority · curiosity hook · 의료·전문 도구
+  | "공감스토리형"    // Storytelling · similarity · 식품·라이프·반려동물
+  | "변화체험형"      // BAB · mehrabian · 뷰티·다이어트
+  | "비교증명형"      // FAB · comparison · 가전·리빙·기능성
+  | "시한촉박형"      // Urgency · scarcity · CTA 강조
+  | "밈시각형";       // visual_meme · 숏폼·트렌드
+
+export const MAIN_CATEGORY_LIST: MainCategory[] = [
+  "문제해결형",
+  "권위전문형",
+  "공감스토리형",
+  "변화체험형",
+  "비교증명형",
+  "시한촉박형",
+  "밈시각형",
+];
+
+// 보조 심리 태그 (치알디니 6 + 핵심 심리 — 한국어)
+export type PsychTag =
+  | "권위"
+  | "사회증거"
+  | "희소성"
+  | "손실회피"
+  | "호혜"
+  | "앵커링"
+  | "유사성"
+  | "긴급성";
+
+export const PSYCH_TAG_LIST: PsychTag[] = [
+  "권위",
+  "사회증거",
+  "희소성",
+  "손실회피",
+  "호혜",
+  "앵커링",
+  "유사성",
+  "긴급성",
+];
+
+export interface ScriptCategories {
+  main: MainCategory;
+  tags: PsychTag[];   // 최대 2개, Gemini가 실제 적용한 심리 원칙
+}
+
+// 메인 카테고리 → UI 표시 색상 (Tailwind class)
+export const MAIN_CATEGORY_BADGE: Record<MainCategory, string> = {
+  "문제해결형": "bg-blue-100 text-blue-700",
+  "권위전문형": "bg-indigo-100 text-indigo-700",
+  "공감스토리형": "bg-pink-100 text-pink-700",
+  "변화체험형": "bg-emerald-100 text-emerald-700",
+  "비교증명형": "bg-amber-100 text-amber-700",
+  "시한촉박형": "bg-red-100 text-red-700",
+  "밈시각형": "bg-purple-100 text-purple-700",
+};
+
 export interface ProductInput {
   productName: string;
   originalPrice: number;
@@ -14,9 +72,15 @@ export interface GenerationContext {
   tone?: string;
   referenceUrl?: string;
   referenceReelExample?: string; // 분석된 릴스를 few-shot으로 주입 (reelToFewShotExample 결과)
+  fewShotCaptions?: string;       // 인스타 공구 캡션 풀에서 동적 주입
 }
 
-export interface LongformOutput {
+export interface BaseOutput {
+  // Gemini API 응답에서만 보장. 로컬 폴백(scriptTemplates)에서는 부재 가능.
+  categories?: ScriptCategories;
+}
+
+export interface LongformOutput extends BaseOutput {
   hook: string;
   intro: string;
   benefits: string;
@@ -24,13 +88,13 @@ export interface LongformOutput {
   cta: string;
 }
 
-export interface ShortsOutput {
+export interface ShortsOutput extends BaseOutput {
   hook: string;
   core: string;
   cta: string;
 }
 
-export interface PostOutput {
+export interface PostOutput extends BaseOutput {
   opening: string;
   body: string;
   hashtags: string;
@@ -90,6 +154,29 @@ const SHARED_KNOWLEDGE = `# 한국 공구 대본 작성 원칙 (TubePing G-FRAME
 ## 출력 언어
 한국어. 크리에이터가 자연스럽게 말할 수 있는 구어체.
 AI가 쓴 티 나지 않도록 — "입니다/합니다" 반복 회피, 문장 길이 리듬 조절.
+
+---
+
+## 📛 카피 분류 라벨 (출력 시 반드시 1개 선택)
+
+대본 작성 후 사용한 카피라이팅 패턴을 다음 7개 중 **1개**로 분류해서 categories.main 필드에 기재하세요.
+
+| 라벨 | 핵심 매커니즘 | 어울리는 상품 |
+|---|---|---|
+| **문제해결형** | 문제→확대→해결 (PAS). "이거 잘못 고르면..." 식 부정 훅 | 다이어트·건강·청결·기능성 |
+| **권위전문형** | 전문 자격·경력·임상 강조. "10년차 ○○가 추천하는" | 의료·전문 도구·교육·고관여 |
+| **공감스토리형** | "저도 그랬어요" 개인 경험 중심 | 식품·라이프·반려동물·육아 |
+| **변화체험형** | Before / After 시각 변화 강조 | 뷰티·다이어트·인테리어 |
+| **비교증명형** | A vs B 직접 비교·기능 우위 | 가전·리빙·기능성 제품 |
+| **시한촉박형** | 한정·긴급·완판 CTA가 본론보다 강한 경우 | 모든 카테고리 (CTA 위주) |
+| **밈시각형** | 짧고 강한 시각 훅·트렌드 밈 | 숏폼·재미·트렌드 제품 |
+
+## 🏷️ 보조 심리 태그 (출력 시 0~2개 선택)
+
+실제 본론에 활용한 심리 원칙을 다음 중 0~2개 골라 categories.tags 필드에 기재.
+선택지: **권위 · 사회증거 · 희소성 · 손실회피 · 호혜 · 앵커링 · 유사성 · 긴급성**
+
+(예: 변화체험형 + ["손실회피", "사회증거"])
 
 ---
 
@@ -181,6 +268,30 @@ const POST_SYSTEM = `${SHARED_KNOWLEDGE}
 - 과장 광고 느낌 금지 — 일상 공유 톤
 `;
 
+// 공통 — 분류 라벨 필드
+const CATEGORIES_SCHEMA = {
+  type: "object",
+  properties: {
+    main: {
+      type: "string",
+      enum: MAIN_CATEGORY_LIST as unknown as string[],
+      description:
+        "이 대본이 가장 가까운 카피 분류 1개 (문제해결형·권위전문형·공감스토리형·변화체험형·비교증명형·시한촉박형·밈시각형)",
+    },
+    tags: {
+      type: "array",
+      items: {
+        type: "string",
+        enum: PSYCH_TAG_LIST as unknown as string[],
+      },
+      maxItems: 2,
+      description: "본론에 실제 적용한 심리 원칙 0~2개 (권위·사회증거·희소성·손실회피·호혜·앵커링·유사성·긴급성)",
+    },
+  },
+  required: ["main", "tags"],
+  additionalProperties: false,
+} as const;
+
 const LONGFORM_SCHEMA = {
   type: "object",
   properties: {
@@ -204,8 +315,9 @@ const LONGFORM_SCHEMA = {
       type: "string",
       description: "링크 안내 + 마감 강조 등 행동 유도 문구.",
     },
+    categories: CATEGORIES_SCHEMA,
   },
-  required: ["hook", "intro", "benefits", "dealInfo", "cta"],
+  required: ["hook", "intro", "benefits", "dealInfo", "cta", "categories"],
   additionalProperties: false,
 } as const;
 
@@ -224,8 +336,9 @@ const SHORTS_SCHEMA = {
       type: "string",
       description: "2~5초. 시한성 필수 CTA.",
     },
+    categories: CATEGORIES_SCHEMA,
   },
-  required: ["hook", "core", "cta"],
+  required: ["hook", "core", "cta", "categories"],
   additionalProperties: false,
 } as const;
 
@@ -248,8 +361,9 @@ const POST_SCHEMA = {
       type: "string",
       description: "구매 유도 + 링크 안내.",
     },
+    categories: CATEGORIES_SCHEMA,
   },
-  required: ["opening", "body", "hashtags", "cta"],
+  required: ["opening", "body", "hashtags", "cta", "categories"],
   additionalProperties: false,
 } as const;
 
@@ -334,11 +448,20 @@ ${
     ? `## 레퍼런스 릴스 (이 톤·구조를 참고하되 그대로 베끼지 말 것)\n${context.referenceReelExample}\n\n위 릴스의 훅 유형·프레임·CTA 패턴만 참고하고, 상품·내용은 위에 지정된 "${product.productName}" 그대로 가야 합니다.\n`
     : ""
 }
+${
+  context.fewShotCaptions
+    ? `## 참고 — 실제 한국 인스타 공구 캡션 (이 톤·구조·줄바꿈·이모지 사용 패턴을 모방)
+${context.fewShotCaptions}
+
+위 캡션들은 좋아요 수가 높은 실제 공구 캡션입니다. 어휘 선택·문장 리듬·이모지 절제·줄바꿈을 모방하되, 상품·내용은 위에 지정된 "${product.productName}" 그대로 가야 합니다.\n`
+    : ""
+}
 
 ## 마무리 체크리스트
 - [ ] hook에 위 상품명 또는 체험 포인트의 핵심이 들어갔는가?
 - [ ] 본문에 위 체험·공구 조건이 그대로 반영됐는가? (AI가 지어낸 경험담 금지)
 - [ ] 시스템 예시의 카테고리(다이어트·뷰티 등)로 빠지지 않았는가?
 - [ ] 가격·기간 숫자는 입력한 그대로인가?
+- [ ] categories.main (분류 라벨 1개) + categories.tags (심리 태그 0~2개)를 채웠는가?
 `;
 }

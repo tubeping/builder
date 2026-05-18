@@ -202,6 +202,14 @@ export default function ContentAnalytics() {
   const [productsError, setProductsError] = useState<string | null>(null);
   const [searchKeyword, setSearchKeyword] = useState("");
 
+  // 직접 입력 모달 (카페24 없이 상품명+설명으로 즉시 생성)
+  const [showQuickModal, setShowQuickModal] = useState(false);
+  const [quickName, setQuickName] = useState("");
+  const [quickBrief, setQuickBrief] = useState("");
+  const [quickFormat, setQuickFormat] = useState<ScriptFormat>("shorts");
+  const [quickGenerating, setQuickGenerating] = useState(false);
+  const [quickError, setQuickError] = useState<string | null>(null);
+
   // 초기 로드
   useEffect(() => {
     setScripts(loadScripts());
@@ -468,6 +476,82 @@ export default function ContentAnalytics() {
     setShowProductPicker(true);
   }
 
+  async function handleQuickGenerate() {
+    const name = quickName.trim();
+    const brief = quickBrief.trim();
+    if (!name) {
+      setQuickError("공구 상품명을 입력해주세요");
+      return;
+    }
+    if (brief.length < 10) {
+      setQuickError("공구 내용을 좀 더 적어주세요 (가격·기간·특징·타겟 등 자유롭게)");
+      return;
+    }
+
+    setQuickError(null);
+    setQuickGenerating(true);
+    try {
+      const r = await fetch("/api/scripts/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          product: { productName: name, originalPrice: 0, gongguPrice: 0 },
+          context: { experience: brief, target: "", tone: "친근" },
+          format: quickFormat,
+          referenceReelId: pendingReelRef ?? undefined,
+        }),
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || "AI 생성 실패");
+      const s = data.script as Record<string, string>;
+
+      const newScript: GongguScript = {
+        id: `q_${Date.now()}`,
+        productNo: 0,
+        productName: name,
+        productImage: "",
+        status: "draft",
+        platforms: quickFormat === "post" ? ["instagram"] : ["youtube"],
+        format: quickFormat,
+        createdAt: today(),
+        updatedAt: today(),
+        hook: s.hook ?? "",
+        intro: s.intro ?? "",
+        benefits: s.benefits ?? "",
+        dealInfo: s.dealInfo ?? "",
+        cta: s.cta ?? "",
+        memo: "",
+        core: s.core ?? "",
+        opening: s.opening ?? "",
+        body: s.body ?? "",
+        hashtags: s.hashtags ?? "",
+        originalPrice: 0,
+        gongguPrice: 0,
+        gongguStart: "",
+        gongguEnd: "",
+        experience: brief,
+        target: "",
+        tone: "친근",
+        referenceReelId: pendingReelRef ?? undefined,
+      };
+
+      setScripts((prev) => {
+        const next = [newScript, ...prev];
+        saveScripts(next);
+        return next;
+      });
+      setExpandedId(newScript.id);
+      setPendingReelRef(null);
+      setShowQuickModal(false);
+      setQuickName("");
+      setQuickBrief("");
+    } catch (err) {
+      setQuickError(err instanceof Error ? err.message : "AI 생성 실패");
+    } finally {
+      setQuickGenerating(false);
+    }
+  }
+
   // sub-tab 바
   const tabBar = (
     <div className="mb-5 flex border-b border-gray-200">
@@ -526,12 +610,20 @@ export default function ContentAnalytics() {
             )}
           </p>
         </div>
-        <button
-          onClick={() => setShowProductPicker(true)}
-          className="cursor-pointer rounded-lg bg-[#C41E1E] px-4 py-2 text-sm font-semibold text-white hover:bg-[#a51919] transition-colors"
-        >
-          + 상품 선택
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setShowQuickModal(true)}
+            className="cursor-pointer rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
+          >
+            + 직접 입력
+          </button>
+          <button
+            onClick={() => setShowProductPicker(true)}
+            className="cursor-pointer rounded-lg bg-[#C41E1E] px-4 py-2 text-sm font-semibold text-white hover:bg-[#a51919] transition-colors"
+          >
+            + 상품 선택
+          </button>
+        </div>
       </div>
 
       {/* ── 요약 카드 ── */}
@@ -732,6 +824,134 @@ export default function ContentAnalytics() {
         </div>
       )}
 
+      {/* ── 직접 입력 모달 (카페24 없이 상품명+설명으로 즉시 생성) ── */}
+      {showQuickModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="w-full max-w-xl rounded-2xl bg-white shadow-xl flex flex-col mx-4">
+            <div className="flex items-center justify-between border-b border-gray-200 px-5 py-4">
+              <h3 className="text-base font-bold text-gray-900">직접 입력 — 공구 대본 생성</h3>
+              <button
+                onClick={() => {
+                  if (quickGenerating) return;
+                  setShowQuickModal(false);
+                  setQuickError(null);
+                }}
+                disabled={quickGenerating}
+                className="cursor-pointer text-gray-400 hover:text-gray-600 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="px-5 py-4 space-y-4">
+              {/* 상품명 */}
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1.5">
+                  공구 상품명 <span className="text-[#C41E1E]">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={quickName}
+                  onChange={(e) => setQuickName(e.target.value)}
+                  disabled={quickGenerating}
+                  placeholder="예: 구찌 블룸 오 드 퍼퓸 50ml"
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-[#C41E1E] focus:outline-none focus:ring-1 focus:ring-[#C41E1E] disabled:bg-gray-50"
+                />
+              </div>
+
+              {/* 공구 내용 */}
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1.5">
+                  공구 내용 <span className="text-[#C41E1E]">*</span>
+                </label>
+                <textarea
+                  value={quickBrief}
+                  onChange={(e) => setQuickBrief(e.target.value)}
+                  disabled={quickGenerating}
+                  rows={7}
+                  placeholder={`정가·공구가·기간·체험 포인트·타겟·톤을 자유롭게 적어주세요.\n\n예시:\n정가 18만원 → 공구가 8만 9천원, 6월 1일~7일.\n출근길에 한 번 뿌리면 점심까지 향이 유지돼서 동료가 물어볼 정도.\n30대 직장인 여성 타겟, 친구한테 추천하는 느낌으로.`}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm leading-relaxed focus:border-[#C41E1E] focus:outline-none focus:ring-1 focus:ring-[#C41E1E] disabled:bg-gray-50"
+                />
+                <p className="mt-1 text-xs text-gray-400">
+                  적은 내용을 바탕으로 훅·본론·CTA를 자동 작성합니다. 가격/기간이 있으면 그대로 반영돼요.
+                </p>
+              </div>
+
+              {/* 포맷 선택 */}
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1.5">포맷</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {(Object.keys(FORMAT_META) as ScriptFormat[]).map((fmt) => {
+                    const meta = FORMAT_META[fmt];
+                    const selected = quickFormat === fmt;
+                    return (
+                      <button
+                        key={fmt}
+                        type="button"
+                        onClick={() => setQuickFormat(fmt)}
+                        disabled={quickGenerating}
+                        className={`cursor-pointer rounded-lg border-2 px-3 py-2 text-left text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
+                          selected
+                            ? "border-[#C41E1E] bg-red-50/30"
+                            : "border-gray-200 hover:border-gray-300"
+                        }`}
+                      >
+                        <p className={`font-semibold ${selected ? "text-[#C41E1E]" : "text-gray-900"}`}>
+                          {meta.icon} {meta.label}
+                        </p>
+                        <p className="mt-0.5 text-[11px] text-gray-500">{meta.desc}</p>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {pendingReelRef && (
+                <div className="rounded-lg bg-yellow-50 px-3 py-2 text-xs text-yellow-800">
+                  📌 분석된 릴스 톤이 이 대본에 적용됩니다
+                  <button
+                    onClick={() => setPendingReelRef(null)}
+                    disabled={quickGenerating}
+                    className="ml-2 cursor-pointer text-yellow-600 hover:text-yellow-900"
+                  >
+                    해제
+                  </button>
+                </div>
+              )}
+
+              {quickError && (
+                <div className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-600">
+                  {quickError}
+                </div>
+              )}
+            </div>
+
+            <div className="flex gap-2 border-t border-gray-200 px-5 py-3">
+              <button
+                onClick={() => {
+                  if (quickGenerating) return;
+                  setShowQuickModal(false);
+                  setQuickError(null);
+                }}
+                disabled={quickGenerating}
+                className="cursor-pointer rounded-lg border border-gray-200 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                취소
+              </button>
+              <button
+                onClick={handleQuickGenerate}
+                disabled={quickGenerating || !quickName.trim() || quickBrief.trim().length < 10}
+                className="cursor-pointer flex-1 rounded-lg bg-[#C41E1E] px-4 py-2 text-sm font-semibold text-white hover:bg-[#a51919] disabled:cursor-not-allowed disabled:bg-gray-300"
+              >
+                {quickGenerating ? "생성중... (5~15초)" : "대본 생성"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── 필터 ── */}
       <div className="mb-4 flex flex-wrap gap-2 border-b border-gray-100 pb-4">
         {([
@@ -772,15 +992,26 @@ export default function ContentAnalytics() {
         {filtered.length === 0 && (
           <div className="rounded-xl border border-dashed border-gray-300 p-8 text-center">
             <p className="text-sm text-gray-400">
-              {scripts.length === 0 ? "카페24 상품을 선택해서 공구 스크립트를 만들어 보세요" : "해당 조건의 스크립트가 없습니다"}
+              {scripts.length === 0
+                ? "상품명과 공구 내용을 적으면 대본이 자동으로 만들어져요"
+                : "해당 조건의 스크립트가 없습니다"}
             </p>
             {scripts.length === 0 && (
-              <button
-                onClick={() => setShowProductPicker(true)}
-                className="mt-2 cursor-pointer text-sm font-medium text-[#C41E1E] hover:underline"
-              >
-                + 상품 선택하기
-              </button>
+              <div className="mt-3 flex justify-center gap-3 text-sm font-medium">
+                <button
+                  onClick={() => setShowQuickModal(true)}
+                  className="cursor-pointer text-[#C41E1E] hover:underline"
+                >
+                  + 직접 입력으로 시작
+                </button>
+                <span className="text-gray-300">·</span>
+                <button
+                  onClick={() => setShowProductPicker(true)}
+                  className="cursor-pointer text-gray-500 hover:underline"
+                >
+                  카페24 상품에서 선택
+                </button>
+              </div>
             )}
           </div>
         )}

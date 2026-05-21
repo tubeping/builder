@@ -5,10 +5,12 @@ import { cookies } from "next/headers";
 import {
   FORMAT_CONFIG,
   buildUserPrompt,
+  MAIN_CATEGORY_LIST,
   type ScriptFormat,
   type ProductInput,
   type GenerationContext,
   type ScriptOutput,
+  type MainCategory,
 } from "@/lib/prompts/scriptGeneration";
 import {
   reelToFewShotExample,
@@ -83,6 +85,7 @@ interface GenerateRequest {
   context: GenerationContext;
   format: ScriptFormat;
   referenceReelId?: string;
+  preferredMain?: MainCategory;  // 사용자가 직접 선택한 유형 (없으면 모델 자동)
 }
 
 async function fetchReelAsExample(reelId: string): Promise<string | null> {
@@ -179,8 +182,12 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const { product, context, format, referenceReelId } = body;
+  const { product, context, format, referenceReelId, preferredMain } = body;
   const config = FORMAT_CONFIG[format];
+
+  // preferredMain 유효성 검증
+  const validPreferredMain =
+    preferredMain && MAIN_CATEGORY_LIST.includes(preferredMain) ? preferredMain : undefined;
 
   // 레퍼런스 릴스가 지정된 경우 fetch해서 few-shot으로 컨텍스트에 주입
   let enrichedContext: GenerationContext = context;
@@ -196,6 +203,11 @@ export async function POST(req: NextRequest) {
   const fewShotCaptions = pickFewShots(inferredCat, 3);
   if (fewShotCaptions) {
     enrichedContext = { ...enrichedContext, fewShotCaptions };
+  }
+
+  // 사용자가 메인 유형을 지정한 경우 prompt에 강제
+  if (validPreferredMain) {
+    enrichedContext = { ...enrichedContext, preferredMain: validPreferredMain };
   }
 
   const ai = new GoogleGenAI({ apiKey });

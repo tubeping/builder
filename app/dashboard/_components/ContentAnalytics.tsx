@@ -5,7 +5,9 @@ import { generateScriptLocal } from "@/lib/scriptTemplates";
 import {
   MAIN_CATEGORY_BADGE,
   MAIN_CATEGORY_LABEL_KO,
+  MAIN_CATEGORY_LIST,
   PSYCH_TAG_LABEL_KO,
+  type MainCategory,
   type ScriptCategories,
 } from "@/lib/prompts/scriptGeneration";
 import ReelAnalyzer from "./ReelAnalyzer";
@@ -216,6 +218,8 @@ export default function ContentAnalytics() {
   const [quickName, setQuickName] = useState("");
   const [quickBrief, setQuickBrief] = useState("");
   const [quickFormat, setQuickFormat] = useState<ScriptFormat>("shorts");
+  // null = 자동 추천 (모델이 자동 분류), MainCategory = 사용자가 선택한 유형
+  const [quickPreferredMain, setQuickPreferredMain] = useState<MainCategory | null>(null);
   const [quickGenerating, setQuickGenerating] = useState(false);
   const [quickError, setQuickError] = useState<string | null>(null);
 
@@ -508,6 +512,7 @@ export default function ContentAnalytics() {
           context: { experience: brief, target: "", tone: "친근" },
           format: quickFormat,
           referenceReelId: pendingReelRef ?? undefined,
+          preferredMain: quickPreferredMain ?? undefined,
         }),
       });
       const data = await r.json();
@@ -681,6 +686,50 @@ export default function ContentAnalytics() {
                 );
               })}
             </div>
+          </div>
+
+          {/* 유형 선택 — 자동 추천 + 7개 카테고리 */}
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1.5">
+              유형 <span className="text-gray-400 font-normal">(자동 추천 또는 직접 선택)</span>
+            </label>
+            <div className="flex flex-wrap gap-1.5">
+              <button
+                type="button"
+                onClick={() => setQuickPreferredMain(null)}
+                disabled={quickGenerating}
+                className={`cursor-pointer rounded-full border px-3 py-1 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
+                  quickPreferredMain === null
+                    ? "border-[#C41E1E] bg-[#C41E1E] text-white"
+                    : "border-gray-300 bg-white text-gray-600 hover:border-gray-400"
+                }`}
+              >
+                ✨ 자동 추천
+              </button>
+              {MAIN_CATEGORY_LIST.map((cat) => {
+                const selected = quickPreferredMain === cat;
+                return (
+                  <button
+                    key={cat}
+                    type="button"
+                    onClick={() => setQuickPreferredMain(cat)}
+                    disabled={quickGenerating}
+                    className={`cursor-pointer rounded-full border px-3 py-1 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
+                      selected
+                        ? "border-[#C41E1E] bg-[#C41E1E] text-white"
+                        : "border-gray-300 bg-white text-gray-700 hover:border-gray-400"
+                    }`}
+                  >
+                    {MAIN_CATEGORY_LABEL_KO[cat]}
+                  </button>
+                );
+              })}
+            </div>
+            {quickPreferredMain && (
+              <p className="mt-1 text-[11px] text-gray-400">
+                선택한 유형으로 강제 작성됩니다.
+              </p>
+            )}
           </div>
 
           {quickError && (

@@ -94,6 +94,7 @@ export interface GenerationContext {
   referenceUrl?: string;
   referenceReelExample?: string; // 분석된 릴스를 few-shot으로 주입 (reelToFewShotExample 결과)
   fewShotCaptions?: string;       // 인스타 공구 캡션 풀에서 동적 주입
+  preferredMain?: MainCategory;   // 사용자가 선택한 메인 카테고리 (없으면 모델 자동 분류)
 }
 
 export interface BaseOutput {
@@ -486,6 +487,22 @@ ${
 ${context.fewShotCaptions}
 
 위 캡션들은 좋아요 수가 높은 실제 공구 캡션입니다. 어휘 선택·문장 리듬·이모지 절제·줄바꿈을 모방하되, 상품·내용은 위에 지정된 "${product.productName}" 그대로 가야 합니다.\n`
+    : ""
+}
+${
+  context.preferredMain
+    ? `## 🎯 사용자 지정 유형 (반드시 이 유형으로 작성)
+**categories.main = "${context.preferredMain}"** 으로 고정합니다.
+모델이 다른 유형으로 분류하면 안 됩니다. 이 유형의 매커니즘에 맞춰 hook·본론·CTA를 구성하세요.
+- problem_solving (문제해결형): 문제→확대→해결. 부정/손실형 훅 ("이거 잘못 고르면...")
+- authority (권위전문형): 전문 자격·경력·임상 강조 ("10년차 ○○ 추천")
+- story_empathy (공감스토리형): "저도 그랬어요" 개인 경험 중심
+- transformation (변화체험형): Before / After 시각 변화 강조
+- comparison_proof (비교증명형): A vs B 비교·기능 우위
+- urgency_focused (시한촉박형): 한정·긴급·완판이 본론보다 강함
+- meme_visual (밈시각형): 강한 시각 훅·트렌드 밈
+
+categories.tags 는 본론에 실제 사용한 심리 원칙 0~2개를 자유롭게 선택.\n`
     : ""
 }
 

@@ -76,9 +76,9 @@ function pickFewShots(category: string, n: number): string {
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-// gemini-2.5-flash는 한국어 토큰 경계에서 일부 multi-byte가 깨지는 케이스 관찰됨.
-// gemini-2.5-pro로 한국어 출력 안정성·instruction following 확보 (비용 ~10x).
-const MODEL = "gemini-2.5-pro";
+// Pro는 thinking 강제로 너무 느림(18~30초). 가드 강화 후 Flash로 다시 전환.
+// 한국어 multi-byte 깨짐은 enum 영어화로 해결됨. thinking_budget=0으로 속도 3배.
+const MODEL = "gemini-2.5-flash";
 
 interface GenerateRequest {
   product: ProductInput;
@@ -221,11 +221,11 @@ export async function POST(req: NextRequest) {
         systemInstruction: config.systemPrompt,
         responseMimeType: "application/json",
         responseSchema: toGeminiSchema(config.schema),
-        // 입력 상품·체험을 정확히 따르도록 낮춤 (창의성 < instruction following)
+        // 입력 상품·체험을 정확히 따르도록 낮춤
         temperature: 0.5,
-        // Pro는 thinking 강제(비활성화 불가). thinkingBudget 미설정 = model default.
-        // thinking 토큰도 maxOutputTokens 한도에 포함되므로 넉넉히.
-        maxOutputTokens: Math.max(config.maxTokens, 6000),
+        // Flash thinking 비활성화 — 속도 3배 (대본 생성은 reasoning 깊이 불필요)
+        thinkingConfig: { thinkingBudget: 0 },
+        maxOutputTokens: Math.max(config.maxTokens, 3000),
       },
     });
 

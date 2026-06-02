@@ -82,6 +82,25 @@ export interface ReelAnalysisMeta {
   source_username?: string;
 }
 
+export interface EmotionFlowEntry {
+  range: string;
+  emotion: string;
+  trigger: string;
+}
+
+export interface NotableCut {
+  time: string;
+  type: string;
+  desc: string;
+}
+
+export interface CutDetails {
+  total_cuts: number;
+  avg_cut_sec: number;
+  transition_styles: string[];
+  notable_cuts: NotableCut[];
+}
+
 export interface ReelAnalysisResult {
   meta: ReelAnalysisMeta;
   transcript: TranscriptSegment[];
@@ -92,6 +111,12 @@ export interface ReelAnalysisResult {
   recommended_for: string[];
   hook_score: number;
   cta_strength: number;
+
+  // v0.5: 분석 차원 4개 확장
+  emotion_flow?: EmotionFlowEntry[];
+  desire_triggers?: string[];
+  cut_details?: CutDetails;
+  extracted_pattern?: string;  // 이 영상의 공식 한 줄
 }
 
 // UI 라벨 매핑 (한국어)
@@ -137,12 +162,17 @@ export function reelToFewShotExample(reel: ReelAnalysisResult): string {
   const sections = reel.gframe.structure.sections
     .map((s) => `  ${SECTION_LABEL[s.name] ?? s.name} ${s.range}: ${s.text}`)
     .join("\n");
-  return [
+  const lines = [
     `# 레퍼런스 릴스 (${reel.category})`,
+    reel.extracted_pattern ? `★ 이 영상의 공식: ${reel.extracted_pattern}` : "",
     `훅 (${HOOK_TYPE_LABEL[hook.type]}, ${hook.duration_sec}초): ${hook.text}`,
     `프레임: ${FRAME_LABEL[reel.gframe.structure.frame]}`,
     sections,
     `CTA (${CTA_PATTERN_LABEL[cta.pattern]}, 강도 ${cta.strength}): ${cta.text}`,
     `심리 태그: ${reel.persuasion_tags.join(", ")}`,
-  ].join("\n");
+    reel.desire_triggers && reel.desire_triggers.length
+      ? `자극한 욕구: ${reel.desire_triggers.join(", ")}`
+      : "",
+  ];
+  return lines.filter(Boolean).join("\n");
 }

@@ -10,7 +10,8 @@ export type MainCategory =
   | "transformation"      // 변화체험형 — BAB · 뷰티·다이어트
   | "comparison_proof"    // 비교증명형 — FAB · 가전·리빙
   | "urgency_focused"     // 시한촉박형 — Urgency · scarcity · CTA
-  | "meme_visual";        // 밈시각형 — visual_meme · 숏폼·트렌드
+  | "meme_visual"         // 밈시각형 — visual_meme · 숏폼·트렌드
+  | "howto_tutorial";     // 하우투/튜토리얼형 — Pain→Promise→How→Tools→Close · 도구·키트·DIY
 
 export const MAIN_CATEGORY_LIST: MainCategory[] = [
   "problem_solving",
@@ -20,6 +21,7 @@ export const MAIN_CATEGORY_LIST: MainCategory[] = [
   "comparison_proof",
   "urgency_focused",
   "meme_visual",
+  "howto_tutorial",
 ];
 
 export const MAIN_CATEGORY_LABEL_KO: Record<MainCategory, string> = {
@@ -30,6 +32,7 @@ export const MAIN_CATEGORY_LABEL_KO: Record<MainCategory, string> = {
   comparison_proof: "비교증명형",
   urgency_focused: "시한촉박형",
   meme_visual: "밈시각형",
+  howto_tutorial: "하우투형",
 };
 
 export type PsychTag =
@@ -77,6 +80,7 @@ export const MAIN_CATEGORY_BADGE: Record<MainCategory, string> = {
   comparison_proof: "bg-amber-100 text-amber-700",
   urgency_focused: "bg-red-100 text-red-700",
   meme_visual: "bg-purple-100 text-purple-700",
+  howto_tutorial: "bg-cyan-100 text-cyan-700",
 };
 
 export interface ProductInput {
@@ -179,6 +183,52 @@ AI가 쓴 티 나지 않도록 — "입니다/합니다" 반복 회피, 문장 �
 
 ---
 
+## 🎯 메시지 1개 관통 (가장 중요한 품질 가드)
+
+작성 전에 이 대본을 관통할 **한 줄 메시지**를 먼저 결정하세요.
+hook · core · cta 세 섹션이 모두 그 한 메시지의 변주여야 합니다.
+섹션마다 다른 메시지로 흩어지지 마세요.
+
+예시 — 한 메시지 "비린내 없이 한 알로 끝나는 영양제":
+- hook: "한 알에 두 영양제, 비린내까지 없애봤어요"
+- core: "오메가3·커큐민 따로 안 챙기고 한 알. 비린내가 거의 없어서 매일 부담 없이..."
+- cta: "비린내 영양제 못 드셨던 분, 이번 공구 놓치지 마세요"
+→ 세 섹션이 모두 "비린내 없는 한 알" 메시지의 변주.
+
+✗ 잘못된 예 (메시지 흩어짐):
+- hook: 권위 강조 / core: 시한 강조 / cta: 후기 강조
+→ 세 메시지가 따로 노는 흔한 실패.
+
+## 🔢 구체 숫자 강제
+
+다음 추상 형용사·부사 **사용 금지**:
+"정말 / 너무 / 굉장히 / 진짜 / 많이 / 엄청 / 완전 / 어마어마하게 / 꿀처럼 / 미친"
+
+대신 구체 수치 사용:
+- "꿀처럼 달콤한" → "당도 17브릭스"
+- "엄청 빠른 배송" → "출고 후 2일 도착"
+- "많은 분들이 구매" → "지난 공구 3,000개 완판"
+- "굉장히 큰 할인" → "정가 대비 54% 할인"
+
+숫자가 없는 자리는 **반드시 빈 자리 표시 [___] 로 두기**.
+모델이 임의로 숫자를 지어내면 안 됩니다.
+
+## 🏷 신뢰 신호 2개를 hook에 명시
+
+hook(첫 1~3초)에 다음 카테고리 중 **2개 이상**을 구체 명사로 박으세요:
+- 브랜드명 (예: KD Pharma, 닥터하랑)
+- 국가/원산지 (예: 독일, 태국 직송, 제주)
+- 인증·자격 (예: 한의사, 임상, GOED 협업)
+- 수치 (예: 17브릭스, 흡수율 300%)
+- 수상·실적 (예: 세계 1등, 3,000개 완판)
+
+예시: "강남허준 박용환 한의사가 직접 설계한 독일 KD Pharma 영양제"
+→ 권위(한의사) + 브랜드/국가(독일 KD Pharma) 두 신뢰 신호 결합.
+
+이 가드는 검색 매칭(SEO·해시태그)에도 직접 효과가 있습니다.
+
+---
+
 ## 📛 카피 분류 라벨 (출력 시 반드시 1개 선택)
 
 대본 작성 후 사용한 카피라이팅 패턴을 다음 7개 enum 중 **1개**로 분류해서 categories.main 필드에 기재.
@@ -193,6 +243,7 @@ AI가 쓴 티 나지 않도록 — "입니다/합니다" 반복 회피, 문장 �
 | comparison_proof | 비교증명형 | A vs B 비교·기능 우위 | 가전·리빙·기능성 |
 | urgency_focused | 시한촉박형 | 한정·긴급·완판 CTA 강함 | 모든 카테고리 |
 | meme_visual | 밈시각형 | 강한 시각 훅·트렌드 밈 | 숏폼·재미 |
+| howto_tutorial | 하우투형 | Pain→Promise→How→Tools→Close 5단 | 도구·키트·앱·DIY·교육 |
 
 ## 🏷️ 보조 심리 태그 (출력 시 0~2개 선택)
 

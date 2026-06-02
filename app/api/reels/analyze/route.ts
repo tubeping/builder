@@ -182,6 +182,11 @@ export async function POST(req: NextRequest) {
         recommended_for: result.recommended_for,
         hook_score: result.hook_score,
         cta_strength: result.cta_strength,
+        // v0.5: 분석 차원 4개 확장
+        emotion_flow: result.emotion_flow ?? null,
+        desire_triggers: result.desire_triggers ?? null,
+        cut_details: result.cut_details ?? null,
+        extracted_pattern: result.extracted_pattern ?? null,
         notes: body.notes ?? "",
         status: "completed",
         error_message: null,
@@ -209,7 +214,7 @@ export async function GET() {
   const { data, error } = await supabase
     .from("analyzed_reels")
     .select(
-      "id, url, duration_sec, category, hook_score, cta_strength, gframe, persuasion_tags, notes, is_favorite, status, created_at"
+      "id, url, duration_sec, category, hook_score, cta_strength, gframe, persuasion_tags, notes, is_favorite, status, created_at, emotion_flow, desire_triggers, cut_details, extracted_pattern"
     )
     .eq("creator_id", creatorId)
     .order("created_at", { ascending: false })

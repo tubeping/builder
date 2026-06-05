@@ -198,9 +198,10 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // 인스타 공구 캡션 풀에서 카테고리에 맞는 샘플 3개 동적 주입 (Few-shot 학습)
+  // 인스타 공구 캡션 풀에서 카테고리에 맞는 샘플 5개 동적 주입 (Few-shot 학습)
+  // 입력이 빈약할수록 풀의 톤·구조가 보강 역할 → 결과 풍부도 ↑
   const inferredCat = inferUiCategory(product.productName, context.experience || "");
-  const fewShotCaptions = pickFewShots(inferredCat, 3);
+  const fewShotCaptions = pickFewShots(inferredCat, 5);
   if (fewShotCaptions) {
     enrichedContext = { ...enrichedContext, fewShotCaptions };
   }
@@ -221,8 +222,9 @@ export async function POST(req: NextRequest) {
         systemInstruction: config.systemPrompt,
         responseMimeType: "application/json",
         responseSchema: toGeminiSchema(config.schema),
-        // 입력 상품·체험을 정확히 따르도록 낮춤
-        temperature: 0.5,
+        // 입력이 빈약해도 풍부한 결과 — 살갗·감각 묘사를 위한 창의성 보장
+        // (수치·가격·기간은 system prompt에서 별도로 가드)
+        temperature: 0.75,
         // Flash thinking 비활성화 — 속도 3배 (대본 생성은 reasoning 깊이 불필요)
         thinkingConfig: { thinkingBudget: 0 },
         maxOutputTokens: Math.max(config.maxTokens, 3000),
